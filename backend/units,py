@@ -1,0 +1,46 @@
+class Unit:
+    def __init__(self, name, hp, atk, spd, defense, res):
+        self.name = name
+        self.hp = hp
+        self.atk = atk
+        self.spd = spd
+        self.defense = defense 
+        self.res = res
+ 
+        self.weapon = None
+        self.special = None
+        self.a_slot = None
+        self.b_slot = None
+        self.c_slot = None
+        self.s_slot = None
+        self.x_slot = None
+        
+        def _get_equipped_items(self):
+        
+        all_slots = [
+            self.weapon, self.special, self.a_slot, 
+            self.b_slot, self.c_slot, self.s_slot, self.x_slot
+        ]
+        return [item for item in all_slots if item is not None]
+
+        def get_potent_percentage(self, target_enemy=None):
+        # Scan through all equipped items
+        for item in self._get_equipped_items():
+            if item.potent_logic is not None:
+                return item.potent_logic(self, target_enemy)
+                
+        return 0.0
+
+class Skill:
+    def __init__(self, name, hpbonus=0, atkbonus=0, spdbonus=0, defbonus=0, resbonus=0, truedmg=0, truedr=0, percentdr=0.0, predamage=0, difficultfollowups=None,
+                 gfu=False, potentlogic = None, brave=False, nfu=False, effective=False, flash=False, adaptivedmg=False, ncd=False, aoe=False
+                 ):
+        self.name = name
+        self.hpbonus = hpbonus
+        self.atkbonus = atkbonus
+        self.spdbonus = spdbonus
+        self.defbonus = defbonus
+        self.resbonus = resbonus
+        self.truedmg = truedmg
+        self.truedr = truedr
+        self.percentdr = percentdr

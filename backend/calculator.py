@@ -18,14 +18,12 @@ def static_files(path):
 def add_numbers():
     data = request.get_json() or {}
 
-    # 2. Extract the numbers (default to 0 if something goes wrong)
+    
     num1 = data.get('number1', 0)
     num2 = data.get('number2', 0)
 
-    # 3. The Logic (This is where complex C++ or Python code would normally run)
     result = num1 + num2
 
-    # 4. Package the answer as JSON and send it back
     return jsonify({'answer': result})
 
 if __name__ == '__main__':
