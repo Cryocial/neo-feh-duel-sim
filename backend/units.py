@@ -14,6 +14,10 @@ class Unit:
         self.defense = defense 
         self.res = res
 
+        # --- Temporary Map States (Visible) ---
+        self.visible_buffs = {"atk": 0, "spd": 0, "def": 0, "res": 0}
+        self.visible_debuffs = {"atk": 0, "spd": 0, "def": 0, "res": 0}
+
         # --- Out-of-Combat Stat Modifiers ---
         self.dragonflower = dragonflower
         self.merges = merges
