@@ -1,26 +1,46 @@
 import json
+from .classes import StatBlock, UtilityBlock
+from . import bonusfunctions
 
 STATUS_EFFECT_DATABASE = {} 
 
 def initialize_status_database():
-    """Runs once when the server starts to build the database."""
-    
-   with open('visualbonuses.json', 'r') as file:
-        raw_json_data = json.load(file)
+    """
+    Builds the STATUS_EFFECT_DATABASE by loading 'visualbonuses.json'
+    and resolving string references to actual Python functions in 'bonusfunctions.py'.
+    """
+    try:
+        with open('visualbonuses.json', 'r') as file:
+            data = json.load(file)
+    except FileNotFoundError:
+        print("Error: 'visualbonuses.json' not found. Status database will be empty.")
+        return
         
-    for status_name, status_info in raw_json_data.items():
-        combat_stats = StatBlock(**status_info.get("combat_stats", {}))
-        utilities = UtilityBlock()
-        utility_data = status_info.get("utilities", {})
+    for name, info in data.items():
+        combat_stats = StatBlock.from_dict(info.get("combat_stats", {}))
+        enemy_combat_stats = StatBlock.from_dict(info.get("enemy_combat_stats", {}))
         
-        utilities.keywords = utility_data.get("keywords", [])
-        utilities.cooldown_modifiers = utility_data.get("cooldown_modifiers", {})
+        util_data = info.get("utilities", {})
         
-        if "logic_tag" in utility_data:
-            tag = utility_data["logic_tag"]
-            if tag in LOGIC_REGISTRY:
-                logic_functions = LOGIC_REGISTRY[tag]
-                utilities.truedr_logic = logic_functions.get("truedr_logic")
-                utilities.truedmg_logic = logic_functions.get("truedmg_logic")
-                utilities.dynamic_stats_logic = logic_functions.get("dynamic_stats_logic") 
+        def resolve_logic(logic_name):
+            if not logic_name: return None
+            return getattr(bonusfunctions, logic_name, None)
+
+        utilities = UtilityBlock(
+            keywords=util_data.get("keywords", []),
+            cooldown_modifiers={
+                phase: (resolve_logic(mod) if isinstance(mod, str) else mod)
+                for phase, mod in util_data.get("cooldown_modifiers", {}).items()
+            }
+        )
+        
+        if tag := util_data.get("logic_tag"):
+            pass
+
+        STATUS_EFFECT_DATABASE[name] = {
+            "combat_stats": combat_stats,
+            "enemy_combat_stats": enemy_combat_stats,
+            "utilities": utilities
+        }
+
 initialize_status_database()
