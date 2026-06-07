@@ -7,22 +7,24 @@ class StatBlock:
         self.res = res
     
 class UtilityBlock:
-    def __init__(self, truedr=0, truedrlogic=None, truedmg=0, truedmglogic=None, 
-                 percentdr=0.0, potent_logic=None, 
-                 keywords=None, grants_statuses=None):
+    def __init__(self, truedr=0, truedrlogic=None, truedmg=0, truedmg_logic=None, 
+                 percentdr=0.0, potent_logic=None, specialcdmod=0, specialcdmod_logic=None, keywords=None, grants_statuses=None):
         
         self.truedr = truedr
         self.truedrlogic = truedrlogic
         self.truedmg = truedmg
-        self.truedmglogic = truedmglogic
+        self.truedmg_logic = truedmg_logic
         self.percentdr = percentdr
         self.potent_logic = potent_logic
+        self.specialcdmod = specialcdmod
+        self.specialcdmod_logic = specialcdmod_logic
+        self.cooldown_modifiers = cooldown_modifiers if cooldown_modifiers else {}
         self.keywords = keywords if keywords else []
 
         self.grants_statuses = grants_statuses if grants_statuses else []
 
 class Unit:
-    def __init__(self, name, movementtype, weapontype, 
+    def __init__(self, name, movement_type, weapon_type, 
                  hp, atk, spd, defense, res, 
                  dragonflower=0, merges=0,
                  superboon=None, superbane=None, boon=None, bane=None, floret=None, bouquet=None, 
@@ -30,8 +32,8 @@ class Unit:
         
         # --- Core Identifiers ---
         self.name = name
-        self.movementtype = movementtype
-        self.weapontype = weapontype     
+        self.movement_type = movement_type
+        self.weapon_type = weapon_type     
 
         # --- Base Stats ---
         self.base_stats = StatBlock(hp=hp, atk=atk, spd=spd, defense=defense, res=res)

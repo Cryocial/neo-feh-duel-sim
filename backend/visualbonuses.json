@@ -1,18 +1,33 @@
 {
   "Anathema": {
-    "type": "bonus"
+    "type": "bonus",
+    "utilities": {
+      "logic_tag": "anathema_logic"
+    }
   },
   "Atk Liberate": {
-    "type": "bonus"
+    "type": "bonus",
+    "combat_stats": {"atk": 8}
   },
   "Bonus Doubler": {
-    "type": "bonus"
+    "type": "bonus",
+    "utilities": {
+      "logic_tag": "bd_logic"
+    }
+    
   },
   "Cancel Affinity": {
-    "type": "bonus"
+    "type": "bonus",
+    "utilities": {
+      "logic_tag": "cancelaffinity_logic"
+    }
   },
-  "Change of Fate": {
-    "type": "bonus"
+"Change of Fate": {
+    "type": "bonus",
+    "combat_stats": {"atk": 5, "spd": 5, "defense": 5, "res": 5},
+    "utilities": {
+      "logic_tag": "changeoffate_logic"
+    }
   },
   "Coax": {
     "type": "bonus"
@@ -187,7 +202,7 @@
 
 
 
-  
+
   "After Start-of-Turn Skills Trigger, Action Ends Immediately": {
     "type": "penalty"
   },
