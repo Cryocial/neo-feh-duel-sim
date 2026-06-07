@@ -42,25 +42,26 @@ def _apply_dragonflowers(self):
     for i in range(self.dragonflower):
         stat_to_boost = stat_list[i % 5]["name"]
         if stat_to_boost == "hp":
-            self.base_hp += 1
+            self.base_stats.hp += 1
         elif stat_to_boost == "atk":
-            self.base_atk += 1
+            self.base_stats.atk += 1
         elif stat_to_boost == "spd":
-            self.base_spd += 1
+            self.base_stats.spd += 1
         elif stat_to_boost == "def":
-            self.base_def += 1
+            self.base_stats.defense += 1
         elif stat_to_boost == "res":
-            self.base_res += 1
+            self.base_stats.res += 1
 
 
-def apply_visible_buff(self, stat, amount):
-    """Applies a visible buff to the specified stat."""
-    self.visible_buffs[stat] = max(self.visible_buffs[stat], amount)
+def apply_visible_buff(self, stat_name, amount):
+    """Applies a visible buff to the specified stat block."""
+    current_val = getattr(self.visible_buffs, stat_name)
+    setattr(self.visible_buffs, stat_name, max(current_val, amount))
 
-
-def apply_visible_debuff(self, stat, amount):
-    """Applies a visible debuff to the specified stat."""
-    self.visible_debuffs[stat] = max(self.visible_debuffs[stat], amount)
+def apply_visible_debuff(self, stat_name, amount):
+    """Applies a visible debuff to the specified stat block."""
+    current_val = getattr(self.visible_debuffs, stat_name)
+    setattr(self.visible_debuffs, stat_name, max(current_val, amount))
 
 
 def _apply_merges(self):
@@ -196,15 +197,23 @@ def get_combat_atk(self):
     """Calculates the combat attack stat, including visible attack and all equipped item bonuses."""
     total_atk = self.get_visible_atk()
     for item in self._get_equipped_items():
-        total_atk += item.combat_stats.atk
-    return total_atk
-
+        total_atk += item.combat_stats.atk  
+    for status_name in self.active_statuses:
+        if status_name in STATUS_EFFECT_DATABASE:
+            status_stats = STATUS_EFFECT_DATABASE[status_name].get("combat_stats")
+            if status_stats:
+                total_atk += status_stats.atk
 
 def get_combat_def(self):
     """Calculates the combat defense stat, including visible defense and all equipped item bonuses."""
     total_def = self.get_visible_def()
     for item in self._get_equipped_items():
-        total_def += item.combat_stats.def_stat
+        total_def += item.combat_stats.defense  
+    for status_name in self.active_statuses:
+        if status_name in STATUS_EFFECT_DATABASE:
+            status_stats = STATUS_EFFECT_DATABASE[status_name].get("combat_stats")
+            if status_stats:
+                total_def += status_stats.defense
     return total_def
 
 
@@ -212,7 +221,12 @@ def get_combat_spd(self):
     """Calculates the combat speed stat, including visible speed and all equipped item bonuses."""
     total_spd = self.get_visible_spd()
     for item in self._get_equipped_items():
-        total_spd += item.combat_stats.spd
+        total_spd += item.combat_stats.spd  
+    for status_name in self.active_statuses:
+        if status_name in STATUS_EFFECT_DATABASE:
+            status_stats = STATUS_EFFECT_DATABASE[status_name].get("combat_stats")
+            if status_stats:
+                total_spd += status_stats.spd
     return total_spd
 
 
@@ -220,8 +234,11 @@ def get_combat_res(self):
     """Calculates the combat resistance stat, including visible resistance and all equipped item bonuses."""
     total_res = self.get_visible_res()
     for item in self._get_equipped_items():
-        total_res += item.combat_stats.res
+        total_res += item.combat_stats.res  
+    for status_name in self.active_statuses:
+        if status_name in STATUS_EFFECT_DATABASE:
+            status_stats = STATUS_EFFECT_DATABASE[status_name].get("combat_stats")
+            if status_stats:
+                total_res += status_stats.res
     return total_res
-
-
 

@@ -1,0 +1,18 @@
+{
+  "Resonance: Blades": {
+    "combat_stats": {"atk": 4, "spd": 4}
+  },
+  "Resonance: Shields": {
+    "combat_stats": {"defense": 4, "res": 4}
+  },
+  "Bonus Doubler": {
+    "utilities": {
+      "logic_tag": "bonus_doubler_logic"
+    }
+  },
+  "Reflective": {
+    "utilities": {
+      "logic_tag": "reflective_logic"
+    }
+  }
+}

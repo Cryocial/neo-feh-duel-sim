@@ -7,12 +7,19 @@ class StatBlock:
         self.res = res
     
 class UtilityBlock:
-    def __init__(self, truedmg=0, percentdr=0.0, gfu=False, nfu=False, potent_logic=None):
+    def __init__(self, truedr=0, truedrlogic=None, truedmg=0, truedmglogic=None, 
+                 percentdr=0.0, potent_logic=None, 
+                 keywords=None, grants_statuses=None):
+        
+        self.truedr = truedr
+        self.truedrlogic = truedrlogic
         self.truedmg = truedmg
+        self.truedmglogic = truedmglogic
         self.percentdr = percentdr
-        self.gfu = gfu
-        self.nfu = nfu
         self.potent_logic = potent_logic
+        self.keywords = keywords if keywords else []
+
+        self.grants_statuses = grants_statuses if grants_statuses else []
 
 class Unit:
     def __init__(self, name, movementtype, weapontype, 
@@ -38,7 +45,13 @@ class Unit:
         self.merges = merges
         self.summonersupport = None
         self.aided = None
-        
+
+        # Temporary map buffs/debuffs (StatBlocks)
+        self.visible_buffs = StatBlock()
+        self.visible_debuffs = StatBlock()
+
+        self.active_statuses = []
+
         # --- IVs and Special Assets ---
         self.boon = boon 
         self.bane = bane
@@ -67,7 +80,6 @@ class Skill:
     def __init__(self, name, slot, visible_stats=None, combat_stats=None, utilities=None):
         self.name = name
         self.slot = slot
-        
         self.visible_stats = visible_stats if visible_stats else StatBlock()
         self.combat_stats = combat_stats if combat_stats else StatBlock()
         self.utilities = utilities if utilities else UtilityBlock()
