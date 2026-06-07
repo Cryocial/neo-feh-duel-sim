@@ -1,252 +1,266 @@
 {
-  "Resonance: Blades": {
-    "type": "bonus",
-    "combat_stats": {
-      "atk": 4, "spd": 4
-    }
+  "Anathema": {
+    "type": "bonus"
   },
-  "Resonance: Shields": {
-    "type": "bonus",
-    "combat_stats": {
-      "defense": 4, "res": 4
-    }
-  },
-  "Rally Spectrum": {
-    "type": "bonus",
-    "combat_stats": {
-      "atk": 5, "spd": 5, "defense": 5, "res": 5
-    }
-  },
-  "Incited": {
+  "Atk Liberate": {
     "type": "bonus"
   },
   "Bonus Doubler": {
     "type": "bonus"
   },
-  "Foe Penalty Doubler": {
+  "Cancel Affinity": {
     "type": "bonus"
   },
-  "Grand Strategy": {
+  "Change of Fate": {
     "type": "bonus"
   },
-  "Future Witness": {
+  "Coax": {
     "type": "bonus"
   },
-  "Dosage": {
+  "Creation Pulse": {
     "type": "bonus"
   },
-  "Divinely Inspiring": {
+  "Collapsed Star": {
     "type": "bonus"
   },
-  "Treachery": {
-    "type": "bonus"
-  },
-  "Dominance": {
-    "type": "bonus"
-  },
-  "Empathy": {
-    "type": "bonus"
-  },
-  "Anathema": {
-    "type": "bonus"
-  },
-  "AoE DR": {
-    "type": "bonus"
-  },
-  "Dodge": {
-    "type": "bonus"
-  },
-  "Initiate -> 40% DR": {
-    "type": "bonus"
-  },
-  "Fallen Star": {
+  "Dark Emblem": {
     "type": "bonus"
   },
   "Deep Star": {
     "type": "bonus"
   },
-  "Neutralize Bonuses": {
-    "type": "bonus"
-  },
-  "Neutralize Penalties": {
-    "type": "bonus"
-  },
-  "En Garde": {
-    "type": "bonus"
-  },
-  "Null Panic": {
-    "type": "bonus"
-  },
-  "Null Follow-Up": {
-    "type": "bonus"
-  },
-  "50% DR Pierce": {
-    "type": "bonus"
-  },
-  "Warp Bubble": {
+  "Desperation": {
     "type": "bonus"
   },
   "Divine Nectar": {
     "type": "bonus"
   },
-  "Dragon Effectiveness": {
+  "Divinely Inspiring": {
     "type": "bonus"
   },
-  "Null Dragon-Eff": {
+  "Dodge": {
     "type": "bonus"
   },
-  "Null Armor-Eff": {
+  "Dominance": {
     "type": "bonus"
   },
-  "Null Flying-Eff": {
+  "Dosage": {
     "type": "bonus"
   },
-  "Movement +1": {
+  "Draconic Hex": {
     "type": "bonus"
   },
-  "Gallop": {
-    "type": "bonus"
-  },
-  "Charge": {
-    "type": "bonus"
-  },
-  "Pathfinder": {
-    "type": "bonus"
-  },
-  "Canto (1)": {
-    "type": "bonus"
-  },
-  "Traverse Terrain": {
-    "type": "bonus"
-  },
-  "Orders": {
-    "type": "bonus"
-  },
-  "Time's Gate": {
-    "type": "bonus"
-  },
-  "Hexblade": {
-    "type": "bonus"
-  },
-  "Special CD+1": {
-    "type": "bonus"
-  },
-  "Preempt Pulse": {
-    "type": "bonus"
-  },
-  "Potent Follow": {
-    "type": "bonus"
-  },
-  "Guaranteed Follow-Ups": {
-    "type": "bonus"
-  },
-  "Follow-Up Prevention": {
-    "type": "bonus"
-  },
-  "Increase Foe Spd Difference": {
-    "type": "bonus"
-  },
-  "Desperation": {
-    "type": "bonus"
-  },
-  "Vantage": {
-    "type": "bonus"
-  },
-  "Paranoia": {
-    "type": "bonus"
-  },
-  "Bulwark": {
-    "type": "bonus"
-  },
-  "Assign Decoy": {
-    "type": "bonus"
-  },
-  "Cancel Affinity": {
-    "type": "bonus"
-  },
-  "Triangle Attack": {
+  "Drain Cancel": {
     "type": "bonus"
   },
   "Dual Strike": {
     "type": "bonus"
   },
-  "Essence Drain": {
+  "Effective against dragons": {
     "type": "bonus"
   },
-  "Bonded": {
+  "Empathy": {
+    "type": "bonus"
+  },
+  "Fallen Star": {
+    "type": "bonus"
+  },
+  "Fell Spirit": {
+    "type": "bonus"
+  },
+  "Fire Emblem": {
+    "type": "bonus"
+  },
+  "Foe Cannot Follow-Up": {
+    "type": "bonus"
+  },
+  "Foe Penalty Doubler": {
+    "type": "bonus"
+  },
+  "Fringe Bonus": {
+    "type": "bonus"
+  },
+  "Future Witness": {
+    "type": "bonus"
+  },
+  "Grand Strategy": {
+    "type": "bonus"
+  },
+  "Guaranteed Follow-Ups": {
+    "type": "bonus"
+  },
+  "Halves non-Special damage reduction": {
+    "type": "bonus"
+  },
+  "Hexblade": {
+    "type": "bonus"
+  },
+  "Imbue": {
+    "type": "bonus"
+  },
+  "Incited": {
+    "type": "bonus"
+  },
+  "Neutralize Bonuses": {
+    "type": "bonus"
+  },
+  "Neutralize Effective Against Armored": {
+    "type": "bonus"
+  },
+  "Neutralize Effective Against Dragons": {
+    "type": "bonus"
+  },
+  "Neutralize Effective Against Flying": {
+    "type": "bonus"
+  },
+  "Neutralize Penalties": {
+    "type": "bonus"
+  },
+  "Null Follow-Up": {
+    "type": "bonus"
+  },
+  "Null Panic": {
+    "type": "bonus"
+  },
+  "Paranoia": {
+    "type": "bonus"
+  },
+  "Potent Follow": {
+    "type": "bonus"
+  },
+  "Preempt Pulse": {
+    "type": "bonus"
+  },
+  "Prof's Guidance": {
+    "type": "bonus"
+  },
+  "Pulse Follow": {
+    "type": "bonus"
+  },
+  "Radiant Hero": {
+    "type": "bonus"
+  },
+  "Rally Spectrum": {
+    "type": "bonus"
+  },
+  "Reduce Area-of-Effect Special Damage Taken": {
+    "type": "bonus"
+  },
+  "Reduces damage when initiating": {
+    "type": "bonus"
+  },
+  "Reflex": {
+    "type": "bonus"
+  },
+  "Res Liberate": {
+    "type": "bonus"
+  },
+  "Resonance: Blades": {
+    "type": "bonus"
+  },
+  "Resonance: Shields": {
+    "type": "bonus"
+  },
+  "Spd difference necessary for foe follow-up attack +10": {
+    "type": "bonus"
+  },
+  "Spd Liberate": {
+    "type": "bonus"
+  },
+  "Special Cooldown Charge +1": {
+    "type": "bonus"
+  },
+  "Time's Gate": {
+    "type": "bonus"
+  },
+  "Treachery": {
+    "type": "bonus"
+  },
+  "Triangle Attack": {
+    "type": "bonus"
+  },
+  "Truly Incited": {
     "type": "bonus"
   },
 
 
 
 
-  "Panic": {
+
+  
+  "After Start-of-Turn Skills Trigger, Action Ends Immediately": {
     "type": "penalty"
   },
-  "Exposure": {
-    "type": "penalty"
-  },
-  "Sabotage": {
-    "type": "penalty"
-  },
-  "Discord": {
-    "type": "penalty"
-  },
-  "Hush Spectrum": {
-    "type": "penalty"
-  },
-  "Shared Spoils": {
-    "type": "penalty"
-  },
-  "False Start": {
-    "type": "penalty"
-  },
-  "Flash": {
-    "type": "penalty"
-  },
-  "Isolation": {
-    "type": "penalty"
-  },
-  "Deep Wounds": {
-    "type": "penalty"
-  },
-  "Null Miracle": {
-    "type": "penalty"
-  },
-  "Undefended": {
-    "type": "penalty"
-  },
-  "Feud": {
-    "type": "penalty"
-  },
-  "Ploy": {
-    "type": "penalty"
-  },
-  "Schism": {
-    "type": "penalty"
-  },
-  "Time's Grip": {
-    "type": "penalty"
-  },
-  "Gravity": {
-    "type": "penalty"
-  },
-  "Stall": {
+  "Atk Shackle": {
     "type": "penalty"
   },
   "Canto Control": {
     "type": "penalty"
   },
-  "Guard": {
+  "Counterattacks disrupted": {
+    "type": "penalty"
+  },
+  "Deep Wounds": {
+    "type": "penalty"
+  },
+  "Def Shackle": {
+    "type": "penalty"
+  },
+  "Discord": {
+    "type": "penalty"
+  },
+  "Exposure": {
+    "type": "penalty"
+  },
+  "False Start": {
+    "type": "penalty"
+  },
+  "Feud": {
     "type": "penalty"
   },
   "Frozen": {
     "type": "penalty"
   },
-  "Triangle Adept": {
+  "Gravity": {
     "type": "penalty"
   },
-  "End Action": {
+  "Guard": {
+    "type": "penalty"
+  },
+  "Hush Spectrum": {
+    "type": "penalty"
+  },
+  "Neutralizes non-Special 'unit survives with 1 HP' effects": {
+    "type": "penalty"
+  },
+  "Panic": {
+    "type": "penalty"
+  },
+  "Ploy": {
+    "type": "penalty"
+  },
+  "Sabotage": {
+    "type": "penalty"
+  },
+  "Schism": {
+    "type": "penalty"
+  },
+  "Share Spoils": {
+    "type": "penalty"
+  },
+  "Share Spoils+": {
+    "type": "penalty"
+  },
+  "Spd Shackle": {
+    "type": "penalty"
+  },
+  "Stall": {
+    "type": "penalty"
+  },
+  "Time's Grip": {
+    "type": "penalty"
+  },
+  "Triangle Adept": {
     "type": "penalty"
   }
 }
