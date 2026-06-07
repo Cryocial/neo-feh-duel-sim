@@ -128,7 +128,7 @@ def _apply_merges(self):
         elif stat_to_boost == "res":
             self.base_res += 1
 
-def get_pulse_amount(self, phase_name):
+def get_pulse_amount(self, phase_name, target_enemy=None):
     """Scans all equipped items and statuses for a pulse during a specific phase."""
     total_pulse = 0
     
@@ -226,49 +226,109 @@ def get_visible_res(self):
 def get_combat_atk(self):
     """Calculates the combat attack stat, including visible attack and all equipped item bonuses."""
     total_atk = self.get_visible_atk()
+    
     for item in self._get_equipped_items():
         total_atk += item.combat_stats.atk  
+        
     for status_name in self.active_statuses:
         if status_name in STATUS_EFFECT_DATABASE:
             status_stats = STATUS_EFFECT_DATABASE[status_name].get("combat_stats")
             if status_stats:
                 total_atk += status_stats.atk
+                
+    if target_enemy is not None:
+        
+        for item in target_enemy._get_equipped_items():
+            if hasattr(item, 'enemy_combat_stats'):
+                total_atk += item.enemy_combat_stats.atk
+                
+        for status_name in target_enemy.active_statuses:
+            if status_name in STATUS_EFFECT_DATABASE:
+                enemy_inflicted_stats = STATUS_EFFECT_DATABASE[status_name].get("enemy_combat_stats")
+                if enemy_inflicted_stats:
+                    total_atk += enemy_inflicted_stats.atk
+                    
+    return total_atk
 
 def get_combat_def(self):
     """Calculates the combat defense stat, including visible defense and all equipped item bonuses."""
     total_def = self.get_visible_def()
+    
     for item in self._get_equipped_items():
         total_def += item.combat_stats.defense  
+        
     for status_name in self.active_statuses:
         if status_name in STATUS_EFFECT_DATABASE:
             status_stats = STATUS_EFFECT_DATABASE[status_name].get("combat_stats")
             if status_stats:
                 total_def += status_stats.defense
+                
+    if target_enemy is not None:
+        
+        for item in target_enemy._get_equipped_items():
+            if hasattr(item, 'enemy_combat_stats'):
+                total_def += item.enemy_combat_stats.defense
+                
+        for status_name in target_enemy.active_statuses:
+            if status_name in STATUS_EFFECT_DATABASE:
+                enemy_inflicted_stats = STATUS_EFFECT_DATABASE[status_name].get("enemy_combat_stats")
+                if enemy_inflicted_stats:
+                    total_def += enemy_inflicted_stats.defense
+                    
     return total_def
 
 
-def get_combat_spd(self):
-    """Calculates the combat speed stat, including visible speed and all equipped item bonuses."""
+def get_combat_spd(self, target_enemy=None):
+    """Calculates combat speed, including own buffs and enemy debuffs."""
     total_spd = self.get_visible_spd()
+    
     for item in self._get_equipped_items():
         total_spd += item.combat_stats.spd  
+        
     for status_name in self.active_statuses:
         if status_name in STATUS_EFFECT_DATABASE:
             status_stats = STATUS_EFFECT_DATABASE[status_name].get("combat_stats")
             if status_stats:
                 total_spd += status_stats.spd
+                
+    if target_enemy is not None:
+        
+        for item in target_enemy._get_equipped_items():
+            if hasattr(item, 'enemy_combat_stats'):
+                total_spd += item.enemy_combat_stats.spd
+                
+        for status_name in target_enemy.active_statuses:
+            if status_name in STATUS_EFFECT_DATABASE:
+                enemy_inflicted_stats = STATUS_EFFECT_DATABASE[status_name].get("enemy_combat_stats")
+                if enemy_inflicted_stats:
+                    total_spd += enemy_inflicted_stats.spd
+                    
     return total_spd
 
 
 def get_combat_res(self):
     """Calculates the combat resistance stat, including visible resistance and all equipped item bonuses."""
-    total_res = self.get_visible_res()
+   total_res = self.get_visible_res()
+    
     for item in self._get_equipped_items():
         total_res += item.combat_stats.res  
+        
     for status_name in self.active_statuses:
         if status_name in STATUS_EFFECT_DATABASE:
             status_stats = STATUS_EFFECT_DATABASE[status_name].get("combat_stats")
             if status_stats:
                 total_res += status_stats.res
+                
+    if target_enemy is not None:
+        
+        for item in target_enemy._get_equipped_items():
+            if hasattr(item, 'enemy_combat_stats'):
+                total_res += item.enemy_combat_stats.res
+                
+        for status_name in target_enemy.active_statuses:
+            if status_name in STATUS_EFFECT_DATABASE:
+                enemy_inflicted_stats = STATUS_EFFECT_DATABASE[status_name].get("enemy_combat_stats")
+                if enemy_inflicted_stats:
+                    total_res += enemy_inflicted_stats.res
+                    
     return total_res
-

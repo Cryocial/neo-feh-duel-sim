@@ -1,9 +1,7 @@
 {
   "Anathema": {
     "type": "bonus",
-    "utilities": {
-      "logic_tag": "anathema_logic"
-    }
+    "enemy_combat_stats": {"spd": -3, "defense": -3, "res": -3}
   },
   "Atk Liberate": {
     "type": "bonus",
@@ -19,7 +17,7 @@
   "Cancel Affinity": {
     "type": "bonus",
     "utilities": {
-      "logic_tag": "cancelaffinity_logic"
+      "keywords": ["cancel_affinity"]
     }
   },
 "Change of Fate": {
@@ -28,9 +26,6 @@
     "utilities": {
       "logic_tag": "changeoffate_logic"
     }
-  },
-  "Coax": {
-    "type": "bonus"
   },
 "Creation Pulse": {
     "type": "bonus",

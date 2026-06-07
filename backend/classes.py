@@ -7,7 +7,7 @@ class StatBlock:
         self.res = res
     
 class UtilityBlock:
-    def __init__(self, truedr=0, truedrlogic=None, truedmg=0, truedmg_logic=None, 
+    def __init__(self, truedr=0, truedrlogic=None, truedmg=0, truedmg_logic=None, dynamic_stats_logic=None, cooldown_modifiers=None,
                  percentdr=0.0, potent_logic=None, specialcdmod=0, specialcdmod_logic=None, keywords=None, grants_statuses=None):
         
         self.truedr = truedr
@@ -17,6 +17,7 @@ class UtilityBlock:
         self.percentdr = percentdr
         self.potent_logic = potent_logic
         self.specialcdmod = specialcdmod
+        self.dynamic_stats_logic = dynamic_stats_logic
         self.specialcdmod_logic = specialcdmod_logic
         self.cooldown_modifiers = cooldown_modifiers if cooldown_modifiers else {}
         self.keywords = keywords if keywords else []
@@ -80,9 +81,10 @@ class Unit:
         
         
 class Skill:
-    def __init__(self, name, slot, visible_stats=None, combat_stats=None, utilities=None):
+    def __init__(self, name, slot, enemy_combat_stats=None, visible_stats=None, combat_stats=None, utilities=None):
         self.name = name
         self.slot = slot
         self.visible_stats = visible_stats if visible_stats else StatBlock()
         self.combat_stats = combat_stats if combat_stats else StatBlock()
         self.utilities = utilities if utilities else UtilityBlock()
+        self.enemy_combat_stats = enemy_combat_stats if enemy_combat_stats else StatBlock()
