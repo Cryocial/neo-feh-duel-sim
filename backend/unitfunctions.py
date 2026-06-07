@@ -1,5 +1,5 @@
 # --- FORMULAS FOR UNIT STATS ---
-
+# --- DO NOT EDIT THESE UNLESS YOU KNOW WHAT YOU'RE DOING, THIS CODE SHOULD BE DONE ALREADY ---
 def _get_equipped_items(self):
     """Returns a list of all currently equipped items (weapon, special, A/B/C/S/X slots)."""
     all_slots = [

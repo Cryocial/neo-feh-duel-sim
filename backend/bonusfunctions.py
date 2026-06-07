@@ -1,3 +1,5 @@
+# --- ONLY USED FOR IMPLEMENTING THE LOGIC OF A CERTAIN BONUS EFFECT, NOT FOR ANYTHING ELSE ---
+from .jsonbootupstuff import STATUS_EFFECT_DATABASE, LOGIC_REGISTRY
 
 def reflex_true_dr(unit, enemy=None):
     return 7

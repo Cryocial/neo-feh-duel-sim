@@ -10,9 +10,9 @@
       "logic_tag": "bonus_doubler_logic"
     }
   },
-  "Reflective": {
+  "Reflex": {
     "utilities": {
-      "logic_tag": "reflective_logic"
+      "logic_tag": "reflex_logic"
     }
   }
 }
