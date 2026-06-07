@@ -32,8 +32,13 @@
   "Coax": {
     "type": "bonus"
   },
-  "Creation Pulse": {
-    "type": "bonus"
+"Creation Pulse": {
+    "type": "bonus",
+    "utilities": {
+      "cooldown_modifiers": {
+        "before_first_attack": "creation_pulse_logic"
+      }
+    }
   },
   "Collapsed Star": {
     "type": "bonus"

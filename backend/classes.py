@@ -51,7 +51,8 @@ class Unit:
         # Temporary map buffs/debuffs (StatBlocks)
         self.visible_buffs = StatBlock()
         self.visible_debuffs = StatBlock()
-
+        self.bonus_count = 0
+        self.penalty_count = 0
         self.active_statuses = []
 
         # --- IVs and Special Assets ---

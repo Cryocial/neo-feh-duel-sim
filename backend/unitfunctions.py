@@ -128,6 +128,36 @@ def _apply_merges(self):
         elif stat_to_boost == "res":
             self.base_res += 1
 
+def get_pulse_amount(self, phase_name):
+    """Scans all equipped items and statuses for a pulse during a specific phase."""
+    total_pulse = 0
+    
+    # 1. Scan equipped skills
+    for item in self._get_equipped_items():
+        # dict.get() safely returns 0 if the phase_name isn't in the dictionary!
+        # VALID PHASES: "start_of_turn", "before_first_attack", "before_every_attack", "before_follow_up", "end_of_combat", "before_foe_attacks", "per_unit_attack", "per_foe_attack    "
+        modifier = item.utilities.cooldown_modifiers.get(phase_name, 0)
+        
+        if callable(modifier):
+            total_pulse += modifier(self, target_enemy)
+        else:
+            total_pulse += modifier
+
+    # 2. Scan active map statuses
+    for status_name in self.active_statuses:
+        if status_name in STATUS_EFFECT_DATABASE:
+            status_utility = STATUS_EFFECT_DATABASE[status_name].get("utilities")
+            if status_utility:
+                
+                # Grab the modifier from the map status
+                modifier = status_utility.cooldown_modifiers.get(phase_name, 0)
+                
+                if callable(modifier):
+                    total_pulse += modifier(self, target_enemy)
+                else:
+                    total_pulse += modifier
+                
+    return total_pulse
 
 def _apply_stat_change(self, stat_name, is_asset):
     """Applies the stat change from a boon or bane to the base stats."""

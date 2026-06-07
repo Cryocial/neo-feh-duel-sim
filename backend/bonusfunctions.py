@@ -29,46 +29,17 @@ def potent_defense_scaling(unit, enemy=None):
         
     return min(def_difference * 0.10, 0.50)
 
-def get_pulse_amount(self, phase_name):
-    """Scans all equipped items and statuses for a pulse during a specific phase."""
-    total_pulse = 0
-    
-    # 1. Scan equipped skills
-    for item in self._get_equipped_items():
-        # dict.get() safely returns 0 if the phase_name isn't in the dictionary!
-        # VALID PHASES: "start_of_turn", "before_first_attack", "before_every_attack", "before_follow_up", "end_of_combat", "before_foe_attacks", "per_unit_attack", "per_foe_attack    "
-        modifier = item.utilities.cooldown_modifiers.get(phase_name, 0)
-        
-        if callable(modifier):
-            total_pulse += modifier(self, target_enemy)
-        else:
-            total_pulse += modifier
 
-    # 2. Scan active map statuses
-    for status_name in self.active_statuses:
-        if status_name in STATUS_EFFECT_DATABASE:
-            status_utility = STATUS_EFFECT_DATABASE[status_name].get("utilities")
-            if status_utility:
-                
-                # Grab the modifier from the map status
-                modifier = status_utility.cooldown_modifiers.get(phase_name, 0)
-                
-                if callable(modifier):
-                    total_pulse += modifier(self, target_enemy)
-                else:
-                    total_pulse += modifier
-                
-    return total_pulse
+def creation_pulse(unit, target_enemy=None):
+    """Grants pulse equal to the number of penalties on the enemy."""
+    if target_enemy is None:
+        return 0
+    pulse = target_enemy.penalty_count
+    return min(2, pulse)
 
 def change_of_fate_true_damage(unit, target_enemy=None):
     """Calculates true damage: 3 x number of active map bonuses (max 15)"""
-    bonus_count = 0
-    
-    for status in unit.active_statuses:
-        status_info = STATUS_EFFECT_DATABASE.get(status, {})
-        if status_info.get("type") == "bonus":
-            bonus_count += 1
-    total_damage = bonus_count * 3
+    total_damage = unit.bonus_count * 3
     return min(15, total_damage)
 
 
@@ -87,5 +58,7 @@ LOGIC_REGISTRY = {
     },
     "changeoffate_logic": {
         "truedmg_logic": change_of_fate_true_damage
-    }
+    },
+    "creation_pulse_logic": creation_pulse,
+
 }
