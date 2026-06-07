@@ -1,119 +1,90 @@
 import math
+from dataclasses import dataclass
+from .classes import Unit
+from .constants import WeaponType, Color
 
-def check_color_advantage(attacker, defender):
-    """Returns 1 for Advantage, -1 for Disadvantage, 0 for Neutral."""
-    
-    # 1. Check for Raven Tomes first
-    if attacker.has_keyword("raven_tome") and defender.color == "Colorless":
-        return 1
-    if defender.has_keyword("raven_tome") and attacker.color == "Colorless":
-        return -1
+@dataclass
+class CombatEngine:
+    """
+    The orchestrator for combat simulation.
+    Handles the timeline of events from 'start of combat' to 'after combat'.
+    """
+    attacker: Unit
+    defender: Unit
 
-    # 2. Standard Weapon Triangle
-    advantage_map = {"Red": "Green", "Green": "Blue", "Blue": "Red"}
-    
-    if advantage_map.get(attacker.color) == defender.color:
-        return 1
-    elif advantage_map.get(defender.color) == attacker.color:
-        return -1
+    def simulate(self) -> dict[str, int]:
+        """
+        Runs the full combat simulation and returns the final HP for both units.
+        """
+        self._phase_start_of_combat()
         
-    return 0
-
-
-def get_wta_multiplier(attacker, defender):
-    """Calculates the Weapon Triangle multiplier for the attacker's damage."""
-    base_multiplier = 1.0
-    advantage_state = check_color_advantage(attacker, defender) 
-    
-    if advantage_state == 0:
-        return base_multiplier
+        self._phase_before_first_attack()
         
-    base_multiplier += (0.20 * advantage_state)
-    
-    # Check for Triangle Adept / Cancel Affinity
-    has_ta = attacker.has_keyword("triangle_adept") or defender.has_keyword("triangle_adept")
-    has_ca = attacker.has_keyword("cancel_affinity") or defender.has_keyword("cancel_affinity")
-    
-    # Apply TA if CA isn't shutting it down
-    if has_ta and not has_ca:
-        base_multiplier += (0.20 * advantage_state)
+        if self.attacker.base_stats.hp > 0:
+            self._process_strike(self.attacker, self.defender)
         
-    return base_multiplier
-
-
-def calculate_effective_buffs(unit, enemy):
-    """Calculates visible buffs after enemy Lulls are applied."""
-    effective_buffs = {"atk": 0, "spd": 0, "defense": 0, "res": 0}
-    
-    for stat in ["atk", "spd", "defense", "res"]:
-        # Assumes Lull keywords look like "lull_atk", "lull_spd", etc.
-        lull_keyword = f"lull_{stat}"
-        if enemy.has_keyword(lull_keyword):
-            effective_buffs[stat] = 0
-        else:
-            effective_buffs[stat] = getattr(unit.visible_buffs, stat, 0)
+        if self.defender.base_stats.hp > 0:
+            self._process_strike(self.defender, self.attacker)
             
-    return effective_buffs
-
-
-def process_single_strike(striker, target):
-    """Handles a single swing of a weapon, including mid-combat pulses and damage."""
-    
-    # 1. "Before Every Attack" Phase
-    striker.current_cooldown -= striker.get_pulse_amount("before_every_attack", target)
-    
-    # 2. Calculate final stats (assuming get_combat_atk uses effective_buffs)
-    raw_atk = striker.get_combat_atk(target) 
-    defensive_stat = target.get_combat_res(striker) if magic_weapon else target.get_combat_def(striker)
-    wta_multiplier = get_wta_multiplier(striker, target)
-    
-    # FEH applies the WTA multiplier to Atk and truncates the decimal BEFORE subtracting Def/Res
-    modified_atk = math.trunc(raw_atk * wta_multiplier)
-    
-    # Determine if we target Def or Res
-    magic_weapons = ["Tome", "Staff", "Dragon", "Beast"]
-    defensive_stat = target.get_combat_res(striker) if magic_weapon else target.get_combat_def(striker)
+        self._phase_after_combat()
         
-    # 3. Base Damage (Cannot go below 0)
-    base_damage = max(0, modified_atk - defensive_stat)
-    
-    # 4. True Damage
-    true_damage = 0
-    if striker.utilities.truedmg_logic is not None:
-        true_damage += striker.utilities.truedmg_logic(striker, target)
-        
-    # 5. Final Damage Calculation & Application
-    final_damage = base_damage + true_damage
-    target.base_stats.hp -= final_damage
-    
-    # 6. The "Swing" Charge
-    swing_charge = 1 + striker.get_pulse_amount("per_unit_attack", target) + target.get_pulse_amount("per_foe_attack", striker)
-    striker.current_cooldown -= max(0, swing_charge)
+        return {
+            "attacker_final_hp": self.attacker.base_stats.hp,
+            "defender_final_hp": self.defender.base_stats.hp
+        }
 
-
-def simulate_combat(attacker, defender):
-    """The Master Timeline. Dictates the order of operations for the entire fight."""
-    
-    # --- PHASE 1: Start of Combat ---
-    attacker.current_cooldown -= attacker.get_pulse_amount("start_of_combat", defender)
-    defender.current_cooldown -= defender.get_pulse_amount("start_of_combat", attacker)
-    
-    # --- PHASE 2: Before First Attack (Defensive Specials) ---
-    defender.current_cooldown -= defender.get_pulse_amount("before_first_attack", attacker)
-    
-    # --- PHASE 3: The Clash ---
-    if attacker.base_stats.hp > 0:
-        process_single_strike(attacker, defender)
+    def _process_strike(self, striker: Unit, target: Unit):
+        """Calculates and applies damage for a single weapon swing."""
+        striker.current_cooldown -= striker.get_pulse_amount("before_every_attack", target)
         
-    # Standard counterattack check (You will add range/sweep checks here later)
-    if defender.base_stats.hp > 0: 
-        process_single_strike(defender, attacker)
+        raw_atk = striker.get_combat_stat("atk", target)
+        is_magic = striker.weapon_type in {WeaponType.TOME, WeaponType.STAFF, WeaponType.DRAGON, WeaponType.BEAST}
+        defensive_stat = target.get_combat_stat("res" if is_magic else "defense", striker)
         
-    # --- PHASE 4: After Combat ---
-    attacker.current_cooldown -= attacker.get_pulse_amount("after_combat", defender)
-    defender.current_cooldown -= defender.get_pulse_amount("after_combat", attacker)
+        wta = self._get_wta_multiplier(striker, target)
+        modified_atk = math.trunc(raw_atk * wta)
+        
+        base_damage = max(0, modified_atk - defensive_stat)
+        true_damage = sum(item.utilities.truedmg_logic(striker, target) 
+                         for item in striker.equipped_items if item.utilities.truedmg_logic)
+        
+        new_hp = target.base_stats.hp - (base_damage + true_damage)
+        target.base_stats = target.base_stats._replace(hp=new_hp)
+        
+        charge = 1 + striker.get_pulse_amount("per_unit_attack", target) + target.get_pulse_amount("per_foe_attack", striker)
+        striker.current_cooldown -= max(0, charge)
 
-    return {
-        "attacker_final_hp": attacker.base_stats.hp,
-        "defender_final_hp": defender.base_stats.hp
-    }
+    def _get_wta_multiplier(self, striker: Unit, target: Unit) -> float:
+        """Calculates the final WTA multiplier, including Triangle Adept/Cancel Affinity."""
+        advantage = self._check_color_advantage(striker, target)
+        if advantage == 0: return 1.0
+        
+        mult = 1.0 + (0.20 * advantage)
+        has_ta = striker.has_keyword("triangle_adept") or target.has_keyword("triangle_adept")
+        has_ca = striker.has_keyword("cancel_affinity") or target.has_keyword("cancel_affinity")
+        
+        if has_ta and not has_ca: 
+            mult += (0.20 * advantage)
+        return mult
+
+    def _check_color_advantage(self, striker: Unit, target: Unit) -> int:
+        """Determines if the striker has color advantage (1), disadvantage (-1), or neutral (0)."""
+        if striker.has_keyword("raven_tome") and target.color == Color.COLORLESS: return 1
+        if target.has_keyword("raven_tome") and striker.color == Color.COLORLESS: return -1
+        
+        match striker.color:
+            case Color.RED: return 1 if target.color == Color.GREEN else (-1 if target.color == Color.BLUE else 0)
+            case Color.GREEN: return 1 if target.color == Color.BLUE else (-1 if target.color == Color.RED else 0)
+            case Color.BLUE: return 1 if target.color == Color.RED else (-1 if target.color == Color.GREEN else 0)
+            case _: return 0
+
+    def _phase_start_of_combat(self):
+        self.attacker.current_cooldown -= self.attacker.get_pulse_amount("start_of_combat", self.defender)
+        self.defender.current_cooldown -= self.defender.get_pulse_amount("start_of_combat", self.attacker)
+
+    def _phase_before_first_attack(self):
+        self.defender.current_cooldown -= self.defender.get_pulse_amount("before_first_attack", self.attacker)
+
+    def _phase_after_combat(self):
+        self.attacker.current_cooldown -= self.attacker.get_pulse_amount("after_combat", self.defender)
+        self.defender.current_cooldown -= self.defender.get_pulse_amount("after_combat", self.attacker)
