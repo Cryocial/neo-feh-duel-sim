@@ -76,7 +76,12 @@ def true_damage(unit, enemy=None):
     """Calculates true damage based on the unit's active bonus count."""
     if unit.change_of_fate
         true_damage += min(15, unit.bonus_count * 3)
-    
+    if unit.treachery
+        buffs = unit.visible_buffs
+        true_damage += max(0, buffs.atk) + max(0, buffs.spd) + max(0, buffs.defense) + max(0, buffs.res)
+    if unit.dominance and enemy is not None:
+        debuffs = enemy.visible_debuffs
+        true_damage += max(0, debuffs.atk) + max(0, debuffs.spd) + max(0, debuffs.defense) + max(0, debuffs.res)
     return true_damage
 
 def reflex_true_damage(unit, enemy=None):
