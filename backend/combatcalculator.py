@@ -180,27 +180,40 @@ class CombatEngine:
             strike.strike_type is StrikeType.FIRST and not strike.brave_second_hit
         )
         for item in strike.target.unit.equipped_items:
-            #check weapons/skills
+            # check weapons/skills
             if is_first_strike:
-                item_dr = getattr(item.utilities, 'first_hit_percent_dr', 0.0)
-                if item_dr > 0:
-                    raw_dr = 1.0 - ((1.0 - raw_dr) * (1.0 - item_dr))
-            
-            perma_dr = getattr(item.utilities, 'percent_dr', 0.0)
+                first_dr = getattr(item.utilities, "first_hit_percent_dr", 0.0)
+                if first_dr > 0:
+                    base_dr = 1.0 - ((1.0 - base_dr) * (1.0 - first_dr))
+
+            if is_first_sequence:
+                sequence = getattr(item.utilities, "first_sequence_percent_dr", 0.0)
+                if sequence > 0:
+                    base_dr = 1.0((1.0 - base_dr) * (1.0 - sequence))
+
+            perma_dr = getattr(item.utilities, "perma_percent_dr", 0.0)
             if perma_dr > 0:
-                raw_dr = 1.0 - ((1.0 - raw_dr) * (1.0 - perma_dr))
-            #check bonuses
+                base_dr = 1.0 - ((1.0 - base_dr) * (1.0 - perma_dr))
+
+        # check bonuses
         for status_name in strike.target.unit.active_statuses:
             if status_data := STATUS_EFFECT_DATABASE.get(status_name):
                 utilities = status_data["utilities"]
                 if is_first_strike:
-                    status_first_dr = getattr(utilities, 'first_hit_percent_dr', 0.0)
+                    status_first_dr = getattr(utilities, "first_hit_percent_dr", 0.0)
                     if status_first_dr > 0:
-                        raw_dr = 1.0 - ((1.0 - raw_dr) * (1.0 - status_first_dr))
-                        
-                status_perma_dr = getattr(utilities, 'percent_dr', 0.0)
+                        base_dr = 1.0 - ((1.0 - base_dr) * (1.0 - status_first_dr))
+
+                if is_first_sequence:
+                    status_sequence_dr = getattr(
+                        utilities, "first_sequence_percent_dr", 0.0
+                    )
+                    if status_sequence_dr > 0:
+                        base_dr = 1.0 - ((1.0 - base_dr) * (1.0 - status_sequence_dr))
+
+                status_perma_dr = getattr(utilities, "perma_percent_dr", 0.0)
                 if status_perma_dr > 0:
-                    raw_dr = 1.0 - ((1.0 - raw_dr) * (1.0 - status_perma_dr))
+                    base_dr = 1.0 - ((1.0 - base_dr) * (1.0 - status_perma_dr))
         # ------------------------------------------------------------------------
         # final touches
         effective_dr = base_dr * pierce_mult
