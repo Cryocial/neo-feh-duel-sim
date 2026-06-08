@@ -39,4 +39,3 @@ class StrikeType(Enum):
     FIRST = auto()
     FOLLOW_UP = auto()
     POTENT = auto()
-    
