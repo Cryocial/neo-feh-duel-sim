@@ -6,31 +6,15 @@ These functions are resolved by name during the JSON bootup process.
 """Omni Boost"""
 def omni_boost(unit, enemy=None):
     omni_boost = 0
-    if unit.change_of_fate:
-        omni_boost += 5
-    if unit.dark_emblem:
-        omni_boost += 5
     if unit.divinely_inspiring:
         omni_boost += min(unit.ally_three_spaces * 3, 6)
-    if unit.dosage:
-        omni_boost += 5
-    if unit.drain_cancel:
-        omni_boost += 4
     if unit.empathy:
         total_effects = unit.bonus_count + unit.penalty_count
         if enemy is not None:
             total_effects += enemy.bonus_count + enemy.penalty_count
         omni_boost += min(total_effects, 7)
-    if unit.future_witness:
-        omni_boost += 5
     if unit.incited:
         omni_boost += min(unit.spaces_moved, 3)
-    if unit.prof_guidance:
-        omni_boost += 5
-    if unit.radiant_hero:
-        omni_boost += 5
-    if unit.rally_spectrum:
-        omni_boost += 5
     if unit.truly_incited:
         omni_boost += min(unit.spaces_moved * 2, 8)
     return [omni_boost, omni_boost, omni_boost, omni_boost]
@@ -50,6 +34,10 @@ def bonus_doubler(unit, target_enemy=None, effective_buffs=None):
             "res": unit.visible_buffs.res
         }
     return {stat: effective_buffs.get(stat, 0) for stat in ["atk", "spd", "defense", "res"]}
+
+def dynamic_stats(unit, target_enemy=None):
+    pass
+#TO DO, IMPLEMENT STUFF LIKE ATK LIBERATE HERE
 
 """Anathema and Omni Debuff"""
 
