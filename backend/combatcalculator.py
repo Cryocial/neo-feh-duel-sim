@@ -74,7 +74,7 @@ class CombatEngine:
             and self.combatant_states["attacker"].current_hp > 0
             and self.combatant_states["defender"].current_hp > 0
         ):
-            strike = strike_sequence.pop()
+            strike = strike_sequence.pop(0)
             self._process_strike(strike)  # CD pulses and healing calc in there too
 
         self._phase_after_combat()
