@@ -120,8 +120,8 @@ def special_jump(unit, target_enemy=None):
         else:
             special_jump += 2
     """Grants cooldown reduction based on enemy penalty count."""
-    if unit.creation_pulse:
-        special_jump = min(2, target_enemy.penalty_count) if target_enemy else 0
+    if unit.creation_pulse and enemy is not None:
+        special_jump = min(2, target_enemy.penalty_count)
     return special_jump
 
 """Potent"""
@@ -137,5 +137,6 @@ def potent_defense_scaling(unit, enemy=None):
         return 0.0
     def_diff = unit.get_combat_stat("defense", enemy) - enemy.get_combat_stat("defense", unit)
     return min(max(0, def_diff) * 0.10, 0.50)
+
 
 """ Legacy Code"""
