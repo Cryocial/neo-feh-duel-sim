@@ -2,8 +2,7 @@ import math
 from dataclasses import dataclass, field
 from typing import Literal
 from .classes import Unit, StatBlock
-from .constants import WeaponType, Color, StrikeType
-from .jsonbootupstuff import STATUS_EFFECT_DATABASE
+from .constants import Color, StrikeType
 
 UnitRole = Literal["attacker", "defender"]
 
@@ -20,6 +19,7 @@ class CombatantState:
 @dataclass
 class Strike:
     """Represents a single attack in the combat sequence."""
+
     striker: UnitRole
     target: UnitRole
     strike_type: StrikeType
@@ -111,7 +111,37 @@ class CombatEngine:
         modified_atk = math.trunc(raw_atk * wta)
 
         base_damage = max(0, modified_atk - defensive_stat)
+        # ------------------------------------------------------------------------
+        # CALCULATE DR PIERCE
 
+        pierce_mult = 1.0
+
+        if strike.striker.unit.has_keyword("pierce_100"):
+            pierce_mult = 0.0
+
+        if (
+            strike.striker.unit.has_keyword("pierce_special_100")
+            and self.combatant_states[strike.striker].current_cooldown == 0
+        ):
+            pierce_mult = 0.0
+
+        if pierce_mult > 0.0:
+            pierce_50_count = sum(
+                1
+                for item in strike.striker.unit.equipped_items
+                if "pierce_50" in item.utilities.keywords
+            )
+
+            from .jsonbootupstuff import STATUS_EFFECT_DATABASE
+
+            for status_name in strike.striker.unit.active_statuses:
+                if status_data := STATUS_EFFECT_DATABASE.get(status_name):
+                    if "pierce_50" in status_data["utilities"].keywords:
+                        pierce_50_count += 1
+
+            pierce_mult *= 0.5**pierce_50_count
+        # ------------------------------------------------------------------------
+        # true dmg stuff here
         true_damage = sum(
             item.utilities.truedmg_logic(striker, target)
             for item in striker.equipped_items
@@ -135,19 +165,59 @@ class CombatEngine:
                 # Add dynamic status true damage
                 if getattr(utilities, "truedmg_logic", None) is not None:
                     true_damage += utilities.truedmg_logic(striker, target)
-
+        # ------------------------------------------------------------------------
         final_damage = base_damage + true_damage
-
-        #  CHECK FOR FIRST HIT DR TYPES
         # for reflex
         mitigated_amount = 0
+        # ------------------------------------------------------------------------
+        # CALCULATE PERCENT DAMAGE REDUCTION
+        base_dr = 0
+        # A CHECK FOR MOST MODERN DR TYPES
+        is_first_sequence = strike.strike_type is StrikeType.FIRST
 
+        # A CHECK FOR LEGACY DR THAT IS ONLY FIRST HIT (NO BRAVE)
+        is_first_strike = (
+            strike.strike_type is StrikeType.FIRST and not strike.brave_second_hit
+        )
+        # ------------------------------------
+        # Fallen Star
+        if strike.target.unit.has_keyword("fallen_star") and is_first_strike:
+            base_dr = 1.0 - ((1.0 - base_dr) * (1.0 - 0.80))
+        # ------------------------------------
+        # ------------------------------------
+        # Deep Star
+        if strike.target.unit.has_keyword("deep_star") and is_first_sequence:
+            base_dr = 1.0 - ((1.0 - base_dr) * (1.0 - 0.80))
+        # ------------------------------------
+        # ------------------------------------
+        # Dodge
+        # TODO: Add Dodge
+        if strike.target.unit.has_keyword("dodge"):
+            base_dr = 1.0 - ((1.0 - base_dr) * (1.0 - max(0, 0.4)))
+        # ------------------------------------
+        # ------------------------------------
+        # Initiate 40% DR
+        # TODO: Add this function
+        # ------------------------------------
+        # ------------------------------------
+        # ???
+        # TODO: Add this function
+        # ------------------------------------
+        # final touches
+        effective_dr = base_dr * pierce_mult
+        target.damage_mitigated_bucket += mitigated_amount
+        damage_multiplier = 1.0 - effective_dr
+        final_damage = math.trunc(final_damage * damage_multiplier)
         # ------------------------------------
         # Collapsed Star
-        # TO DO: wait for a method to track when a attack is to be implemented:
+        if strike.target.unit.has_keyword("collapsed_star") and is_first_sequence:
+            if final_damage > 1:
+                mitigated_amount = final_damage - 1
+            final_damage = 1
         # ------------------------------------
-
-        target.damage_mitigated_bucket += mitigated_amount
+        # ------------------------------------
+        # TODO: Future Slot for Y!Edel's 1 Damage Style
+        # ------------------------------------
         self.combatant_states[strike.target].current_hp -= final_damage
 
         charge = (
@@ -227,60 +297,107 @@ class CombatEngine:
         self.combatant_states["attacker"].combat_stats = StatBlock(**atk_vals)
         self.combatant_states["defender"].combat_stats = StatBlock(**def_vals)
 
-        self.combatant_states["attacker"].defensive_stat = "def" if self.defender.is_physical() else "res"
-        self.combatant_states["defender"].defensive_stat = "def" if self.attacker.is_physical() else "res"
+        self.combatant_states["attacker"].defensive_stat = (
+            "def" if self.defender.is_physical() else "res"
+        )
+        self.combatant_states["defender"].defensive_stat = (
+            "def" if self.attacker.is_physical() else "res"
+        )
 
     def _determine_strike_sequence(self) -> list[Strike]:
         """Determines the number and order of strikes."""
         # Assuming no effects preventing defender's counterattacks or effects that change attack priority
-        spd_diff = self.combatant_states["attacker"].combat_stats.spd - self.combatant_states["defender"].combat_stats.spd
+        spd_diff = (
+            self.combatant_states["attacker"].combat_stats.spd
+            - self.combatant_states["defender"].combat_stats.spd
+        )
         attacker_spd_check = 1 if spd_diff > 5 else 0
         defender_spd_check = 1 if spd_diff < -5 else 0
 
-        nb_attacker_GFU = 0 # TODO: count the number of "Unit makes a guaranteed follow-up attack"
-        nb_defender_GFU = 0 # TODO: count the number of "Unit makes a guaranteed follow-up attack"
+        nb_attacker_GFU = (
+            0  # TODO: count the number of "Unit makes a guaranteed follow-up attack"
+        )
+        nb_defender_GFU = (
+            0  # TODO: count the number of "Unit makes a guaranteed follow-up attack"
+        )
 
-        nb_attacker_FU_denial = 0 # TODO: count the number of "Foe cannot make a follow-up attack" layers
-        nb_defender_FU_denial = 0 # TODO: count the number of "Foe cannot make a follow-up attack" layers
+        nb_attacker_FU_denial = (
+            0  # TODO: count the number of "Foe cannot make a follow-up attack" layers
+        )
+        nb_defender_FU_denial = (
+            0  # TODO: count the number of "Foe cannot make a follow-up attack" layers
+        )
 
-        attacker_off_NFU = 0 # TODO: 1 if attacker has "neutralizes effects that prevent unit's followup attacks"
-        defender_off_NFU = 0 # TODO: 1 if defender has "neutralizes effects that prevent unit's followup attacks"
+        attacker_off_NFU = 0  # TODO: 1 if attacker has "neutralizes effects that prevent unit's followup attacks"
+        defender_off_NFU = 0  # TODO: 1 if defender has "neutralizes effects that prevent unit's followup attacks"
 
-        attacker_def_NFU = 0 # TODO: 1 if attacker has "neutralizes effects that guarantee foe's follow-up attacks"
-        defender_def_NFU = 0 # TODO: 1 if defender has "neutralizes effects that guarantee foe's follow-up attacks"
+        attacker_def_NFU = 0  # TODO: 1 if attacker has "neutralizes effects that guarantee foe's follow-up attacks"
+        defender_def_NFU = 0  # TODO: 1 if defender has "neutralizes effects that guarantee foe's follow-up attacks"
 
-        attacker_FU = nb_attacker_GFU * (1 - defender_def_NFU) - nb_defender_FU_denial * (1 - attacker_off_NFU) + attacker_spd_check
-        defender_FU = nb_defender_GFU * (1 - attacker_def_NFU) - nb_attacker_FU_denial * (1 - defender_off_NFU) + defender_spd_check
-        
-        attacker_brave = False # TODO: check wether attacker can attack twice
-        defender_brave = False # TODO: check wether defender can attack twice
+        attacker_FU = (
+            nb_attacker_GFU * (1 - defender_def_NFU)
+            - nb_defender_FU_denial * (1 - attacker_off_NFU)
+            + attacker_spd_check
+        )
+        defender_FU = (
+            nb_defender_GFU * (1 - attacker_def_NFU)
+            - nb_attacker_FU_denial * (1 - defender_off_NFU)
+            + defender_spd_check
+        )
 
-        attacker_potent = False # TODO check wether attacker can trigger a potent attack
-        defender_potent = False # TODO check wether defender can trigger a potent attack
+        attacker_brave = False  # TODO: check wether attacker can attack twice
+        defender_brave = False  # TODO: check wether defender can attack twice
+
+        attacker_potent = (
+            False  # TODO check wether attacker can trigger a potent attack
+        )
+        defender_potent = (
+            False  # TODO check wether defender can trigger a potent attack
+        )
 
         strike_sequence = []
 
-        strike_sequence.append(Strike("attacker", "defender", StrikeType.FIRST, False, False))        
+        strike_sequence.append(
+            Strike("attacker", "defender", StrikeType.FIRST, False, False)
+        )
         if attacker_brave:
-            strike_sequence.append(Strike("attacker", "defender", StrikeType.FIRST, True, True))
+            strike_sequence.append(
+                Strike("attacker", "defender", StrikeType.FIRST, True, True)
+            )
 
-        strike_sequence.append(Strike("defender", "attacker", StrikeType.FIRST, False, False))
+        strike_sequence.append(
+            Strike("defender", "attacker", StrikeType.FIRST, False, False)
+        )
         if defender_brave:
-            strike_sequence.append(Strike("defender", "attacker", StrikeType.FIRST, True, True))
+            strike_sequence.append(
+                Strike("defender", "attacker", StrikeType.FIRST, True, True)
+            )
 
         if attacker_FU > 0:
-            strike_sequence.append(Strike("attacker", "defender", StrikeType.FOLLOW_UP, False, False))
+            strike_sequence.append(
+                Strike("attacker", "defender", StrikeType.FOLLOW_UP, False, False)
+            )
             if attacker_brave:
-                strike_sequence.append(Strike("attacker", "defender", StrikeType.FOLLOW_UP, True, True))
+                strike_sequence.append(
+                    Strike("attacker", "defender", StrikeType.FOLLOW_UP, True, True)
+                )
         if attacker_potent:
-            strike_sequence.append(Strike("attacker", "defender", StrikeType.POTENT, False, True))
+            strike_sequence.append(
+                Strike("attacker", "defender", StrikeType.POTENT, False, True)
+            )
 
         if defender_FU > 0:
-            strike_sequence.append(Strike("defender", "attacker", StrikeType.FOLLOW_UP, False, False))
+            strike_sequence.append(
+                Strike("defender", "attacker", StrikeType.FOLLOW_UP, False, False)
+            )
             if defender_brave:
-                strike_sequence.append(Strike("defender", "attacker", StrikeType.FOLLOW_UP, True, True))
+                strike_sequence.append(
+                    Strike("defender", "attacker", StrikeType.FOLLOW_UP, True, True)
+                )
         if defender_potent:
-            strike_sequence.append(Strike("defender", "attacker", StrikeType.POTENT, False, True))
+            strike_sequence.append(
+                Strike("defender", "attacker", StrikeType.POTENT, False, True)
+            )
 
         return strike_sequence
 
