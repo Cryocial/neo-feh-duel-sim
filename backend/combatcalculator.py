@@ -4,11 +4,14 @@ from .classes import Unit, StatBlock
 from .constants import WeaponType, Color
 from .jsonbootupstuff import STATUS_EFFECT_DATABASE
 
+
 @dataclass
 class Strike:
     """Represents a single attack in the combat sequence."""
+
     striker: Unit
     target: Unit
+
 
 @dataclass
 class CombatEngine:
@@ -19,9 +22,11 @@ class CombatEngine:
 
     attacker: Unit
     defender: Unit
-    attacker_combat_stats: StatBlock = field(init=False) # in combat stats
+    attacker_combat_stats: StatBlock = field(init=False)  # in combat stats
     defender_combat_stats: StatBlock = field(init=False)
-    attacker_targeted_stat: int = field(init=False) # encoding which stat to use when attacker takes a hit: 0 for physical (def), 1 for magical (res)
+    attacker_targeted_stat: int = field(
+        init=False
+    )  # encoding which stat to use when attacker takes a hit: 0 for physical (def), 1 for magical (res)
     defender_targeted_stat: int = field(init=False)
 
     def simulate(self) -> dict[str, int]:
@@ -36,12 +41,17 @@ class CombatEngine:
 
         self._phase_start_of_combat()
 
-        while len(strike_sequence) > 0 and self.attacker.base_stats.hp > 0 and self.defender.base_stats.hp > 0:
+        while (
+            len(strike_sequence) > 0
+            and self.attacker.base_stats.hp > 0
+            and self.defender.base_stats.hp > 0
+        ):
             strike = strike_sequence.pop()
-            self._process_strike(strike.striker, strike.target) #CD pulses and healing calc in there too
-            
-        self._phase_before_first_attack()
+            self._process_strike(
+                strike.striker, strike.target
+            )  # CD pulses and healing calc in there too
 
+        self._phase_before_first_attack()
 
         # tracks dmg mitigated for reflex
         self.attacker.damage_mitigated_bucket = 0
@@ -59,7 +69,7 @@ class CombatEngine:
             "attacker_final_hp": self.attacker.base_stats.hp,
             "defender_final_hp": self.defender.base_stats.hp,
         }
-    
+
     def _process_AoE(self, striker: Unit, target: Unit):
         """Applies AoE damage"""
         ...
@@ -85,36 +95,36 @@ class CombatEngine:
         modified_atk = math.trunc(raw_atk * wta)
 
         base_damage = max(0, modified_atk - defensive_stat)
-    
+
         true_damage = sum(
             item.utilities.truedmg_logic(striker, target)
             for item in striker.equipped_items
             if item.utilities.truedmg_logic is not None
         )
-        
+
         true_damage += sum(
             item.utilities.truedmg
             for item in striker.equipped_items
-            if hasattr(item.utilities, 'truedmg')
+            if hasattr(item.utilities, "truedmg")
         )
-    
+
         for status_name in striker.active_statuses:
             status_data = STATUS_EFFECT_DATABASE.get(status_name)
             if status_data:
                 utilities = status_data["utilities"]
-                
+
                 # Add flat status true damage
-                true_damage += getattr(utilities, 'truedmg', 0)
-                
+                true_damage += getattr(utilities, "truedmg", 0)
+
                 # Add dynamic status true damage
-                if getattr(utilities, 'truedmg_logic', None) is not None:
+                if getattr(utilities, "truedmg_logic", None) is not None:
                     true_damage += utilities.truedmg_logic(striker, target)
         final_damage = base_damage + true_damage
 
         #  CHECK FOR FIRST HIT DR TYPES
-        #for reflex
-        mitigated_amount = 0 
-        
+        # for reflex
+        mitigated_amount = 0
+
         # ------------------------------------
         # Collapsed Star
         # TO DO: wait for a method to track when a attack is to be implemented:
@@ -182,7 +192,9 @@ class CombatEngine:
     def _phase_before_combat(self):
         """AOE"""
         if self.attacker.has_AoE:
-            self.attacker.current_cooldown -= self.attacker.get_pulse_amount("before_combat", self.defender)
+            self.attacker.current_cooldown -= self.attacker.get_pulse_amount(
+                "before_combat", self.defender
+            )
             if self.attacker.current_cooldown == 0:
                 self._process_AoE(self.attacker, self.defender)
 
@@ -206,6 +218,7 @@ class CombatEngine:
     def _phase_start_of_combat(self):
         """Pre-combat damage and healing effects."""
         ...
+
     def _phase_start_of_combat(self):
         self.attacker.current_cooldown -= self.attacker.get_pulse_amount(
             "start_of_combat", self.defender
