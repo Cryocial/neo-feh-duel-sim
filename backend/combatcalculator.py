@@ -1,8 +1,14 @@
 import math
-from dataclasses import dataclass
-from .classes import Unit
+from dataclasses import dataclass, field
+from .classes import Unit, StatBlock
 from .constants import WeaponType, Color
 from .jsonbootupstuff import STATUS_EFFECT_DATABASE
+
+@dataclass
+class Strike:
+    """Represents a single attack in the combat sequence."""
+    striker: Unit
+    target: Unit
 
 @dataclass
 class CombatEngine:
@@ -13,13 +19,27 @@ class CombatEngine:
 
     attacker: Unit
     defender: Unit
+    attacker_combat_stats: StatBlock = field(init=False) # in combat stats
+    defender_combat_stats: StatBlock = field(init=False)
+    attacker_targeted_stat: int = field(init=False) # encoding which stat to use when attacker takes a hit: 0 for physical (def), 1 for magical (res)
+    defender_targeted_stat: int = field(init=False)
 
     def simulate(self) -> dict[str, int]:
         """
         Runs the full combat simulation and returns the final HP for both units.
         """
+        self._phase_before_combat()
+
+        self._combat_stat_calculations()
+
+        strike_sequence = self._determine_strike_sequence()
+
         self._phase_start_of_combat()
 
+        while len(strike_sequence) > 0 and self.attacker.base_stats.hp > 0 and self.defender.base_stats.hp > 0:
+            strike = strike_sequence.pop()
+            self._process_strike(strike.striker, strike.target) #CD pulses and healing calc in there too
+            
         self._phase_before_first_attack()
         # tracks amount of hits per combat
         self.attacker.combat_attacks_performed = 0
@@ -40,6 +60,10 @@ class CombatEngine:
             "attacker_final_hp": self.attacker.base_stats.hp,
             "defender_final_hp": self.defender.base_stats.hp,
         }
+    
+    def _process_AoE(self, striker: Unit, target: Unit):
+        """Applies AoE damage"""
+        ...
 
     def _process_strike(self, striker: Unit, target: Unit):
         """Calculates and applies damage for a single weapon swing."""
@@ -164,6 +188,33 @@ class CombatEngine:
             case _:
                 return 0
 
+    def _phase_before_combat(self):
+        """AOE"""
+        if self.attacker.has_AoE:
+            self.attacker.current_cooldown -= self.attacker.get_pulse_amount("before_combat", self.defender)
+            if self.attacker.current_cooldown == 0:
+                self._process_AoE(self.attacker, self.defender)
+
+    def _combat_stat_calculations(self):
+        """Calculates combat stats for both units."""
+        atk_vals, def_vals = {}, {}
+        for stat in ["hp", "atk", "spd", "defense", "res"]:
+            atk_vals[stat] = self.attacker.get_combat_stat(stat, self.defender)
+            def_vals[stat] = self.defender.get_combat_stat(stat, self.attacker)
+
+        self.attacker_combat_stats = StatBlock(**atk_vals)
+        self.defender_combat_stats = StatBlock(**def_vals)
+
+        self.attacker_targeted_stat = 0 if self.defender.is_physical() else 1
+        self.defender_targeted_stat = 0 if self.attacker.is_physical() else 1
+
+    def _determine_strike_sequence(self) -> list[Strike]:
+        """Determines the number and order of strikes."""
+        ...
+
+    def _phase_start_of_combat(self):
+        """Pre-combat damage and healing effects."""
+        ...
     def _phase_start_of_combat(self):
         self.attacker.current_cooldown -= self.attacker.get_pulse_amount(
             "start_of_combat", self.defender
