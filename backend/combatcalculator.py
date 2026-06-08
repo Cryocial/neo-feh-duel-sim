@@ -179,30 +179,28 @@ class CombatEngine:
         is_first_strike = (
             strike.strike_type is StrikeType.FIRST and not strike.brave_second_hit
         )
-        # ------------------------------------
-        # Fallen Star
-        if strike.target.unit.has_keyword("fallen_star") and is_first_strike:
-            base_dr = 1.0 - ((1.0 - base_dr) * (1.0 - 0.80))
-        # ------------------------------------
-        # ------------------------------------
-        # Deep Star
-        if strike.target.unit.has_keyword("deep_star") and is_first_sequence:
-            base_dr = 1.0 - ((1.0 - base_dr) * (1.0 - 0.80))
-        # ------------------------------------
-        # ------------------------------------
-        # Dodge
-        # TODO: Add Dodge
-        if strike.target.unit.has_keyword("dodge"):
-            base_dr = 1.0 - ((1.0 - base_dr) * (1.0 - max(0, 0.4)))
-        # ------------------------------------
-        # ------------------------------------
-        # Initiate 40% DR
-        # TODO: Add this function
-        # ------------------------------------
-        # ------------------------------------
-        # ???
-        # TODO: Add this function
-        # ------------------------------------
+        for item in strike.target.unit.equipped_items:
+            #check weapons/skills
+            if is_first_strike:
+                item_dr = getattr(item.utilities, 'first_hit_percent_dr', 0.0)
+                if item_dr > 0:
+                    raw_dr = 1.0 - ((1.0 - raw_dr) * (1.0 - item_dr))
+            
+            perma_dr = getattr(item.utilities, 'percent_dr', 0.0)
+            if perma_dr > 0:
+                raw_dr = 1.0 - ((1.0 - raw_dr) * (1.0 - perma_dr))
+            #check bonuses
+        for status_name in strike.target.unit.active_statuses:
+            if status_data := STATUS_EFFECT_DATABASE.get(status_name):
+                utilities = status_data["utilities"]
+                if is_first_strike:
+                    status_first_dr = getattr(utilities, 'first_hit_percent_dr', 0.0)
+                    if status_first_dr > 0:
+                        raw_dr = 1.0 - ((1.0 - raw_dr) * (1.0 - status_first_dr))
+                        
+                status_perma_dr = getattr(utilities, 'percent_dr', 0.0)
+                if status_perma_dr > 0:
+                    raw_dr = 1.0 - ((1.0 - raw_dr) * (1.0 - status_perma_dr))
         # final touches
         effective_dr = base_dr * pierce_mult
         target.damage_mitigated_bucket += mitigated_amount
