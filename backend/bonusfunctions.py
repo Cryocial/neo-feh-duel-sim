@@ -10,15 +10,17 @@ def omni_boost(unit, enemy=None):
         omni_boost += 5
     if unit.dark_emblem:
         omni_boost += 5
-    if unit.divinely_inspiring
+    if unit.divinely_inspiring:
         omni_boost += min(unit.ally_three_spaces * 3, 6)
     if unit.dosage:
         omni_boost += 5
-    if unit.drain_cancel
+    if unit.drain_cancel:
         omni_boost += 4
-    """Too lazy to code these conditions we all know it is 7 lmao"""
     if unit.empathy:
-        omni_boost += 7
+        total_effects = unit.bonus_count + unit.penalty_count
+        if enemy is not None:
+            total_effects += enemy.bonus_count + enemy.penalty_count
+        omni_boost += min(total_effects, 7)
     if unit.future_witness:
         omni_boost += 5
     if unit.incited:
@@ -29,7 +31,7 @@ def omni_boost(unit, enemy=None):
         omni_boost += 5
     if unit.rally_spectrum:
         omni_boost += 5
-    if unit.truly_incited
+    if unit.truly_incited:
         omni_boost += min(unit.spaces_moved * 2, 8)
     return [omni_boost, omni_boost, omni_boost, omni_boost]
 
@@ -74,6 +76,7 @@ def true_damage(unit, enemy=None):
     """Calculates true damage based on the unit's active bonus count."""
     if unit.change_of_fate
         true_damage += min(15, unit.bonus_count * 3)
+    
     return true_damage
 
 def reflex_true_damage(unit, enemy=None):
@@ -115,7 +118,7 @@ def special_jump(unit, target_enemy=None):
     return special_jump
 
 """Potent"""
-def potent_flat_40(unit, enemy=None):
+def potent_40_or_80(unit, enemy=None):
     """Calculates potent effectiveness based on speed comparison."""
     if unit.get_combat_stat("spd", enemy) > enemy.get_combat_stat("spd", unit):
         return 0.40
@@ -128,15 +131,3 @@ def potent_defense_scaling(unit, enemy=None):
     return min(max(0, def_diff) * 0.10, 0.50)
 
 """ Legacy Code"""
-
-def reflex_true_dr(unit, enemy=None):
-    """Example of a flat damage reduction skill."""
-    return 7
-
-def change_of_fate_true_damage(unit, target_enemy=None):
-    """Calculates true damage based on the unit's active bonus count."""
-    return min(15, unit.bonus_count * 3)
-
-def creation_pulse(unit, target_enemy=None):
-    """Grants cooldown reduction based on enemy penalty count."""
-    return min(2, target_enemy.penalty_count) if target_enemy else 0
