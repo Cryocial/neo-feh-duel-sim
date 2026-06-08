@@ -43,7 +43,6 @@
   "Collapsed Star": {
     "type": "bonus",
     "utilities": {
-      "keywords": ["collapsed_star"]
     }
   },
   "Dark Emblem": {
@@ -51,7 +50,10 @@
     "combat_stats": {"atk": 5, "spd": 5, "defense": 5, "res": 5}
   },
   "Deep Star": {
-    "type": "bonus"
+    "type": "bonus",
+    "utilities": {
+      "first_sequence_percent_dr": 0.80
+    }
   },
   "Desperation": {
     "type": "bonus"
@@ -94,7 +96,7 @@
   "Fallen Star": {
     "type": "bonus",
     "utilities": {
-      "keywords": ["fallen_star"]
+      "first_hit_percent_dr": 0.80
     }
   },
   "Fell Spirit": {
@@ -200,8 +202,11 @@
   "Reduce Area-of-Effect Special Damage Taken": {
     "type": "bonus"
   },
-  "Reduces damage when initiating": {
-    "type": "bonus"
+  "40% Initial Hit DR": {
+    "type": "bonus",
+    "utilities": {
+      "first_sequence_percent_dr": 0.40
+    }
   },
   "Reflex": {
     "type": "bonus",
@@ -215,12 +220,15 @@
     "type": "bonus"
   },
   "Resonance: Blades": {
-    "type": "bonus"
+    "type": "bonus",
+    "combat_stats": {"atk": 5, "spd": 5}
   },
   "Resonance: Shields": {
-    "type": "bonus"
+    "type": "bonus",
+    "combat_stats": {"defense": 5, "res": 5},
+    "TODO: ADD FU DENIAL ONCE ITS DONE" : "pass"
   },
-  "Spd difference necessary for foe follow-up attack +10": {
+  "Spd Rift +10": {
     "type": "bonus"
   },
   "Spd Liberate": {
