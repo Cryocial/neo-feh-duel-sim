@@ -9,7 +9,7 @@ UnitRole = Literal["attacker", "defender"]
 
 
 @dataclass
-class CombatantInfo:
+class CombatantState:
     unit: Unit
     current_hp: int
     current_cooldown: int
@@ -35,19 +35,19 @@ class CombatEngine:
 
     attacker: Unit
     defender: Unit
-    infos: dict[UnitRole, CombatantInfo] = field(init=False)
+    combatant_states: dict[UnitRole, CombatantState] = field(init=False)
 
     def simulate(self) -> dict[str, int]:
         """
         Runs the full combat simulation and returns the final HP for both units.
         """
-        self.infos = {
-            "attacker": CombatantInfo(
+        self.combatant_states = {
+            "attacker": CombatantState(
                 unit=self.attacker,
                 current_hp=self.attacker.base_stats.hp,
                 current_cooldown=self.attacker.current_cooldown,
             ),
-            "defender": CombatantInfo(
+            "defender": CombatantState(
                 unit=self.defender,
                 current_hp=self.defender.base_stats.hp,
                 current_cooldown=self.defender.current_cooldown,
@@ -70,8 +70,8 @@ class CombatEngine:
 
         while (
             len(strike_sequence) > 0
-            and self.infos["attacker"].current_hp > 0
-            and self.infos["defender"].current_hp > 0
+            and self.combatant_states["attacker"].current_hp > 0
+            and self.combatant_states["defender"].current_hp > 0
         ):
             strike = strike_sequence.pop()
             self._process_strike(strike)  # CD pulses and healing calc in there too
@@ -79,8 +79,8 @@ class CombatEngine:
         self._phase_after_combat()
 
         return {
-            "attacker_final_hp": self.infos["attacker"].current_hp,
-            "defender_final_hp": self.infos["defender"].current_hp,
+            "attacker_final_hp": self.combatant_states["attacker"].current_hp,
+            "defender_final_hp": self.combatant_states["defender"].current_hp,
         }
 
     def _process_AoE(self, striker: Unit, target: Unit):
@@ -89,21 +89,21 @@ class CombatEngine:
 
     def _process_strike(self, strike: Strike):
         """Calculates and applies damage for a single weapon swing."""
-        striker = self.infos[strike.striker].unit
-        target = self.infos[strike.target].unit
+        striker = self.combatant_states[strike.striker].unit
+        target = self.combatant_states[strike.target].unit
 
-        # self.infos[strike.striker]["current_cooldown"] -= striker.get_pulse_amount(
+        # self.combatant_states[strike.striker].current_cooldown -= striker.get_pulse_amount(
         #     "before_every_attack", target
         # )
-        # self.infos[strike.target]["current_cooldown"] -= striker.get_pulse_amount(
+        # self.combatant_states[strike.target].current_cooldown -= striker.get_pulse_amount(
         #     "before_every_attack", target
         # )
 
-        raw_atk = self.infos[strike.striker].combat_stats.atk
+        raw_atk = self.combatant_states[strike.striker].combat_stats.atk
         defensive_stat = (
-            self.infos[strike.target].combat_stats.defense
-            if self.infos[strike.target].defensive_stat == "def"
-            else self.infos[strike.target].combat_stats.res
+            self.combatant_states[strike.target].combat_stats.defense
+            if self.combatant_states[strike.target].defensive_stat == "def"
+            else self.combatant_states[strike.target].combat_stats.res
         )
 
         wta = self._get_wta_multiplier(striker, target)
@@ -147,14 +147,14 @@ class CombatEngine:
         # ------------------------------------
 
         target.damage_mitigated_bucket += mitigated_amount
-        self.infos[strike.target].current_hp -= final_damage
+        self.combatant_states[strike.target].current_hp -= final_damage
 
         charge = (
             1
             + striker.get_pulse_amount("per_unit_attack", target)
             + target.get_pulse_amount("per_foe_attack", striker)
         )
-        self.infos[strike.striker].current_cooldown -= max(0, charge)
+        self.combatant_states[strike.striker].current_cooldown -= max(0, charge)
 
     def _get_wta_multiplier(self, striker: Unit, target: Unit) -> float:
         """Calculates the final WTA multiplier, including Triangle Adept/Cancel Affinity."""
@@ -223,11 +223,11 @@ class CombatEngine:
             atk_vals[stat] = self.attacker.get_combat_stat(stat, self.defender)
             def_vals[stat] = self.defender.get_combat_stat(stat, self.attacker)
 
-        self.infos["attacker"].combat_stats = StatBlock(**atk_vals)
-        self.infos["defender"].combat_stats = StatBlock(**def_vals)
+        self.combatant_states["attacker"].combat_stats = StatBlock(**atk_vals)
+        self.combatant_states["defender"].combat_stats = StatBlock(**def_vals)
 
-        self.infos["attacker"].defensive_stat = "def" if self.defender.is_physical() else "res"
-        self.infos["defender"].defensive_stat = "def" if self.attacker.is_physical() else "res"
+        self.combatant_states["attacker"].defensive_stat = "def" if self.defender.is_physical() else "res"
+        self.combatant_states["defender"].defensive_stat = "def" if self.attacker.is_physical() else "res"
 
     def _determine_strike_sequence(self) -> list[Strike]:
         """Determines the number and order of strikes."""
