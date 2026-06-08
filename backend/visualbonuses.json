@@ -63,7 +63,8 @@
     }
   },
   "Dosage": {
-    "type": "bonus"
+    "type": "bonus",
+    "combat_stats": {"atk": 5, "spd": 5, "defense": 5, "res": 5}
   },
   "Draconic Hex": {
     "type": "bonus"
@@ -147,7 +148,12 @@
     "type": "bonus"
   },
   "Preempt Pulse": {
-    "type": "bonus"
+    "type": "bonus",
+    "utilities": {
+      "cooldown_modifiers": {
+        "before_first_attack": 1
+      }
+    }
   },
   "Prof's Guidance": {
     "type": "bonus"
