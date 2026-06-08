@@ -179,7 +179,7 @@ class CombatEngine:
         is_first_strike = (
             strike.strike_type is StrikeType.FIRST and not strike.brave_second_hit
         )
-        for item in strike.target.unit.equipped_items:
+        for item in self.combatant_states[striker.target].unit.active_statuses.equipped_items:
             # check weapons/skills
             if is_first_strike:
                 first_dr = getattr(item.utilities, "first_hit_percent_dr", 0.0)
@@ -196,7 +196,7 @@ class CombatEngine:
                 base_dr = 1.0 - ((1.0 - base_dr) * (1.0 - perma_dr))
 
         # check bonuses
-        for status_name in strike.target.unit.active_statuses:
+        for status_name in self.combatant_states[striker.target].unit.active_statuses:
             if status_data := STATUS_EFFECT_DATABASE.get(status_name):
                 utilities = status_data["utilities"]
                 if is_first_strike:
