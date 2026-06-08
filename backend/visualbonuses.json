@@ -1,11 +1,14 @@
 {
   "Anathema": {
     "type": "bonus",
-    "enemy_combat_stats": {"spd": -3, "defense": -3, "res": -3}
+    "enemy_combat_stats": {"spd": -4, "defense": -4, "res": -4}
   },
   "Atk Liberate": {
     "type": "bonus",
-    "combat_stats": {"atk": 8}
+    "utilities": {
+      "keywords": ["atk_liberate"],
+      "logic_tag": "dynamic_stats"
+    }
   },
   "Bonus Doubler": {
     "type": "bonus",
@@ -24,22 +27,27 @@
     "type": "bonus",
     "combat_stats": {"atk": 5, "spd": 5, "defense": 5, "res": 5},
     "utilities": {
-      "logic_tag": "changeoffate_logic"
+      "keywords": ["change_of_fate"],
+      "logic_tag": "true_damage"
     }
   },
 "Creation Pulse": {
     "type": "bonus",
     "utilities": {
       "cooldown_modifiers": {
-        "before_first_attack": "creation_pulse_logic"
+        "before_first_attack": "special_jump"
       }
     }
   },
   "Collapsed Star": {
-    "type": "bonus"
+    "type": "bonus",
+    "utilities": {
+      "keywords": ["collapsed_star"]
+    }
   },
   "Dark Emblem": {
-    "type": "bonus"
+    "type": "bonus",
+    "combat_stats": {"atk": 5, "spd": 5, "defense": 5, "res": 5}
   },
   "Deep Star": {
     "type": "bonus"
@@ -57,16 +65,21 @@
     "type": "bonus"
   },
   "Dominance": {
-    "type": "bonus"
+    "type": "bonus",
+    "utilities": {
+      "logic_tag": "true_dmg"
+    }
   },
   "Dosage": {
-    "type": "bonus"
+    "type": "bonus",
+    "combat_stats": {"atk": 5, "spd": 5, "defense": 5, "res": 5}
   },
   "Draconic Hex": {
     "type": "bonus"
   },
   "Drain Cancel": {
-    "type": "bonus"
+    "type": "bonus",
+    "combat_stats": {"atk": 4, "spd": 4, "defense": 4, "res": 4}
   },
   "Dual Strike": {
     "type": "bonus"
@@ -78,7 +91,10 @@
     "type": "bonus"
   },
   "Fallen Star": {
-    "type": "bonus"
+    "type": "bonus",
+    "utilities": {
+      "keywords": ["fallen_star"]
+    }
   },
   "Fell Spirit": {
     "type": "bonus"
@@ -96,7 +112,8 @@
     "type": "bonus"
   },
   "Future Witness": {
-    "type": "bonus"
+    "type": "bonus",
+    "combat_stats": {"atk": 5, "spd": 5, "defense": 5, "res": 5}
   },
   "Grand Strategy": {
     "type": "bonus"
@@ -144,19 +161,40 @@
     "type": "bonus"
   },
   "Preempt Pulse": {
-    "type": "bonus"
+    "type": "bonus",
+    "utilities": {
+      "cooldown_modifiers": {
+        "before_first_attack": 1
+      }
+    }
   },
   "Prof's Guidance": {
-    "type": "bonus"
+    "type": "bonus",
+    "combat_stats": {"atk": 5, "spd": 5, "defense": 5, "res": 5},
+    "utilities" : {
+      "TODO: IMPLEMENT THE TREAT GUST AS 2X DR + SPECIAL JUMP AFTER COMBAT HERE" : ["PLACEHOLDER"]
+    }
   },
   "Pulse Follow": {
     "type": "bonus"
   },
   "Radiant Hero": {
-    "type": "bonus"
+    "type": "bonus",
+    "combat_stats": {"atk": 5, "spd": 5, "defense": 5, "res": 5},
+    "utilities" : {
+      "keywords": ["radiant_hero"],
+      "truedr": 10,
+      "logic_tag": "true_damage"
+    }
   },
   "Rally Spectrum": {
-    "type": "bonus"
+    "type": "bonus",
+    "combat_stats": {"atk": 5, "spd": 5, "defense": 5, "res": 5},
+    "utilities": {
+      "cooldown_modifiers": {
+        "before_first_attack": "special_jump"
+      }
+    }
   },
   "Reduce Area-of-Effect Special Damage Taken": {
     "type": "bonus"
@@ -165,7 +203,12 @@
     "type": "bonus"
   },
   "Reflex": {
-    "type": "bonus"
+    "type": "bonus",
+    "utilities": {
+      "keywords": ["reflex"],
+      "truedr": 7,
+      "logic_tag": "true_damage"
+    }
   },
   "Res Liberate": {
     "type": "bonus"
@@ -189,7 +232,10 @@
     "type": "bonus"
   },
   "Treachery": {
-    "type": "bonus"
+    "type": "bonus",
+    "utilities": {
+      "logic_tag": "true_dmg"
+    }
   },
   "Triangle Attack": {
     "type": "bonus"
