@@ -2,7 +2,7 @@ import math
 from dataclasses import dataclass
 from .classes import Unit
 from .constants import WeaponType, Color
-
+from .jsonbootupstuff import STATUS_EFFECT_DATABASE
 
 @dataclass
 class CombatEngine:
@@ -21,6 +21,12 @@ class CombatEngine:
         self._phase_start_of_combat()
 
         self._phase_before_first_attack()
+        # tracks amount of hits per combat
+        self.attacker.combat_attacks_performed = 0
+        self.defender.combat_attacks_performed = 0
+        # tracks dmg mitigated for reflex
+        self.attacker.damage_mitigated_bucket = 0
+        self.defender.damage_mitigated_bucket = 0
 
         if self.attacker.base_stats.hp > 0:
             self._process_strike(self.attacker, self.defender)
@@ -56,14 +62,53 @@ class CombatEngine:
         modified_atk = math.trunc(raw_atk * wta)
 
         base_damage = max(0, modified_atk - defensive_stat)
+    
         true_damage = sum(
             item.utilities.truedmg_logic(striker, target)
             for item in striker.equipped_items
-            if item.utilities.truedmg_logic
+            if item.utilities.truedmg_logic is not None
         )
+        
+        true_damage += sum(
+            item.utilities.truedmg
+            for item in striker.equipped_items
+            if hasattr(item.utilities, 'truedmg')
+        )
+    
+        for status_name in striker.active_statuses:
+            status_data = STATUS_EFFECT_DATABASE.get(status_name)
+            if status_data:
+                utilities = status_data["utilities"]
+                
+                # Add flat status true damage
+                true_damage += getattr(utilities, 'truedmg', 0)
+                
+                # Add dynamic status true damage
+                if getattr(utilities, 'truedmg_logic', None) is not None:
+                    true_damage += utilities.truedmg_logic(striker, target)
+        final_damage = base_damage + true_damage
 
-        new_hp = target.base_stats.hp - (base_damage + true_damage)
-        target.base_stats = target.base_stats._replace(hp=new_hp)
+        #  CHECK FOR FIRST HIT DR TYPES
+        # for legacy DR's that dont consider brave a part of the first hit
+        is_absolute_first_strike = (striker.combat_attacks_performed == 0)
+        #for most modern DR's that do consider brave a part of the first hit
+        is_first_sequence = is_absolute_first_strike or (
+            striker.combat_attacks_performed == 1 and striker.has_keyword("brave_weapon")
+        )
+        #for reflex
+        mitigated_amount = 0 
+        
+        # ------------------------------------
+        # Collapsed Star
+        if target.has_keyword("collapsed_star") and is_first_sequence:
+           if final_damage > 1:
+                mitigated_amount = final_damage - 1
+                final_damage = 1
+        # ------------------------------------
+        
+        target.damage_mitigated_bucket += mitigated_amount
+        new_hp = target.base_stats.hp - final_damage
+        target.base_stats.hp = new_hp
 
         charge = (
             1
@@ -71,6 +116,7 @@ class CombatEngine:
             + target.get_pulse_amount("per_foe_attack", striker)
         )
         striker.current_cooldown -= max(0, charge)
+        striker.combat_attacks_performed += 1
 
     def _get_wta_multiplier(self, striker: Unit, target: Unit) -> float:
         """Calculates the final WTA multiplier, including Triangle Adept/Cancel Affinity."""

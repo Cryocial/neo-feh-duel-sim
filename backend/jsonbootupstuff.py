@@ -37,7 +37,9 @@ def initialize_status_database():
         )
 
         if tag := util_data.get("logic_tag"):
-            pass
+            if tag := util_data.get("logic_tag"):
+                utilities.truedmg_logic = resolve_logic(tag)
+                #ADD MORE SOON
 
         STATUS_EFFECT_DATABASE[name] = {
             "combat_stats": combat_stats,

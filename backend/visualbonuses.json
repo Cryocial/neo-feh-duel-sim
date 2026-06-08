@@ -31,12 +31,15 @@
     "type": "bonus",
     "utilities": {
       "cooldown_modifiers": {
-        "before_first_attack": "creation_pulse_logic"
+        "before_first_attack": "special_jump"
       }
     }
   },
   "Collapsed Star": {
-    "type": "bonus"
+    "type": "bonus",
+    "utilities": {
+      "keywords": ["collapsed_star"]
+    }
   },
   "Dark Emblem": {
     "type": "bonus"
@@ -82,7 +85,10 @@
     "type": "bonus"
   },
   "Fallen Star": {
-    "type": "bonus"
+    "type": "bonus",
+    "utilities": {
+      "keywords": ["fallen_star"]
+    }
   },
   "Fell Spirit": {
     "type": "bonus"
@@ -165,7 +171,12 @@
     "type": "bonus"
   },
   "Rally Spectrum": {
-    "type": "bonus"
+    "type": "bonus",
+    "utilities": {
+      "cooldown_modifiers": {
+        "before_first_attack": "special_jump"
+      }
+    }
   },
   "Reduce Area-of-Effect Special Damage Taken": {
     "type": "bonus"
