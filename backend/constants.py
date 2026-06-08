@@ -1,10 +1,12 @@
 from enum import Enum, auto
 
+
 class MovementType(Enum):
     INFANTRY = auto()
     ARMOR = auto()
     CAVALRY = auto()
     FLIER = auto()
+
 
 class WeaponType(Enum):
     SWORD = auto()
@@ -17,11 +19,13 @@ class WeaponType(Enum):
     DRAGON = auto()
     BEAST = auto()
 
+
 class Color(Enum):
     RED = auto()
     BLUE = auto()
     GREEN = auto()
     COLORLESS = auto()
+
 
 class StatType(Enum):
     HP = "hp"
