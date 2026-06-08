@@ -1,7 +1,7 @@
 {
   "Anathema": {
     "type": "bonus",
-    "enemy_combat_stats": {"spd": -3, "defense": -3, "res": -3}
+    "enemy_combat_stats": {"spd": -4, "defense": -4, "res": -4}
   },
   "Atk Liberate": {
     "type": "bonus",
