@@ -41,9 +41,8 @@ class CombatEngine:
             self._process_strike(strike.striker, strike.target) #CD pulses and healing calc in there too
             
         self._phase_before_first_attack()
-        # tracks amount of hits per combat
-        self.attacker.combat_attacks_performed = 0
-        self.defender.combat_attacks_performed = 0
+
+
         # tracks dmg mitigated for reflex
         self.attacker.damage_mitigated_bucket = 0
         self.defender.damage_mitigated_bucket = 0
@@ -111,22 +110,14 @@ class CombatEngine:
                 if getattr(utilities, 'truedmg_logic', None) is not None:
                     true_damage += utilities.truedmg_logic(striker, target)
         final_damage = base_damage + true_damage
+
         #  CHECK FOR FIRST HIT DR TYPES
-        # for legacy DR's that dont consider brave a part of the first hit
-        is_absolute_first_strike = (striker.combat_attacks_performed == 0)
-        #for most modern DR's that do consider brave a part of the first hit
-        is_first_sequence = is_absolute_first_strike or (
-            striker.combat_attacks_performed == 1 and striker.has_keyword("brave_weapon")
-        )
         #for reflex
         mitigated_amount = 0 
         
         # ------------------------------------
         # Collapsed Star
-        if target.has_keyword("collapsed_star") and is_first_sequence:
-           if final_damage > 1:
-                mitigated_amount = final_damage - 1
-                final_damage = 1
+        # TO DO: wait for a method to track when a attack is to be implemented:
         # ------------------------------------
 
         target.damage_mitigated_bucket += mitigated_amount
