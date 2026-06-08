@@ -52,18 +52,20 @@ def bonus_doubler(unit, target_enemy=None, effective_buffs=None):
     return {stat: effective_buffs.get(stat, 0) for stat in ["atk", "spd", "defense", "res"]}
 
 """Anathema and Omni Debuff"""
-def anathema(unit, enemy=None):
+
+"""def anathema(unit, enemy=None):
     anathema = 0
     if unit.anathema:
         anathema += 4
     return [anathema, anathema, anathema]
+    }""" #Redundant with visualbonuses.json, but keeping here just in case
 def omni_debuff(unit, enemy=None):
     omni_debuff = 0
-    if unit.fell_spirit
-        if unit.engage or enemy.engage
+    if unit.fell_spirit:
+        if unit.engage or enemy.engage:
             omni_debuff += 6
-        else
-            omni_bebuff += 4
+        else:
+            omni_debuff += 4
     return [omni_debuff, omni_debuff, omni_debuff, omni_debuff]
 
 
