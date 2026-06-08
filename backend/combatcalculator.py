@@ -201,6 +201,7 @@ class CombatEngine:
                 status_perma_dr = getattr(utilities, 'percent_dr', 0.0)
                 if status_perma_dr > 0:
                     raw_dr = 1.0 - ((1.0 - raw_dr) * (1.0 - status_perma_dr))
+        # ------------------------------------------------------------------------
         # final touches
         effective_dr = base_dr * pierce_mult
         target.damage_mitigated_bucket += mitigated_amount
