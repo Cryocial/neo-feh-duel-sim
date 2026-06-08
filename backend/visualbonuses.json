@@ -221,11 +221,11 @@
   },
   "Resonance: Blades": {
     "type": "bonus",
-    "combat_stats": {"atk": 5, "spd": 5}
+    "combat_stats": {"atk": 4, "spd": 4}
   },
   "Resonance: Shields": {
     "type": "bonus",
-    "combat_stats": {"defense": 5, "res": 5},
+    "combat_stats": {"defense": 4, "res": 4},
     "TODO: ADD FU DENIAL ONCE ITS DONE" : "pass"
   },
   "Spd Rift +10": {
@@ -235,9 +235,6 @@
     "type": "bonus"
   },
   "Special Cooldown Charge +1": {
-    "type": "bonus"
-  },
-  "Time's Gate": {
     "type": "bonus"
   },
   "Treachery": {
@@ -255,16 +252,7 @@
 
 
 
-
-
-
-  "After Start-of-Turn Skills Trigger, Action Ends Immediately": {
-    "type": "penalty"
-  },
   "Atk Shackle": {
-    "type": "penalty"
-  },
-  "Canto Control": {
     "type": "penalty"
   },
   "Counterattacks disrupted": {
@@ -289,9 +277,6 @@
     "type": "penalty"
   },
   "Frozen": {
-    "type": "penalty"
-  },
-  "Gravity": {
     "type": "penalty"
   },
   "Guard": {
@@ -322,9 +307,6 @@
     "type": "penalty"
   },
   "Spd Shackle": {
-    "type": "penalty"
-  },
-  "Stall": {
     "type": "penalty"
   },
   "Time's Grip": {
