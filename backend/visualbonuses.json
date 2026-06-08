@@ -24,7 +24,7 @@
     "type": "bonus",
     "combat_stats": {"atk": 5, "spd": 5, "defense": 5, "res": 5},
     "utilities": {
-      "logic_tag": "changeoffate_logic"
+      "logic_tag": "true_dmg"
     }
   },
 "Creation Pulse": {
@@ -57,7 +57,10 @@
     "type": "bonus"
   },
   "Dominance": {
-    "type": "bonus"
+    "type": "bonus",
+    "utilities": {
+      "logic_tag": "true_dmg"
+    }
   },
   "Dosage": {
     "type": "bonus"
@@ -189,7 +192,10 @@
     "type": "bonus"
   },
   "Treachery": {
-    "type": "bonus"
+    "type": "bonus",
+    "utilities": {
+      "logic_tag": "true_dmg"
+    }
   },
   "Triangle Attack": {
     "type": "bonus"
