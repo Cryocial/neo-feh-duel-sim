@@ -87,7 +87,6 @@ class CombatEngine:
                 if getattr(utilities, 'truedmg_logic', None) is not None:
                     true_damage += utilities.truedmg_logic(striker, target)
         final_damage = base_damage + true_damage
-
         #  CHECK FOR FIRST HIT DR TYPES
         # for legacy DR's that dont consider brave a part of the first hit
         is_absolute_first_strike = (striker.combat_attacks_performed == 0)
@@ -105,7 +104,7 @@ class CombatEngine:
                 mitigated_amount = final_damage - 1
                 final_damage = 1
         # ------------------------------------
-        
+
         target.damage_mitigated_bucket += mitigated_amount
         new_hp = target.base_stats.hp - final_damage
         target.base_stats.hp = new_hp
