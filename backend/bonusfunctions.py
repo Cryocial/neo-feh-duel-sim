@@ -76,9 +76,9 @@ def omni_debuff(unit, enemy=None):
 def true_damage(unit, enemy=None):
     true_damage = 0
     """Calculates true damage based on the unit's active bonus count."""
-    if unit.change_of_fate
+    if unit.change_of_fate:
         true_damage += min(15, unit.bonus_count * 3)
-    if unit.treachery
+    if unit.treachery:
         buffs = unit.visible_buffs
         true_damage += max(0, buffs.atk) + max(0, buffs.spd) + max(0, buffs.defense) + max(0, buffs.res)
     if unit.dominance and enemy is not None:
@@ -108,19 +108,19 @@ def bonus_true_dr(unit, enemy=None):
 def all_bonus_true_dr (unit, enemy=None):
     all_true_dr = 0
     if unit.divine_nectar:
-        all true_dr += 10
+        all true_dr += 10 # apparently an error here?
     return all_true_dr
 
 """Special Jumps"""
 def special_jump(unit, target_enemy=None):
     special_jump = 0
-    if unit.rally_spectrum
-        if unit.slaying or unit.slaying2 or unit.brave
+    if unit.rally_spectrum:
+        if unit.slaying or unit.slaying2 or unit.brave:
             special_jump += 1
         else:
             special_jump += 2
     """Grants cooldown reduction based on enemy penalty count."""
-    if unit.creation_pulse
+    if unit.creation_pulse:
         special_jump = min(2, target_enemy.penalty_count) if target_enemy else 0
     return special_jump
 
@@ -133,7 +133,8 @@ def potent_40_or_80(unit, enemy=None):
 
 def potent_defense_scaling(unit, enemy=None):
     """Calculates potent effectiveness based on defense difference."""
-    if enemy is None: return 0.0
+    if enemy is None: 
+        return 0.0
     def_diff = unit.get_combat_stat("defense", enemy) - enemy.get_combat_stat("defense", unit)
     return min(max(0, def_diff) * 0.10, 0.50)
 
