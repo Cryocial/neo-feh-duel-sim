@@ -7,13 +7,13 @@
     "type": "bonus",
     "utilities": {
       "keywords": ["atk_liberate"],
-      "logic_tag": "dynamic_stats"
+      "logic_tag": "single_stats"
     }
   },
   "Bonus Doubler": {
     "type": "bonus",
     "utilities": {
-      "logic_tag": "bd_logic"
+      "logic_tag": "bonus_doubler"
     }
     
   },
@@ -34,6 +34,7 @@
 "Creation Pulse": {
     "type": "bonus",
     "utilities": {
+      "keywords": ["creation_pulse"],
       "cooldown_modifiers": {
         "before_first_attack": "special_jump"
       }
@@ -189,8 +190,8 @@
   },
   "Rally Spectrum": {
     "type": "bonus",
-    "combat_stats": {"atk": 5, "spd": 5, "defense": 5, "res": 5},
     "utilities": {
+      "keywords": ["rally_spectrum"],
       "cooldown_modifiers": {
         "before_first_attack": "special_jump"
       }
