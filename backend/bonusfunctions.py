@@ -2,7 +2,7 @@
 Contains logic for specific skills and status effects.
 These functions are resolved by name during the JSON bootup process.
 """
-
+import math
 
 def omni_boost(unit, enemy=None):
     """Aggregates all dynamic omni-stat boosts."""
@@ -61,20 +61,47 @@ def true_damage(unit, target_enemy=None):
 
     return total
 
+
 def true_dr(unit, target_enemy=None):
     """Aggregates conditional True Damage Reduction."""
     dr = 0
-    if unit.has_keyword("divine_nectar") and getattr(unit, "first_combat_of_turn", True):
+    if unit.has_keyword("divine_nectar") and getattr(
+        unit, "first_combat_of_turn", False
+    ):
         dr += 10
 
-def heal_start_of_combat(unit, enemy=None):
+
+def heal_start_of_combat(unit, target_enemy=None):
     """Triggers after pre-combat damage/AoE, before swing 0."""
     heal = 0
-    
+
     if unit.has_keyword("divine_nectar"):
         heal += 20
-    # bol/imbue goes here    
+    # bol/imbue goes here
+    if unit.has_keyword("imbue"):
+        heal += math.trunc(0.4 * unit.base_stats.hp)
+    if unit.has_keyword("bol4") and target_enemy is not None:
+        if unit.combat_stats.defense >= (target_enemy.combat_stats.defense - 5):
+            heal += math.trunc(0.4 * unit.base_stats.hp)
+        else:
+            heal += math.trunc(0.2 * unit.base_stats.hp)
     return heal
+
+
+def heal_on_hit(unit, target_enemy=None):
+    """Triggers strictly after a unit lands a weapon swing."""
+    heal = 0
+    if unit.has_keyword("profs_guidance"):
+        heal += 7
+    return heal
+
+
+def pre_combat_damage(unit, target_enemy=None):
+    """Aggregates all pre-combat damage dealt TO the enemy."""
+    dmg = 0
+    # placeholder
+    return dmg
+
 
 def special_jump(unit, target_enemy=None):
     """Aggregates all special cooldown jumps."""
