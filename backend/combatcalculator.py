@@ -581,8 +581,8 @@ class CombatEngine:
             strike_sequence = (
                 defender_first
                 + attacker_first
-                + attacker_followups
                 + defender_followups
+                + attacker_followups
             )
         elif attacker_bunches:
             strike_sequence = attacker_package + defender_package
@@ -640,4 +640,5 @@ class CombatEngine:
         # self.defender.current_cooldown -= self.defender.get_pulse_amount(
         #     "after_combat", self.attacker
         # )
+        pass
         ...
