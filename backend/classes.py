@@ -261,6 +261,15 @@ class Unit:
                     
         return count
 
+    def is_physical(self) -> bool:
+        """Returns True if the unit's weapon type is physical (not magic/staff/beast)."""
+        return self.weapon_type not in {
+            WeaponType.TOME,
+            WeaponType.STAFF,
+            WeaponType.DRAGON,
+            WeaponType.BEAST,
+        }
+
     def get_pulse_amount(self, phase: str, target: Self | None = None) -> int:
         """Scans all sources for cooldown modifiers during a specific combat phase."""
         from .jsonbootupstuff import STATUS_EFFECT_DATABASE
