@@ -586,6 +586,13 @@ class CombatEngine:
             )
         elif attacker_bunches:
             strike_sequence = attacker_package + defender_package
+        elif defender_vantage and attacker_bunches:
+            strike_sequence = (
+                defender_first
+                + attacker_first
+                + attacker_followups
+                + defender_followups
+            )
         else:
             strike_sequence = (
                 attacker_first
