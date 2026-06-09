@@ -141,7 +141,10 @@
     "type": "bonus"
   },
   "Hexblade": {
-    "type": "bonus"
+    "type": "bonus",
+    "utilities": {
+      "adaptive_tag": "hexblade_logic"
+    }
   },
   "Imbue": {
     "type": "bonus",
