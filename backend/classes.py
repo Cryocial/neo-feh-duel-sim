@@ -300,9 +300,6 @@ class Unit:
                 total += mod(self, target) if callable(mod) else mod
         return total
 
-    def is_physical(self):
-        return not(self.weapon_type in [WeaponType.TOME, WeaponType.STAFF, WeaponType.DRAGON])
-
     @property
     def has_AoE(self):
-        return (self.special and self.special.utilities.aoe_coefficient)
+        return self.special and self.special.utilities.aoe_coefficient
