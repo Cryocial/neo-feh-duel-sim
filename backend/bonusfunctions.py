@@ -87,6 +87,16 @@ def true_dr(unit, target_enemy=None):
         dr += 10
     return dr
 
+def hexblade_logic(unit, target_enemy=None):
+    """Hexblade status: Targets the lower of foe's Def/Res."""
+    if target_enemy is None:
+        return None
+    
+    # combat_stats is set in combatcalculator before this would be called
+    if target_enemy.combat_stats.defense < target_enemy.combat_stats.res:
+        return "def"
+    return "res"
+
 def set_to_one(unit, target_enemy, strike):
     """Set Incoming Damage = 1"""
     #NOTE FOR FUTURE, THIS FUNCTION CAN BE CHANGED TO SET TO ANY FLAT NUMBER THATS NOT 1, IF NEEDED

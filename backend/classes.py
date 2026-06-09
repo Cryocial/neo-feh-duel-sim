@@ -66,6 +66,7 @@ class UtilityBlock:
     percentdr: float = 0.0
     potent_logic: Callable | None = None
     set_to_one_logic: Callable | None = None
+    adaptive_logic: Callable | None = None
     keywords: list[str] = field(default_factory=list)
 
 
@@ -287,3 +288,9 @@ class Unit:
                 mod = info["utilities"].cooldown_modifiers.get(phase, 0)
                 total += mod(self, target) if callable(mod) else mod
         return total
+
+    @property
+    def has_AoE(self) -> bool:
+        if self.special and "aoe_special" in self.special.utilities.keywords:
+            return True
+        return False
