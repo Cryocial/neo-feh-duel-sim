@@ -64,8 +64,11 @@
     }
   },
   "Desperation": {
-    "type": "bonus"
-  },
+    "type": "bonus",
+    "utilities": {
+        "keywords": ["desperation"]
+    }
+},
   "Divine Nectar": {
     "type": "bonus",
     "utilities": {
@@ -143,8 +146,11 @@
     "type": "bonus"
   },
   "Foe Cannot Follow-Up": {
-    "type": "bonus"
-  },
+    "type": "bonus",
+    "utilities": {
+        "keywords": ["foe_cannot_follow_up"]
+    }
+},
   "Foe Penalty Doubler": {
     "type": "bonus"
   },
@@ -159,8 +165,11 @@
     "type": "bonus"
   },
   "Guaranteed Follow-Ups": {
-    "type": "bonus"
-  },
+    "type": "bonus",
+    "utilities": {
+        "keywords": ["guaranteed_follow_up"]
+    }
+},
   "Halves non-Special damage reduction": {
     "type": "bonus"
   },
@@ -219,8 +228,11 @@
     }
   },
   "Null Follow-Up": {
-    "type": "bonus"
-  },
+    "type": "bonus",
+    "utilities": {
+        "keywords": ["null_follow_up"]
+    }
+},
   "Null Panic": {
     "type": "bonus"
   },
@@ -330,6 +342,12 @@
   "Truly Incited": {
     "type": "bonus"
   },
+  "Vantage": {
+    "type": "bonus",
+    "utilities": {
+        "keywords": ["vantage"]
+    }
+},
 
 
 
