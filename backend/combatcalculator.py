@@ -186,10 +186,12 @@ class CombatEngine:
         mitigated_amount = 0
         # ------------------------------------------------------------------------
         # CALCULATE PERCENT DAMAGE REDUCTION
-        base_dr = 0
-        # A CHECK FOR MOST MODERN DR TYPES
-        is_first_sequence = strike.strike_type is StrikeType.FIRST
+        base_dr = 0.0
+        
+        is_first_sequence = (strike.strike_type is StrikeType.FIRST)
+        is_absolute_first_strike = (strike.strike_type is StrikeType.FIRST and not strike.brave_second_hit)
 
+<<<<<<< HEAD
         # A CHECK FOR LEGACY DR THAT IS ONLY FIRST HIT (NO BRAVE)
         is_first_strike = (
             strike.strike_type is StrikeType.FIRST and not strike.brave_second_hit
@@ -199,40 +201,45 @@ class CombatEngine:
         ].unit.active_statuses.equipped_items:
             # check weapons/skills
             if is_first_strike:
+=======
+        # A. Check Equipped Items
+        for item in target.equipped_items:
+            if is_absolute_first_strike:
+>>>>>>> 52a717064e0e8a39cebaa0f7260d68436e200bdf
                 first_dr = getattr(item.utilities, "first_hit_percent_dr", 0.0)
                 if first_dr > 0:
                     base_dr = 1.0 - ((1.0 - base_dr) * (1.0 - first_dr))
 
             if is_first_sequence:
-                sequence = getattr(item.utilities, "first_sequence_percent_dr", 0.0)
-                if sequence > 0:
-                    base_dr = 1.0((1.0 - base_dr) * (1.0 - sequence))
+                seq_dr = getattr(item.utilities, "first_sequence_percent_dr", 0.0)
+                if seq_dr > 0:
+                    base_dr = 1.0 - ((1.0 - base_dr) * (1.0 - seq_dr))
 
             perma_dr = getattr(item.utilities, "perma_percent_dr", 0.0)
             if perma_dr > 0:
                 base_dr = 1.0 - ((1.0 - base_dr) * (1.0 - perma_dr))
 
-        # check bonuses
-        for status_name in self.combatant_states[striker.target].unit.active_statuses:
+        # B. Check Active Statuses
+        from .jsonbootupstuff import STATUS_EFFECT_DATABASE
+        for status_name in target.active_statuses:
             if status_data := STATUS_EFFECT_DATABASE.get(status_name):
                 utilities = status_data["utilities"]
-                if is_first_strike:
+                
+                if is_absolute_first_strike:
                     status_first_dr = getattr(utilities, "first_hit_percent_dr", 0.0)
                     if status_first_dr > 0:
                         base_dr = 1.0 - ((1.0 - base_dr) * (1.0 - status_first_dr))
 
                 if is_first_sequence:
-                    status_sequence_dr = getattr(
-                        utilities, "first_sequence_percent_dr", 0.0
-                    )
-                    if status_sequence_dr > 0:
-                        base_dr = 1.0 - ((1.0 - base_dr) * (1.0 - status_sequence_dr))
+                    status_seq_dr = getattr(utilities, "first_sequence_percent_dr", 0.0)
+                    if status_seq_dr > 0:
+                        base_dr = 1.0 - ((1.0 - base_dr) * (1.0 - status_seq_dr))
 
                 status_perma_dr = getattr(utilities, "perma_percent_dr", 0.0)
                 if status_perma_dr > 0:
                     base_dr = 1.0 - ((1.0 - base_dr) * (1.0 - status_perma_dr))
-        # ------------------------------------------------------------------------
-        # final touches
+
+        # Apply Pierce & Calculate Post-% DR Damage
         effective_dr = base_dr * pierce_mult
         damage_multiplier = 1.0 - effective_dr
         final_damage = math.trunc(final_damage * damage_multiplier)
