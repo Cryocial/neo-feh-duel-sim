@@ -69,6 +69,7 @@ def true_dr(unit, target_enemy=None):
         unit, "first_combat_of_turn", False
     ):
         dr += 10
+    return dr
 
 
 def heal_start_of_combat(unit, target_enemy=None):
@@ -81,7 +82,9 @@ def heal_start_of_combat(unit, target_enemy=None):
     if unit.has_keyword("imbue"):
         heal += math.trunc(0.4 * unit.base_stats.hp)
     if unit.has_keyword("bol4") and target_enemy is not None:
-        if unit.combat_stats.defense >= (target_enemy.combat_stats.defense - 5):
+        unit_def = unit.get_combat_stat("defense", target_enemy)
+        enemy_def = target_enemy.get_combat_stat("defense", unit)
+        if unit_def >= (enemy_def - 5):
             heal += math.trunc(0.4 * unit.base_stats.hp)
         else:
             heal += math.trunc(0.2 * unit.base_stats.hp)

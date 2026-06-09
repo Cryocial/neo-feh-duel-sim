@@ -33,6 +33,7 @@
   },
 "Creation Pulse": {
     "type": "bonus",
+    "combat_stats": {"atk": 5, "spd": 5, "defense": 5, "res": 5},
     "utilities": {
       "keywords": ["creation_pulse"],
       "cooldown_modifiers": {
@@ -75,7 +76,7 @@
   "Dominance": {
     "type": "bonus",
     "utilities": {
-      "logic_tag": "true_dmg"
+      "logic_tag": "true_damage"
     }
   },
   "Dosage": {
@@ -203,6 +204,7 @@
   },
   "Rally Spectrum": {
     "type": "bonus",
+    "combat_stats": {"atk": 5, "spd": 5, "defense": 5, "res": 5},
     "utilities": {
       "keywords": ["rally_spectrum"],
       "cooldown_modifiers": {
@@ -251,7 +253,7 @@
   "Treachery": {
     "type": "bonus",
     "utilities": {
-      "logic_tag": "true_dmg"
+      "logic_tag": "true_damage"
     }
   },
   "Triangle Attack": {

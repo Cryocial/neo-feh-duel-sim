@@ -4,6 +4,7 @@ from typing import Literal
 from .classes import Unit, StatBlock
 from .constants import Color, StrikeType
 from .jsonbootupstuff import STATUS_EFFECT_DATABASE
+
 UnitRole = Literal["attacker", "defender"]
 
 
@@ -90,21 +91,22 @@ class CombatEngine:
             return
         heal_multiplier = 1.0
 
-        if unit.has_keyword("deep_wounds") and not unit.has_keyword("neutralize_deep_wounds"):
-            
+        if unit.has_keyword("deep_wounds") and not unit.has_keyword(
+            "neutralize_deep_wounds"
+        ):
             base_penalty = 1.0
-            
+
             partial_stacks = unit.count_keyword("partial_deep_wounds")
-            
-            actual_penalty = base_penalty * (0.5 ** partial_stacks)
-        
+
+            actual_penalty = base_penalty * (0.5**partial_stacks)
+
             heal_multiplier -= actual_penalty
-            
+
             amount = math.trunc(amount * heal_multiplier)
 
         if amount <= 0:
             return
-        
+
         new_hp = unit.current_hp + amount
         unit.current_hp = min(unit.base_stats.hp, new_hp)
 
