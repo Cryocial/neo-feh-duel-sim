@@ -112,7 +112,16 @@ class CombatEngine:
 
     def _process_AoE(self, striker: Unit, target: Unit):
         """Applies AoE damage"""
-        ...
+        # TODO: include bonus damage and DR effects
+        striker = self.combatant_states["attacker"]
+        target = self.combatant_states["defender"]
+        
+        coefficient = striker.unit.special.utilities.aoe_coefficient
+        visible_atk = striker.unit.get_visible_stat("atk")
+        visible_defensive_stat = target.unit.get_visible_stat("defense") if striker.unit.is_physical() else target.unit.get_visible_stat("res")
+        
+        damage = max(0, math.floor(coefficient * (visible_atk - visible_defensive_stat)))
+        target.current_hp = max(1, target.current_hp - damage)
 
     def _process_strike(self, strike: Strike):
         """Calculates and applies damage for a single weapon swing."""
@@ -387,7 +396,7 @@ class CombatEngine:
                 "before_AoE", self.defender
             )
             if self.attacker.current_cooldown == 0:
-                self._process_AoE(self.attacker, self.defender)
+                self._process_AoE()
 
     def _combat_stat_calculations(self):
         """Calculates combat stats for both units."""
