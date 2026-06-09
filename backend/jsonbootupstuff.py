@@ -53,6 +53,8 @@ def initialize_status_database():
 
         if tag := util_data.get("heal_after_tag"):
             utilities.heal_after_logic = resolve_logic(tag)
+        if tag := util_data.get("set_to_one_tag"):
+            utilities.set_to_one_logic = resolve_logic(tag)
             # ADD MORE SOON
 
         STATUS_EFFECT_DATABASE[name] = {
