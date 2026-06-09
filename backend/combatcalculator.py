@@ -115,12 +115,18 @@ class CombatEngine:
         # TODO: include bonus damage and DR effects
         striker = self.combatant_states["attacker"]
         target = self.combatant_states["defender"]
-        
+
         coefficient = striker.unit.special.utilities.aoe_coefficient
         visible_atk = striker.unit.get_visible_stat("atk")
-        visible_defensive_stat = target.unit.get_visible_stat("defense") if striker.unit.is_physical() else target.unit.get_visible_stat("res")
-        
-        damage = max(0, math.floor(coefficient * (visible_atk - visible_defensive_stat)))
+        visible_defensive_stat = (
+            target.unit.get_visible_stat("defense")
+            if striker.unit.is_physical()
+            else target.unit.get_visible_stat("res")
+        )
+
+        damage = max(
+            0, math.floor(coefficient * (visible_atk - visible_defensive_stat))
+        )
         target.current_hp = max(1, target.current_hp - damage)
 
     def _process_strike(self, strike: Strike):
@@ -552,30 +558,41 @@ class CombatEngine:
                 Strike("defender", "attacker", StrikeType.POTENT, consecutive=True)
             )
 
-        defender_vantage = self.defender.has_keyword("vantage")
-
         # Standard desperation — PP Only
         attacker_desperation = self.attacker.has_keyword("desperation")
 
         # Special version — no initiation requirement, can apply on ep (Marth for example)
-        attacker_desp_effect = self.attacker.has_keyword("desperation_effect")
-        defender_desp_effect = self.defender.has_keyword("desperation_effect")
+        attacker_desp_effect = self.attacker.has_keyword("dualphasedesperation")
+        defender_desp_effect = self.defender.has_keyword("dualphasedesperation")
+
+        attacker_package = attacker_first + attacker_followups
+        defender_package = defender_first + defender_followups
 
         attacker_package = attacker_first + attacker_followups
         defender_package = defender_first + defender_followups
 
         defender_vantage = self.defender.has_keyword("vantage")
-        attacker_bunches = self.attacker.has_keyword("desperation") or self.attacker.has_keyword("desperation_effect")
-        defender_bunches = self.defender.has_keyword("desperation_effect")
+        attacker_bunches = attacker_desperation or attacker_desp_effect
+        defender_bunches = defender_desp_effect
 
         if defender_vantage and defender_bunches:
             strike_sequence = defender_package + attacker_package
         elif defender_vantage:
-            strike_sequence = defender_first + attacker_first + attacker_followups + defender_followups
+            strike_sequence = (
+                defender_first
+                + attacker_first
+                + attacker_followups
+                + defender_followups
+            )
         elif attacker_bunches:
             strike_sequence = attacker_package + defender_package
         else:
-            strike_sequence = attacker_first + defender_first + attacker_followups + defender_followups
+            strike_sequence = (
+                attacker_first
+                + defender_first
+                + attacker_followups
+                + defender_followups
+            )
 
         return strike_sequence
 
