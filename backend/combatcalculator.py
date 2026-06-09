@@ -140,16 +140,24 @@ class CombatEngine:
 
         # Effectiveness calculation
         is_effective = False
-        if target.movement_type == MovementType.ARMOR and striker.has_keyword("effective_armor"):
+        if target.movement_type == MovementType.ARMOR and striker.has_keyword(
+            "effective_armor"
+        ):
             if not target.has_keyword("neutralize_effective_armor"):
                 is_effective = True
-        elif target.movement_type == MovementType.CAVALRY and striker.has_keyword("effective_cavalry"):
+        elif target.movement_type == MovementType.CAVALRY and striker.has_keyword(
+            "effective_cavalry"
+        ):
             if not target.has_keyword("neutralize_effective_cavalry"):
                 is_effective = True
-        elif target.movement_type == MovementType.FLIER and striker.has_keyword("effective_flier"):
+        elif target.movement_type == MovementType.FLIER and striker.has_keyword(
+            "effective_flier"
+        ):
             if not target.has_keyword("neutralize_effective_flying"):
                 is_effective = True
-        elif target.weapon_type == WeaponType.DRAGON and striker.has_keyword("effective_dragon"):
+        elif target.weapon_type == WeaponType.DRAGON and striker.has_keyword(
+            "effective_dragon"
+        ):
             if not target.has_keyword("neutralize_effective_dragon"):
                 is_effective = True
 
@@ -398,22 +406,30 @@ class CombatEngine:
         attacker_targets = "def" if self.attacker.is_physical() else "res"
         for item in self.attacker.equipped_items:
             if item.utilities.adaptive_logic:
-                attacker_targets = item.utilities.adaptive_logic(self.attacker, self.defender)
+                attacker_targets = item.utilities.adaptive_logic(
+                    self.attacker, self.defender
+                )
         for s in self.attacker.active_statuses:
             if info := STATUS_EFFECT_DATABASE.get(s):
                 if info["utilities"].adaptive_logic:
-                    attacker_targets = info["utilities"].adaptive_logic(self.attacker, self.defender)
+                    attacker_targets = info["utilities"].adaptive_logic(
+                        self.attacker, self.defender
+                    )
         self.combatant_states["defender"].defensive_stat = attacker_targets
 
         # Determine targeting for Defender targeting Attacker
         defender_targets = "def" if self.defender.is_physical() else "res"
         for item in self.defender.equipped_items:
             if item.utilities.adaptive_logic:
-                defender_targets = item.utilities.adaptive_logic(self.defender, self.attacker)
+                defender_targets = item.utilities.adaptive_logic(
+                    self.defender, self.attacker
+                )
         for s in self.defender.active_statuses:
             if info := STATUS_EFFECT_DATABASE.get(s):
                 if info["utilities"].adaptive_logic:
-                    defender_targets = info["utilities"].adaptive_logic(self.defender, self.attacker)
+                    defender_targets = info["utilities"].adaptive_logic(
+                        self.defender, self.attacker
+                    )
         self.combatant_states["attacker"].defensive_stat = defender_targets
 
     def _determine_strike_sequence(self) -> list[Strike]:
@@ -426,25 +442,16 @@ class CombatEngine:
         attacker_spd_check = 1 if spd_diff > 5 else 0
         defender_spd_check = 1 if spd_diff < -5 else 0
 
-        nb_attacker_GFU = (
-            0  # TODO: count the number of "Unit makes a guaranteed follow-up attack"
-        )
-        nb_defender_GFU = (
-            0  # TODO: count the number of "Unit makes a guaranteed follow-up attack"
-        )
+        nb_attacker_GFU = self.attacker.count_keyword("guaranteed_follow_up")
+        nb_defender_GFU = self.defender.count_keyword("guaranteed_follow_up")
 
-        nb_attacker_FU_denial = (
-            0  # TODO: count the number of "Foe cannot make a follow-up attack" layers
-        )
-        nb_defender_FU_denial = (
-            0  # TODO: count the number of "Foe cannot make a follow-up attack" layers
-        )
+        nb_attacker_FU_denial = self.defender.count_keyword("foe_cannot_follow_up")
+        nb_defender_FU_denial = self.attacker.count_keyword("foe_cannot_follow_up")
 
-        attacker_off_NFU = 0  # TODO: 1 if attacker has "neutralizes effects that prevent unit's followup attacks"
-        defender_off_NFU = 0  # TODO: 1 if defender has "neutralizes effects that prevent unit's followup attacks"
-
-        attacker_def_NFU = 0  # TODO: 1 if attacker has "neutralizes effects that guarantee foe's follow-up attacks"
-        defender_def_NFU = 0  # TODO: 1 if defender has "neutralizes effects that guarantee foe's follow-up attacks"
+        attacker_off_NFU = 1 if self.attacker.has_keyword("null_follow_up") else 0
+        attacker_def_NFU = 1 if self.attacker.has_keyword("null_follow_up") else 0
+        defender_off_NFU = 1 if self.defender.has_keyword("null_follow_up") else 0
+        defender_def_NFU = 1 if self.defender.has_keyword("null_follow_up") else 0
 
         attacker_FU = (
             nb_attacker_GFU * (1 - defender_def_NFU)
@@ -457,59 +464,109 @@ class CombatEngine:
             + defender_spd_check
         )
 
-        attacker_brave = False  # TODO: check wether attacker can attack twice
-        defender_brave = False  # TODO: check wether defender can attack twice
+        attacker_brave = self.attacker.has_keyword("brave_weapon")
+        defender_brave = self.defender.has_keyword("brave_weapon")
 
-        attacker_potent = (
-            False  # TODO check wether attacker can trigger a potent attack
-        )
-        defender_potent = (
-            False  # TODO check wether defender can trigger a potent attack
-        )
+        attacker_spd = self.combatant_states["attacker"].combat_stats.spd
+        defender_spd = self.combatant_states["defender"].combat_stats.spd
+        spd_diff = attacker_spd - defender_spd
 
-        strike_sequence = []
+        attacker_potent = self.attacker.has_keyword("potent") and spd_diff >= 25
+        defender_potent = self.defender.has_keyword("potent") and spd_diff <= -25
 
-        strike_sequence.append(
-            Strike("attacker", "defender", StrikeType.FIRST, False, False)
-        )
+        attacker_brave_fu = attacker_brave and not attacker_potent
+        defender_brave_fu = defender_brave and not defender_potent
+
+        attacker_first = [
+            Strike("attacker", "defender", StrikeType.FIRST, is_first_hit=True)
+        ]
         if attacker_brave:
-            strike_sequence.append(
-                Strike("attacker", "defender", StrikeType.FIRST, True, True)
+            attacker_first.append(
+                Strike(
+                    "attacker",
+                    "defender",
+                    StrikeType.FIRST,
+                    brave_second_hit=True,
+                    consecutive=True,
+                )
             )
 
-        strike_sequence.append(
-            Strike("defender", "attacker", StrikeType.FIRST, False, False)
-        )
-        if defender_brave:
-            strike_sequence.append(
-                Strike("defender", "attacker", StrikeType.FIRST, True, True)
-            )
-
+        attacker_followups = []
         if attacker_FU > 0:
-            strike_sequence.append(
-                Strike("attacker", "defender", StrikeType.FOLLOW_UP, False, False)
+            attacker_followups.append(
+                Strike("attacker", "defender", StrikeType.FOLLOW_UP)
             )
-            if attacker_brave:
-                strike_sequence.append(
-                    Strike("attacker", "defender", StrikeType.FOLLOW_UP, True, True)
+            if attacker_brave_fu:  # brave doubles FU only if no potent
+                attacker_followups.append(
+                    Strike(
+                        "attacker",
+                        "defender",
+                        StrikeType.FOLLOW_UP,
+                        brave_second_hit=True,
+                        consecutive=True,
+                    )
                 )
         if attacker_potent:
-            strike_sequence.append(
-                Strike("attacker", "defender", StrikeType.POTENT, False, True)
+            attacker_followups.append(
+                Strike("attacker", "defender", StrikeType.POTENT, consecutive=True)
             )
 
-        if defender_FU > 0:
-            strike_sequence.append(
-                Strike("defender", "attacker", StrikeType.FOLLOW_UP, False, False)
+        defender_first = [Strike("defender", "attacker", StrikeType.FIRST)]
+        if defender_brave:
+            defender_first.append(
+                Strike(
+                    "defender",
+                    "attacker",
+                    StrikeType.FIRST,
+                    brave_second_hit=True,
+                    consecutive=True,
+                )
             )
-            if defender_brave:
-                strike_sequence.append(
-                    Strike("defender", "attacker", StrikeType.FOLLOW_UP, True, True)
+
+        defender_followups = []
+        if defender_FU > 0:
+            defender_followups.append(
+                Strike("defender", "attacker", StrikeType.FOLLOW_UP)
+            )
+            if defender_brave_fu:
+                defender_followups.append(
+                    Strike(
+                        "defender",
+                        "attacker",
+                        StrikeType.FOLLOW_UP,
+                        brave_second_hit=True,
+                        consecutive=True,
+                    )
                 )
         if defender_potent:
-            strike_sequence.append(
-                Strike("defender", "attacker", StrikeType.POTENT, False, True)
+            defender_followups.append(
+                Strike("defender", "attacker", StrikeType.POTENT, consecutive=True)
             )
+
+        defender_vantage = self.defender.has_keyword("vantage")
+
+        # Standard desperation — PP Only
+        attacker_desperation = self.attacker.has_keyword("desperation")
+
+        # Special version — no initiation requirement, can apply on ep (Marth for example)
+        attacker_desp_effect = self.attacker.has_keyword("desperation_effect")
+        defender_desp_effect = self.defender.has_keyword("desperation_effect")
+
+        attacker_package = attacker_first + attacker_followups
+        defender_package = defender_first + defender_followups
+
+        defender_vantage = self.defender.has_keyword("vantage")
+        attacker_bunches = self.attacker.has_keyword("desperation") or self.attacker.has_keyword("desperation_effect")
+        defender_bunches = self.defender.has_keyword("desperation_effect")
+
+        if defender_vantage and defender_bunches:
+            strike_sequence = defender_package + attacker_package
+        elif defender_vantage:
+            strike_sequence = defender_first + attacker_first + attacker_followups + defender_followups
+        elif attacker_bunches:
+            strike_sequence = attacker_package + defender_package
+        else:
+            strike_sequence = attacker_first + defender_first + attacker_followups + defender_followups
 
         return strike_sequence
 
