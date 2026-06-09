@@ -46,10 +46,10 @@ def initialize_status_database():
             utilities.predmg_logic = resolve_logic(tag)
 
         if tag := util_data.get("heal_start_tag"):
-            utilities.heal_start_logic = resolve_logic(tag)
+            utilities.heal_precombat_logic = resolve_logic(tag)
 
         if tag := util_data.get("heal_hit_tag"):
-            utilities.heal_hit_logic = resolve_logic(tag)
+            utilities.heal_on_hit_logic = resolve_logic(tag)
 
         if tag := util_data.get("heal_after_tag"):
             utilities.heal_after_logic = resolve_logic(tag)
