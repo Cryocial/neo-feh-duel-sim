@@ -116,11 +116,18 @@ class CombatEngine:
 
     def _process_strike(self, strike: Strike):
         """Calculates and applies damage for a single weapon swing."""
-        striker_state = self.combatant_states[strike.striker].unit
-        target_state = self.combatant_states[strike.target].unit
+        striker_state = self.combatant_states[strike.striker]
+        target_state = self.combatant_states[strike.target]
 
         striker = striker_state.unit
         target = target_state.unit
+
+        raw_atk = striker_state.combat_stats.atk
+        defensive_stat = (
+            target_state.combat_stats.defense
+            if target_state.defensive_stat == "def"
+            else target_state.combat_stats.res
+        )
 
         special_triggered = False
         if striker_state.current_cooldown == 0 and striker.special is not None:
@@ -128,13 +135,6 @@ class CombatEngine:
             is_aoe = "aoe_special" in striker.special.utilities.keywords
             if not is_defensive and not is_aoe:
                 special_triggered = True
-
-            raw_atk = striker_state.combat_stats.atk
-            defensive_stat = (
-                target_state.combat_stats.defense
-                if target_state.defensive_stat == "def"
-                else target_state.combat_stats.res
-            )
 
         wta = self._get_wta_multiplier(striker, target)
         modified_atk = math.trunc(raw_atk * wta)
@@ -145,7 +145,7 @@ class CombatEngine:
 
         pierce_mult = 1.0
 
-        if strike.striker.unit.has_keyword("pierce_100"):
+        if striker.has_keyword("pierce_100"):
             pierce_mult = 0.0
 
         if striker.has_keyword("pierce_special_100") and special_triggered:
@@ -154,13 +154,13 @@ class CombatEngine:
         if pierce_mult > 0.0:
             pierce_50_count = sum(
                 1
-                for item in strike.striker.unit.equipped_items
+                for item in striker.equipped_items
                 if "pierce_50" in item.utilities.keywords
             )
 
             from .jsonbootupstuff import STATUS_EFFECT_DATABASE
 
-            for status_name in strike.striker.unit.active_statuses:
+            for status_name in striker.active_statuses:
                 if status_data := STATUS_EFFECT_DATABASE.get(status_name):
                     if "pierce_50" in status_data["utilities"].keywords:
                         pierce_50_count += 1
@@ -251,10 +251,10 @@ class CombatEngine:
         # ------------------------------------
         # First-hit damage floor (Collapsed Star and similar)
         if is_first_sequence:
-            for status_name in strike.target.unit.active_statuses:
+            for status_name in target.active_statuses:
                 if status_data := STATUS_EFFECT_DATABASE.get(status_name):
                     if fn := status_data["utilities"].first_hit_dmg_floor_logic:
-                        dmg_floor = fn(strike.target.unit, strike.striker.unit)
+                        dmg_floor = fn(target, striker)
                         if final_damage > dmg_floor:
                             mitigated_amount += final_damage - dmg_floor
                             final_damage = dmg_floor
@@ -375,12 +375,27 @@ class CombatEngine:
         self.attacker.combat_stats = self.combatant_states["attacker"].combat_stats
         self.defender.combat_stats = self.combatant_states["defender"].combat_stats
 
-        self.combatant_states["attacker"].defensive_stat = (
-            "def" if self.defender.is_physical() else "res"
-        )
-        self.combatant_states["defender"].defensive_stat = (
-            "def" if self.attacker.is_physical() else "res"
-        )
+        # Determine targeting for Attacker targeting Defender
+        attacker_targets = "def" if self.attacker.is_physical() else "res"
+        for item in self.attacker.equipped_items:
+            if item.utilities.adaptive_logic:
+                attacker_targets = item.utilities.adaptive_logic(self.attacker, self.defender)
+        for s in self.attacker.active_statuses:
+            if info := STATUS_EFFECT_DATABASE.get(s):
+                if info["utilities"].adaptive_logic:
+                    attacker_targets = info["utilities"].adaptive_logic(self.attacker, self.defender)
+        self.combatant_states["defender"].defensive_stat = attacker_targets
+
+        # Determine targeting for Defender targeting Attacker
+        defender_targets = "def" if self.defender.is_physical() else "res"
+        for item in self.defender.equipped_items:
+            if item.utilities.adaptive_logic:
+                defender_targets = item.utilities.adaptive_logic(self.defender, self.attacker)
+        for s in self.defender.active_statuses:
+            if info := STATUS_EFFECT_DATABASE.get(s):
+                if info["utilities"].adaptive_logic:
+                    defender_targets = info["utilities"].adaptive_logic(self.defender, self.attacker)
+        self.combatant_states["attacker"].defensive_stat = defender_targets
 
     def _determine_strike_sequence(self) -> list[Strike]:
         """Determines the number and order of strikes."""
