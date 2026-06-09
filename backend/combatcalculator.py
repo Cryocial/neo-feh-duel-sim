@@ -104,8 +104,11 @@ class CombatEngine:
 
     def _process_strike(self, strike: Strike):
         """Calculates and applies damage for a single weapon swing."""
-        striker = self.combatant_states[strike.striker].unit
-        target = self.combatant_states[strike.target].unit
+        striker_state = self.combatant_states[strike.striker].unit
+        target_state = self.combatant_states[strike.target].unit
+
+        striker = striker_  state.unit
+        target = target_state.unit
 
         # self.combatant_states[strike.striker].current_cooldown -= striker.get_pulse_amount(
         #     "before_every_attack", target
@@ -114,11 +117,11 @@ class CombatEngine:
         #     "before_every_attack", target
         # )
 
-        raw_atk = self.combatant_states[strike.striker].combat_stats.atk
+        raw_atk = striker_state.combat_stats.atk
         defensive_stat = (
-            self.combatant_states[strike.target].combat_stats.defense
-            if self.combatant_states[strike.target].defensive_stat == "def"
-            else self.combatant_states[strike.target].combat_stats.res
+            target_state.combat_stats.defense
+            if target_state.defensive_stat == "def"
+            else target_state.combat_stats.res
         )
 
         wta = self._get_wta_multiplier(striker, target)
@@ -214,7 +217,6 @@ class CombatEngine:
                 base_dr = 1.0 - ((1.0 - base_dr) * (1.0 - perma_dr))
 
         # B. Check Active Statuses
-        from .jsonbootupstuff import STATUS_EFFECT_DATABASE
         for status_name in target.active_statuses:
             if status_data := STATUS_EFFECT_DATABASE.get(status_name):
                 utilities = status_data["utilities"]
@@ -250,20 +252,24 @@ class CombatEngine:
         # TODO: Future Slot for Y!Edel's 1 Damage Style
         # TODO: IGNORE ABOVE TODO, MUST MAKE IT SCALIABLE.
         # ------------------------------------
-        self.combatant_states[strike.target].current_hp -= final_damage
+        mitigated_amount = pre_mitigation_damage - final_damage
+        
+        target.damage_mitigated_bucket += mitigated_amount 
+
+        target_state.current_hp -= final_damage
+
         hit_heal = sum(
-            item.utilities.heal_hit_logic(strike.striker.unit, strike.target.unit)
-            for item in strike.striker.unit.equipped_items
-            if getattr(item.utilities, "heal_hit_logic", None)
+            item.utilities.heal_hit_logic(striker, target)
+            for item in striker.equipped_items if getattr(item.utilities, 'heal_hit_logic', None)
         )
-        self._apply_healing(strike.striker.unit, hit_heal)
+        self._apply_healing(striker, hit_heal)
 
         charge = (
-            1
-            + striker.get_pulse_amount("per_unit_attack", target)
+            1 
+            + striker.get_pulse_amount("per_unit_attack", target) 
             + target.get_pulse_amount("per_foe_attack", striker)
         )
-        self.combatant_states[strike.striker].current_cooldown -= max(0, charge)
+        striker_state.current_cooldown -= max(0, charge)
 
     def _get_wta_multiplier(self, striker: Unit, target: Unit) -> float:
         """Calculates the final WTA multiplier, including Triangle Adept/Cancel Affinity."""
