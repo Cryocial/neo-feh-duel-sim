@@ -122,19 +122,22 @@ class CombatEngine:
         striker = striker_state.unit
         target = target_state.unit
 
-        # self.combatant_states[strike.striker].current_cooldown -= striker.get_pulse_amount(
-        #     "before_every_attack", target
-        # )
-        # self.combatant_states[strike.target].current_cooldown -= striker.get_pulse_amount(
-        #     "before_every_attack", target
-        # )
+        special_triggered = False
+        if (
+            striker_state.current_cooldown == 0
+            and striker.special is not None
+        ):
+            is_defensive = "defensive_special" in striker.special.utilities.keywords
+            is_aoe = "aoe_special" in striker.special.utilities.keywords
+            if not is_defensive and not is_aoe:
+                special_triggered = True
 
-        raw_atk = striker_state.combat_stats.atk
-        defensive_stat = (
-            target_state.combat_stats.defense
-            if target_state.defensive_stat == "def"
-            else target_state.combat_stats.res
-        )
+            raw_atk = striker_state.combat_stats.atk
+            defensive_stat = (
+                target_state.combat_stats.defense
+                if target_state.defensive_stat == "def"
+                else target_state.combat_stats.res
+            )
 
         wta = self._get_wta_multiplier(striker, target)
         modified_atk = math.trunc(raw_atk * wta)
@@ -149,8 +152,8 @@ class CombatEngine:
             pierce_mult = 0.0
 
         if (
-            strike.striker.unit.has_keyword("pierce_special_100")
-            and self.combatant_states[strike.striker].current_cooldown == 0
+            striker.has_keyword("pierce_special_100")
+            and special_triggered
         ):
             pierce_mult = 0.0
 
@@ -251,17 +254,39 @@ class CombatEngine:
         effective_dr = base_dr * pierce_mult
         damage_multiplier = 1.0 - effective_dr
         final_damage = math.trunc(final_damage * damage_multiplier)
+       # ------------------------------------
+        # First-hit damage floor (Collapsed Star and similar)
+        if is_first_sequence:
+            for status_name in strike.target.unit.active_statuses:
+                if status_data := STATUS_EFFECT_DATABASE.get(status_name):
+                    if fn := status_data["utilities"].first_hit_dmg_floor_logic:
+                        dmg_floor = fn(strike.target.unit, strike.striker.unit)
+                        if final_damage > dmg_floor:
+                            mitigated_amount += final_damage - dmg_floor
+                            final_damage = dmg_floor
         # ------------------------------------
-        # Collapsed Star
-        if strike.target.unit.has_keyword("collapsed_star") and is_first_sequence:
-            if final_damage > 1:
-                mitigated_amount = final_damage - 1
-            final_damage = 1
+        dmg_floor = None
+
+        for item in target.equipped_items:
+            if getattr(item.utilities, 'dmg_floor_logic', None):
+                floor = item.utilities.dmg_floor_logic(target, striker, strike)
+                if floor is not None:
+                    dmg_floor = floor if dmg_floor is None else min(dmg_floor, floor)
+
+        from .jsonbootupstuff import STATUS_EFFECT_DATABASE
+        for status_name in target.active_statuses:
+            if status_data := STATUS_EFFECT_DATABASE.get(status_name):
+                utilities = status_data["utilities"]
+                if getattr(utilities, 'dmg_floor_logic', None):
+                    floor = utilities.dmg_floor_logic(target, striker, strike)
+                    if floor is not None:
+                        dmg_floor = floor if dmg_floor is None else min(dmg_floor, floor)
+
+        if dmg_floor is not None and final_damage > dmg_floor:
+            mitigated_amount += (final_damage - dmg_floor)
+            final_damage = dmg_floor
         # ------------------------------------
-        # ------------------------------------
-        # TODO: Future Slot for Y!Edel's 1 Damage Style
-        # TODO: IGNORE ABOVE TODO, MUST MAKE IT SCALIABLE.
-        # ------------------------------------
+      
         mitigated_amount = pre_mitigation_damage - final_damage
 
         target.damage_mitigated_bucket += mitigated_amount
