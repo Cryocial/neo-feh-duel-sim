@@ -75,7 +75,10 @@
     }
   },
   "Divinely Inspiring": {
-    "type": "bonus"
+    "type": "bonus",
+    "utilities": {
+      "keywords": ["divinely_inspiring"]
+    }
   },
   "Dodge": {
     "type": "bonus"
@@ -224,7 +227,9 @@
   "Paranoia": {
     "type": "bonus",
     "utilities" : {
-      "keywords": ["paranoia"]
+      "keywords": ["paranoia"],
+      "logic_tag": "single_stats"
+
     }
   },
   "Potent Follow": {
