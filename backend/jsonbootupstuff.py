@@ -17,7 +17,9 @@ def initialize_status_database():
         with open(json_path, "r") as file:
             data = json.load(file)
     except FileNotFoundError:
-        print(f"Error: 'visualbonuses.json' not found at {json_path}. Status database will be empty.")
+        print(
+            f"Error: 'visualbonuses.json' not found at {json_path}. Status database will be empty."
+        )
         return
 
     for name, info in data.items():
