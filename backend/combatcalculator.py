@@ -45,12 +45,12 @@ class CombatEngine:
         self.combatant_states = {
             "attacker": CombatantState(
                 unit=self.attacker,
-                current_hp=self.attacker.base_stats.hp,
+                current_hp=self.attacker.current_hp
                 current_cooldown=self.attacker.current_cooldown,
             ),
             "defender": CombatantState(
                 unit=self.defender,
-                current_hp=self.defender.base_stats.hp,
+                current_hp=self.defender.current_hp
                 current_cooldown=self.defender.current_cooldown,
             ),
         }
@@ -83,6 +83,17 @@ class CombatEngine:
             "attacker_final_hp": self.combatant_states["attacker"].current_hp,
             "defender_final_hp": self.combatant_states["defender"].current_hp,
         }
+    def _apply_healing(self, unit: Unit, amount: int):
+        """The master gateway for all healing. Enforces Deep Wounds and Max HP caps."""
+        if amount <= 0:
+            return
+            
+        # Check for Deep Wounds and the neutralization keyword
+        if unit.has_keyword("deep_wounds") and not unit.has_keyword("neutralize_deep_wounds"):
+            return 
+            
+        new_hp = unit.current_hp + amount
+        unit.current_hp = min(unit.base_stats.hp, new_hp)
 
     def _process_AoE(self, striker: Unit, target: Unit):
         """Applies AoE damage"""
@@ -217,9 +228,10 @@ class CombatEngine:
         # ------------------------------------------------------------------------
         # final touches
         effective_dr = base_dr * pierce_mult
-        target.damage_mitigated_bucket += mitigated_amount
         damage_multiplier = 1.0 - effective_dr
         final_damage = math.trunc(final_damage * damage_multiplier)
+        mitigated_amount = 
+        self.combatant_states[strike.target].damage_mitigated_bucket += mitigated_amount
         # ------------------------------------
         # Collapsed Star
         if strike.target.unit.has_keyword("collapsed_star") and is_first_sequence:
@@ -229,8 +241,14 @@ class CombatEngine:
         # ------------------------------------
         # ------------------------------------
         # TODO: Future Slot for Y!Edel's 1 Damage Style
+        # TODO: IGNORE ABOVE TODO, MUST MAKE IT SCALIABLE. 
         # ------------------------------------
         self.combatant_states[strike.target].current_hp -= final_damage
+        hit_heal = sum(
+            item.utilities.heal_hit_logic(strike.striker.unit, strike.target.unit)
+            for item in strike.striker.unit.equipped_items if getattr(item.utilities, 'heal_hit_logic', None)
+        )
+        self._apply_healing(strike.striker.unit, hit_heal)
 
         charge = (
             1
