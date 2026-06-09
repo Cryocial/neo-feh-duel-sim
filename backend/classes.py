@@ -65,6 +65,7 @@ class UtilityBlock:
     cooldown_modifiers: dict[str, Any] = field(default_factory=dict)
     percentdr: float = 0.0
     potent_logic: Callable | None = None
+    set_to_one_logic: Callable | None = None
     keywords: list[str] = field(default_factory=list)
 
 

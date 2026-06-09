@@ -3,7 +3,7 @@ Contains logic for specific skills and status effects.
 These functions are resolved by name during the JSON bootup process.
 """
 import math
-
+from .constants import StrikeType
 def omni_boost(unit, enemy=None):
     """Aggregates all dynamic omni-stat boosts."""
     boost = 0
@@ -71,7 +71,15 @@ def true_dr(unit, target_enemy=None):
         dr += 10
     return dr
 
-
+def set_to_one(unit, target_enemy, strike):
+    """Set Incoming Damage = 1"""
+    #NOTE FOR FUTURE, THIS FUNCTION CAN BE CHANGED TO SET TO ANY FLAT NUMBER THATS NOT 1, IF NEEDED
+    is_first_sequence = (strike.strike_type is StrikeType.FIRST)
+    
+    if unit.has_keyword("collapsed_star") and is_first_sequence:
+        return 1
+    return None
+    
 def heal_start_of_combat(unit, target_enemy=None):
     """Triggers after pre-combat damage/AoE, before swing 0."""
     heal = 0
