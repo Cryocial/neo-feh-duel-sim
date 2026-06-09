@@ -57,6 +57,7 @@ def true_damage(unit, target_enemy=None):
 
     if unit.has_keyword("reflex"):
         total += unit.damage_mitigated_bucket
+        unit.damage_mitigated_bucket = 0
 
     return total
 
