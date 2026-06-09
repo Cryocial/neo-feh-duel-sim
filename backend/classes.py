@@ -57,6 +57,10 @@ class UtilityBlock:
     truedr_logic: Callable | None = None
     truedmg: int = 0
     truedmg_logic: Callable | None = None
+    heal_precombat_logic: Callable | None = None
+    heal_on_hit_logic: Callable | None = None
+    heal_after_logic: Callable | None = None
+    predmg_logic: Callable | None = None
     dynamic_stats_logic: Callable | None = None
     cooldown_modifiers: dict[str, Any] = field(default_factory=dict)
     percentdr: float = 0.0
@@ -133,6 +137,8 @@ class Unit:
         self.penalty_count = 0
 
         self._initialize_stats()
+        self.current_hp = self.base_stats.hp
+        self.first_combat_of_turn = True
 
     def _initialize_stats(self):
         """
