@@ -45,12 +45,12 @@ class CombatEngine:
         self.combatant_states = {
             "attacker": CombatantState(
                 unit=self.attacker,
-                current_hp=self.attacker.current_hp
+                current_hp=self.attacker.current_hp,
                 current_cooldown=self.attacker.current_cooldown,
             ),
             "defender": CombatantState(
                 unit=self.defender,
-                current_hp=self.defender.current_hp
+                current_hp=self.defender.current_hp,
                 current_cooldown=self.defender.current_cooldown,
             ),
         }
@@ -178,6 +178,7 @@ class CombatEngine:
                     true_damage += utilities.truedmg_logic(striker, target)
         # ------------------------------------------------------------------------
         final_damage = base_damage + true_damage
+        pre_mitigation_damage = final_damage
         # for reflex
         mitigated_amount = 0
         # ------------------------------------------------------------------------
@@ -230,7 +231,7 @@ class CombatEngine:
         effective_dr = base_dr * pierce_mult
         damage_multiplier = 1.0 - effective_dr
         final_damage = math.trunc(final_damage * damage_multiplier)
-        mitigated_amount = 
+        
         self.combatant_states[strike.target].damage_mitigated_bucket += mitigated_amount
         # ------------------------------------
         # Collapsed Star
@@ -433,7 +434,34 @@ class CombatEngine:
 
     def _phase_start_of_combat(self):
         """Pre-combat damage and healing effects."""
-        ...
+        
+        # 1. HP SNAPSHOT (For conditional HP checks)
+        self.attacker.start_of_combat_hp = self.attacker.current_hp
+        self.defender.start_of_combat_hp = self.defender.current_hp
+
+        # 2. PRE-COMBAT DAMAGE
+        atk_predmg = sum(
+            item.utilities.predmg_logic(self.attacker, self.defender)
+            for item in self.attacker.equipped_items if getattr(item.utilities, 'predmg_logic', None)
+        )
+        def_predmg = sum(
+            item.utilities.predmg_logic(self.defender, self.attacker)
+            for item in self.defender.equipped_items if getattr(item.utilities, 'predmg_logic', None)
+        )
+
+        if atk_predmg > 0:
+            self.defender.current_hp = max(1, self.defender.current_hp - atk_predmg)
+            
+        if def_predmg > 0:
+            self.attacker.current_hp = max(1, self.attacker.current_hp - def_predmg)
+
+        # 3. START OF COMBAT HEALING
+        for combatant, opponent in [(self.attacker, self.defender), (self.defender, self.attacker)]:
+            heal = sum(
+                item.utilities.heal_start_logic(combatant, opponent)
+                for item in combatant.equipped_items if getattr(item.utilities, 'heal_start_logic', None)
+            )
+            self._apply_healing(combatant, heal)
 
     def _phase_after_combat(self):
         # self.attacker.current_cooldown -= self.attacker.get_pulse_amount(
