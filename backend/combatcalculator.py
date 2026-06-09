@@ -107,7 +107,7 @@ class CombatEngine:
         striker_state = self.combatant_states[strike.striker].unit
         target_state = self.combatant_states[strike.target].unit
 
-        striker = striker_  state.unit
+        striker = striker_state.unit
         target = target_state.unit
 
         # self.combatant_states[strike.striker].current_cooldown -= striker.get_pulse_amount(
@@ -198,9 +198,7 @@ class CombatEngine:
         is_first_strike = (
             strike.strike_type is StrikeType.FIRST and not strike.brave_second_hit
         )
-        for item in self.combatant_states[
-            striker.target
-        ].unit.active_statuses.equipped_items:
+        for item in target.equipped_items:
             # check weapons/skills
             if is_first_strike:
                 first_dr = getattr(item.utilities, "first_hit_percent_dr", 0.0)
@@ -239,8 +237,6 @@ class CombatEngine:
         effective_dr = base_dr * pierce_mult
         damage_multiplier = 1.0 - effective_dr
         final_damage = math.trunc(final_damage * damage_multiplier)
-
-        self.combatant_states[strike.target].damage_mitigated_bucket += mitigated_amount
         # ------------------------------------
         # Collapsed Star
         if strike.target.unit.has_keyword("collapsed_star") and is_first_sequence:
