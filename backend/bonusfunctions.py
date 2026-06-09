@@ -4,6 +4,23 @@ These functions are resolved by name during the JSON bootup process.
 """
 import math
 
+def single_boost(unit, enemy=None):
+    """Aggregates all dynamic single-stat boosts."""
+    single_boosts = {stat: 0 for stat in ["atk", "spd", "defense", "res"]}
+
+
+    if unit.has_keyword("atk_liberate")
+        single_boosts["atk"] += min(8, unit.bonus_count + 4)
+    if unit.has_keyword("spd_liberate")
+        single_boosts["spd"] += min(8, unit.bonus_count + 4)
+    if unit.has_keyword("def_liberate")
+        single_boosts["defense"] += min(8, unit.bonus_count + 4)
+    if unit.has_keyword("res_liberate")
+        single_boosts["res"] += min(8, unit.bonus_count + 4)
+    if unit.has_keyword("paranoia") and unit.current_hp < unit.max_hp
+        single_boosts["atk"] += 5
+    return {stat: single_boosts[stat] for stat in ["atk", "spd", "defense", "res"]}
+
 def omni_boost(unit, enemy=None):
     """Aggregates all dynamic omni-stat boosts."""
     boost = 0

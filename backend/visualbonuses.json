@@ -56,6 +56,14 @@
       "first_sequence_percent_dr": 0.80
     }
   },
+  "Def Liberate": {
+    "type": "bonus",
+    "utilities": {
+      "keywords": ["def_liberate"],
+      "logic_tag": "single_stats"
+    }
+  },
+
   "Desperation": {
     "type": "bonus"
   },
@@ -170,7 +178,10 @@
     "type": "bonus"
   },
   "Paranoia": {
-    "type": "bonus"
+    "type": "bonus",
+    "utilities" : {
+      "keywords": ["paranoia"]
+    }
   },
   "Potent Follow": {
     "type": "bonus"
@@ -230,7 +241,11 @@
     }
   },
   "Res Liberate": {
-    "type": "bonus"
+    "type": "bonus",
+    "utilities": {
+      "keywords": ["res_liberate"],
+      "logic_tag": "single_stats"
+    }
   },
   "Resonance: Blades": {
     "type": "bonus",
@@ -245,7 +260,11 @@
     "type": "bonus"
   },
   "Spd Liberate": {
-    "type": "bonus"
+    "type": "bonus",
+    "utilities": {
+      "keywords": ["spd_liberate"],
+      "logic_tag": "single_stats"
+    }
   },
   "Special Cooldown Charge +1": {
     "type": "bonus"
