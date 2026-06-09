@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 from .classes import Unit, StatBlock
 from .constants import Color, StrikeType
-
+from .jsonbootupstuff import STATUS_EFFECT_DATABASE
 UnitRole = Literal["attacker", "defender"]
 
 
@@ -85,16 +85,26 @@ class CombatEngine:
         }
 
     def _apply_healing(self, unit: Unit, amount: int):
-        """The master gateway for all healing. Enforces Deep Wounds and Max HP caps."""
+        """Enforces Deep Wounds, Imbue, and Max HP caps."""
         if amount <= 0:
             return
+        heal_multiplier = 1.0
 
-        # Check for Deep Wounds and the neutralization keyword
-        if unit.has_keyword("deep_wounds") and not unit.has_keyword(
-            "neutralize_deep_wounds"
-        ):
+        if unit.has_keyword("deep_wounds") and not unit.has_keyword("neutralize_deep_wounds"):
+            
+            base_penalty = 1.0
+            
+            partial_stacks = unit.count_keyword("partial_deep_wounds")
+            
+            actual_penalty = base_penalty * (0.5 ** partial_stacks)
+        
+            heal_multiplier -= actual_penalty
+            
+            amount = math.trunc(amount * heal_multiplier)
+
+        if amount <= 0:
             return
-
+        
         new_hp = unit.current_hp + amount
         unit.current_hp = min(unit.base_stats.hp, new_hp)
 
@@ -190,9 +200,11 @@ class CombatEngine:
         # ------------------------------------------------------------------------
         # CALCULATE PERCENT DAMAGE REDUCTION
         base_dr = 0.0
-        
-        is_first_sequence = (strike.strike_type is StrikeType.FIRST)
-        is_absolute_first_strike = (strike.strike_type is StrikeType.FIRST and not strike.brave_second_hit)
+
+        is_first_sequence = strike.strike_type is StrikeType.FIRST
+        is_absolute_first_strike = (
+            strike.strike_type is StrikeType.FIRST and not strike.brave_second_hit
+        )
 
         # A CHECK FOR LEGACY DR THAT IS ONLY FIRST HIT (NO BRAVE)
         is_first_strike = (
@@ -218,7 +230,7 @@ class CombatEngine:
         for status_name in target.active_statuses:
             if status_data := STATUS_EFFECT_DATABASE.get(status_name):
                 utilities = status_data["utilities"]
-                
+
                 if is_absolute_first_strike:
                     status_first_dr = getattr(utilities, "first_hit_percent_dr", 0.0)
                     if status_first_dr > 0:
@@ -249,20 +261,21 @@ class CombatEngine:
         # TODO: IGNORE ABOVE TODO, MUST MAKE IT SCALIABLE.
         # ------------------------------------
         mitigated_amount = pre_mitigation_damage - final_damage
-        
-        target.damage_mitigated_bucket += mitigated_amount 
+
+        target.damage_mitigated_bucket += mitigated_amount
 
         target_state.current_hp -= final_damage
 
         hit_heal = sum(
             item.utilities.heal_hit_logic(striker, target)
-            for item in striker.equipped_items if getattr(item.utilities, 'heal_hit_logic', None)
+            for item in striker.equipped_items
+            if getattr(item.utilities, "heal_hit_logic", None)
         )
         self._apply_healing(striker, hit_heal)
 
         charge = (
-            1 
-            + striker.get_pulse_amount("per_unit_attack", target) 
+            1
+            + striker.get_pulse_amount("per_unit_attack", target)
             + target.get_pulse_amount("per_foe_attack", striker)
         )
         striker_state.current_cooldown -= max(0, charge)
@@ -336,6 +349,9 @@ class CombatEngine:
 
         self.combatant_states["attacker"].combat_stats = StatBlock(**atk_vals)
         self.combatant_states["defender"].combat_stats = StatBlock(**def_vals)
+
+        self.attacker.combat_stats = self.combatant_states["attacker"].combat_stats
+        self.defender.combat_stats = self.combatant_states["defender"].combat_stats
 
         self.combatant_states["attacker"].defensive_stat = (
             "def" if self.defender.is_physical() else "res"

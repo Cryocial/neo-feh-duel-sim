@@ -59,7 +59,12 @@
     "type": "bonus"
   },
   "Divine Nectar": {
-    "type": "bonus"
+    "type": "bonus",
+    "utilities": {
+      "keywords": ["divine_nectar", "neutralize_deep_wounds"],
+      "truedr_logic_tag": "true_dr",
+      "heal_start_tag": "heal_start_of_combat"
+    }
   },
   "Divinely Inspiring": {
     "type": "bonus"
@@ -131,7 +136,13 @@
     "type": "bonus"
   },
   "Imbue": {
-    "type": "bonus"
+    "type": "bonus",
+    "utilities": {
+      "keywords": ["imbue", "partial_deep_wounds"],
+      "truedr_logic_tag": "true_dr",
+      "heal_start_tag": "heal_start_of_combat"
+    }
+
   },
   "Incited": {
     "type": "bonus"
@@ -259,7 +270,10 @@
     "type": "penalty"
   },
   "Deep Wounds": {
-    "type": "penalty"
+    "type": "penalty",
+    "utilities": {
+      "keywords": ["deep_wounds"]
+    }
   },
   "Def Shackle": {
     "type": "penalty"
