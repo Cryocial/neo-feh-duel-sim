@@ -247,19 +247,22 @@ class Unit:
             for s in self.active_statuses
             if s in STATUS_EFFECT_DATABASE
         )
+
     def count_keyword(self, target_keyword: str) -> int:
         """Counts how many times a keyword appears across all items and statuses."""
         count = sum(
-            1 for item in self.equipped_items 
-            if target_keyword in getattr(item.utilities, 'keywords', [])
+            1
+            for item in self.equipped_items
+            if target_keyword in getattr(item.utilities, "keywords", [])
         )
-        
+
         from .jsonbootupstuff import STATUS_EFFECT_DATABASE
+
         for status_name in self.active_statuses:
             if status_data := STATUS_EFFECT_DATABASE.get(status_name):
                 if target_keyword in status_data["utilities"].keywords:
                     count += 1
-                    
+
         return count
 
     def is_physical(self) -> bool:
