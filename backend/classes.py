@@ -67,6 +67,8 @@ class UtilityBlock:
     potent_logic: Callable | None = None
     set_to_one_logic: Callable | None = None
     adaptive_logic: Callable | None = None
+    first_hit_dmg_floor_logic: Callable | None = None
+    dmg_floor_logic: Callable | None = None
     keywords: list[str] = field(default_factory=list)
 
 
@@ -202,13 +204,16 @@ class Unit:
             if s
         ]
 
-    def get_visible_stat(self, name: str) -> int:
+    def get_visible_stat(
+        self, name: str, ignore_buffs: bool = False, ignore_debuffs: bool = False
+    ) -> int:
         """Calculates the 'stat-screen' value including buffs, debuffs, and visible skill stats."""
-        val = (
-            getattr(self.base_stats, name)
-            + getattr(self.visible_buffs, name)
-            - getattr(self.visible_debuffs, name)
-        )
+        val = getattr(self.base_stats, name)
+        if not ignore_buffs:
+            val += getattr(self.visible_buffs, name)
+        if not ignore_debuffs:
+            val -= getattr(self.visible_debuffs, name)
+
         for item in self.equipped_items:
             val += getattr(item.visible_stats, name)
         return val
@@ -220,7 +225,12 @@ class Unit:
         """
         from .jsonbootupstuff import STATUS_EFFECT_DATABASE
 
-        total = self.get_visible_stat(name)
+        ignore_buffs = target.has_keyword("neutralize_foe_bonuses") if target else False
+        ignore_debuffs = self.has_keyword("neutralize_unit_penalties")
+
+        total = self.get_visible_stat(
+            name, ignore_buffs=ignore_buffs, ignore_debuffs=ignore_debuffs
+        )
 
         for item in self.equipped_items:
             total += getattr(item.combat_stats, name)
