@@ -101,7 +101,28 @@
     "type": "bonus"
   },
   "Effective against dragons": {
-    "type": "bonus"
+    "type": "bonus",
+    "utilities": {
+      "keywords": ["effective_dragon"]
+    }
+  },
+  "Effective against armored": {
+    "type": "bonus",
+    "utilities": {
+      "keywords": ["effective_armor"]
+    }
+  },
+  "Effective against cavalry": {
+    "type": "bonus",
+    "utilities": {
+      "keywords": ["effective_cavalry"]
+    }
+  },
+  "Effective against fliers": {
+    "type": "bonus",
+    "utilities": {
+      "keywords": ["effective_flier"]
+    }
   },
   "Empathy": {
     "type": "bonus"
@@ -141,7 +162,10 @@
     "type": "bonus"
   },
   "Hexblade": {
-    "type": "bonus"
+    "type": "bonus",
+    "utilities": {
+      "adaptive_tag": "hexblade_logic"
+    }
   },
   "Imbue": {
     "type": "bonus",
@@ -156,19 +180,40 @@
     "type": "bonus"
   },
   "Neutralize Bonuses": {
-    "type": "bonus"
+    "type": "bonus",
+    "utilities": {
+      "keywords": ["neutralize_foe_bonuses"]
+    }
   },
   "Neutralize Effective Against Armored": {
-    "type": "bonus"
+    "type": "bonus",
+    "utilities": {
+      "keywords": ["neutralize_effective_armor"]
+    }
   },
   "Neutralize Effective Against Dragons": {
-    "type": "bonus"
+    "type": "bonus",
+    "utilities": {
+      "keywords": ["neutralize_effective_dragon"]
+    }
   },
   "Neutralize Effective Against Flying": {
-    "type": "bonus"
+    "type": "bonus",
+    "utilities": {
+      "keywords": ["neutralize_effective_flying"]
+    }
+  },
+  "Neutralize Effective Against Cavalry": {
+    "type": "bonus",
+    "utilities": {
+      "keywords": ["neutralize_effective_cavalry"]
+    }
   },
   "Neutralize Penalties": {
-    "type": "bonus"
+    "type": "bonus",
+    "utilities": {
+      "keywords": ["neutralize_unit_penalties"]
+    }
   },
   "Null Follow-Up": {
     "type": "bonus"

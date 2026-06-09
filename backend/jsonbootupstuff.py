@@ -1,4 +1,5 @@
 import json
+import os
 from .classes import StatBlock, UtilityBlock
 from . import bonusfunctions
 
@@ -11,10 +12,12 @@ def initialize_status_database():
     and resolving string references to actual Python functions in 'bonusfunctions.py'.
     """
     try:
-        with open("visualbonuses.json", "r") as file:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        json_path = os.path.join(base_dir, "visualbonuses.json")
+        with open(json_path, "r") as file:
             data = json.load(file)
     except FileNotFoundError:
-        print("Error: 'visualbonuses.json' not found. Status database will be empty.")
+        print(f"Error: 'visualbonuses.json' not found at {json_path}. Status database will be empty.")
         return
 
     for name, info in data.items():
@@ -55,6 +58,12 @@ def initialize_status_database():
             utilities.heal_after_logic = resolve_logic(tag)
         if tag := util_data.get("set_to_one_tag"):
             utilities.set_to_one_logic = resolve_logic(tag)
+        if tag := util_data.get("adaptive_tag"):
+            utilities.adaptive_logic = resolve_logic(tag)
+        if tag := util_data.get("first_hit_dmg_floor_tag"):
+            utilities.first_hit_dmg_floor_logic = resolve_logic(tag)
+        if tag := util_data.get("dmg_floor_tag"):
+            utilities.dmg_floor_logic = resolve_logic(tag)
             # ADD MORE SOON
 
         STATUS_EFFECT_DATABASE[name] = {
