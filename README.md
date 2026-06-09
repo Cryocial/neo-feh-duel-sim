@@ -1,5 +1,4 @@
-# feh-calculator
+# FEH Duel Simulator
 personal project feh calc
-g
 
 calc is short for calculator btw
