@@ -61,6 +61,20 @@ def true_damage(unit, target_enemy=None):
 
     return total
 
+def true_dr(unit, target_enemy=None):
+    """Aggregates conditional True Damage Reduction."""
+    dr = 0
+    if unit.has_keyword("divine_nectar") and getattr(unit, "first_combat_of_turn", True):
+        dr += 10
+
+def heal_start_of_combat(unit, enemy=None):
+    """Triggers after pre-combat damage/AoE, before swing 0."""
+    heal = 0
+    
+    if unit.has_keyword("divine_nectar"):
+        heal += 20
+    # bol/imbue goes here    
+    return heal
 
 def special_jump(unit, target_enemy=None):
     """Aggregates all special cooldown jumps."""
