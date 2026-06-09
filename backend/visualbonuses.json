@@ -33,7 +33,6 @@
   },
 "Creation Pulse": {
     "type": "bonus",
-    "combat_stats": {"atk": 5, "spd": 5, "defense": 5, "res": 5},
     "utilities": {
       "keywords": ["creation_pulse"],
       "cooldown_modifiers": {
