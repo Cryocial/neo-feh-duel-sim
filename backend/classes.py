@@ -53,6 +53,7 @@ class UtilityBlock:
     true damage logic, and cooldown modifiers.
     """
 
+    aoe_coefficient: float | None = None
     truedr: int = 0
     truedr_logic: Callable | None = None
     truedmg: int = 0
@@ -299,8 +300,9 @@ class Unit:
                 total += mod(self, target) if callable(mod) else mod
         return total
 
+    def is_physical(self):
+        return not(self.weapon_type in [WeaponType.TOME, WeaponType.STAFF, WeaponType.DRAGON])
+
     @property
-    def has_AoE(self) -> bool:
-        if self.special and "aoe_special" in self.special.utilities.keywords:
-            return True
-        return False
+    def has_AoE(self):
+        return (self.special and self.special.utilities.aoe_coefficient)
