@@ -2,7 +2,7 @@ import math
 from dataclasses import dataclass, field
 from typing import Literal
 from .classes import Unit, StatBlock
-from .constants import Color, StrikeType
+from .constants import Color, StrikeType, MovementType, WeaponType
 from .jsonbootupstuff import STATUS_EFFECT_DATABASE
 
 UnitRole = Literal["attacker", "defender"]
@@ -137,6 +137,25 @@ class CombatEngine:
                 special_triggered = True
 
         wta = self._get_wta_multiplier(striker, target)
+
+        # Effectiveness calculation
+        is_effective = False
+        if target.movement_type == MovementType.ARMOR and striker.has_keyword("effective_armor"):
+            if not target.has_keyword("neutralize_effective_armor"):
+                is_effective = True
+        elif target.movement_type == MovementType.CAVALRY and striker.has_keyword("effective_cavalry"):
+            if not target.has_keyword("neutralize_effective_cavalry"):
+                is_effective = True
+        elif target.movement_type == MovementType.FLIER and striker.has_keyword("effective_flier"):
+            if not target.has_keyword("neutralize_effective_flying"):
+                is_effective = True
+        elif target.weapon_type == WeaponType.DRAGON and striker.has_keyword("effective_dragon"):
+            if not target.has_keyword("neutralize_effective_dragon"):
+                is_effective = True
+
+        if is_effective:
+            raw_atk = math.trunc(raw_atk * 1.5)
+
         modified_atk = math.trunc(raw_atk * wta)
 
         base_damage = max(0, modified_atk - defensive_stat)
