@@ -60,6 +60,10 @@ def initialize_status_database():
             utilities.set_to_one_logic = resolve_logic(tag)
         if tag := util_data.get("adaptive_tag"):
             utilities.adaptive_logic = resolve_logic(tag)
+        if tag := util_data.get("first_hit_dmg_floor_tag"):
+            utilities.first_hit_dmg_floor_logic = resolve_logic(tag)
+        if tag := util_data.get("dmg_floor_tag"):
+            utilities.dmg_floor_logic = resolve_logic(tag)
             # ADD MORE SOON
 
         STATUS_EFFECT_DATABASE[name] = {
