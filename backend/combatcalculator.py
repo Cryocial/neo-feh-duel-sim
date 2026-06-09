@@ -123,10 +123,7 @@ class CombatEngine:
         target = target_state.unit
 
         special_triggered = False
-        if (
-            striker_state.current_cooldown == 0
-            and striker.special is not None
-        ):
+        if striker_state.current_cooldown == 0 and striker.special is not None:
             is_defensive = "defensive_special" in striker.special.utilities.keywords
             is_aoe = "aoe_special" in striker.special.utilities.keywords
             if not is_defensive and not is_aoe:
@@ -151,10 +148,7 @@ class CombatEngine:
         if strike.striker.unit.has_keyword("pierce_100"):
             pierce_mult = 0.0
 
-        if (
-            striker.has_keyword("pierce_special_100")
-            and special_triggered
-        ):
+        if striker.has_keyword("pierce_special_100") and special_triggered:
             pierce_mult = 0.0
 
         if pierce_mult > 0.0:
@@ -254,7 +248,7 @@ class CombatEngine:
         effective_dr = base_dr * pierce_mult
         damage_multiplier = 1.0 - effective_dr
         final_damage = math.trunc(final_damage * damage_multiplier)
-       # ------------------------------------
+        # ------------------------------------
         # First-hit damage floor (Collapsed Star and similar)
         if is_first_sequence:
             for status_name in strike.target.unit.active_statuses:
@@ -268,25 +262,26 @@ class CombatEngine:
         dmg_floor = None
 
         for item in target.equipped_items:
-            if getattr(item.utilities, 'dmg_floor_logic', None):
+            if getattr(item.utilities, "dmg_floor_logic", None):
                 floor = item.utilities.dmg_floor_logic(target, striker, strike)
                 if floor is not None:
                     dmg_floor = floor if dmg_floor is None else min(dmg_floor, floor)
 
-        from .jsonbootupstuff import STATUS_EFFECT_DATABASE
         for status_name in target.active_statuses:
             if status_data := STATUS_EFFECT_DATABASE.get(status_name):
                 utilities = status_data["utilities"]
-                if getattr(utilities, 'dmg_floor_logic', None):
+                if getattr(utilities, "dmg_floor_logic", None):
                     floor = utilities.dmg_floor_logic(target, striker, strike)
                     if floor is not None:
-                        dmg_floor = floor if dmg_floor is None else min(dmg_floor, floor)
+                        dmg_floor = (
+                            floor if dmg_floor is None else min(dmg_floor, floor)
+                        )
 
         if dmg_floor is not None and final_damage > dmg_floor:
-            mitigated_amount += (final_damage - dmg_floor)
+            mitigated_amount += final_damage - dmg_floor
             final_damage = dmg_floor
         # ------------------------------------
-      
+
         mitigated_amount = pre_mitigation_damage - final_damage
 
         target.damage_mitigated_bucket += mitigated_amount
