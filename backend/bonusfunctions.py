@@ -2,10 +2,8 @@
 Contains logic for specific skills and status effects.
 These functions are resolved by name during the JSON bootup process.
 """
-
 import math
 from .constants import StrikeType
-
 
 def single_boost(unit, enemy=None):
     """Aggregates all dynamic single-stat boosts."""
@@ -18,10 +16,9 @@ def single_boost(unit, enemy=None):
         single_boosts["defense"] += min(8, unit.bonus_count + 4)
     if unit.has_keyword("res_liberate"):
         single_boosts["res"] += min(8, unit.bonus_count + 4)
-    if unit.has_keyword("paranoia") and unit.current_hp < unit.max_hp:
+    if unit.has_keyword("paranoia") and unit.current_hp < unit.base_stats.hp:
         single_boosts["atk"] += 5
     return {stat: single_boosts[stat] for stat in ["atk", "spd", "defense", "res"]}
-
 
 def omni_boost(unit, enemy=None):
     """Aggregates all dynamic omni-stat boosts."""
@@ -90,17 +87,15 @@ def true_dr(unit, target_enemy=None):
         dr += 10
     return dr
 
-
 def set_to_one(unit, target_enemy, strike):
     """Set Incoming Damage = 1"""
-    # NOTE FOR FUTURE, THIS FUNCTION CAN BE CHANGED TO SET TO ANY FLAT NUMBER THATS NOT 1, IF NEEDED
-    is_first_sequence = strike.strike_type is StrikeType.FIRST
-
+    #NOTE FOR FUTURE, THIS FUNCTION CAN BE CHANGED TO SET TO ANY FLAT NUMBER THATS NOT 1, IF NEEDED
+    is_first_sequence = (strike.strike_type is StrikeType.FIRST)
+    
     if unit.has_keyword("collapsed_star") and is_first_sequence:
         return 1
     return None
-
-
+    
 def heal_start_of_combat(unit, target_enemy=None):
     """Triggers after pre-combat damage/AoE, before swing 0."""
     heal = 0
