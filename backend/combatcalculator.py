@@ -83,15 +83,18 @@ class CombatEngine:
             "attacker_final_hp": self.combatant_states["attacker"].current_hp,
             "defender_final_hp": self.combatant_states["defender"].current_hp,
         }
+
     def _apply_healing(self, unit: Unit, amount: int):
         """The master gateway for all healing. Enforces Deep Wounds and Max HP caps."""
         if amount <= 0:
             return
-            
+
         # Check for Deep Wounds and the neutralization keyword
-        if unit.has_keyword("deep_wounds") and not unit.has_keyword("neutralize_deep_wounds"):
-            return 
-            
+        if unit.has_keyword("deep_wounds") and not unit.has_keyword(
+            "neutralize_deep_wounds"
+        ):
+            return
+
         new_hp = unit.current_hp + amount
         unit.current_hp = min(unit.base_stats.hp, new_hp)
 
@@ -183,15 +186,18 @@ class CombatEngine:
         mitigated_amount = 0
         # ------------------------------------------------------------------------
         # CALCULATE PERCENT DAMAGE REDUCTION
-        base_dr = 0
-        # A CHECK FOR MOST MODERN DR TYPES
-        is_first_sequence = strike.strike_type is StrikeType.FIRST
+        base_dr = 0.0
+        
+        is_first_sequence = (strike.strike_type is StrikeType.FIRST)
+        is_absolute_first_strike = (strike.strike_type is StrikeType.FIRST and not strike.brave_second_hit)
 
         # A CHECK FOR LEGACY DR THAT IS ONLY FIRST HIT (NO BRAVE)
         is_first_strike = (
             strike.strike_type is StrikeType.FIRST and not strike.brave_second_hit
         )
-        for item in self.combatant_states[striker.target].unit.active_statuses.equipped_items:
+        for item in self.combatant_states[
+            striker.target
+        ].unit.active_statuses.equipped_items:
             # check weapons/skills
             if is_first_strike:
                 first_dr = getattr(item.utilities, "first_hit_percent_dr", 0.0)
@@ -199,39 +205,39 @@ class CombatEngine:
                     base_dr = 1.0 - ((1.0 - base_dr) * (1.0 - first_dr))
 
             if is_first_sequence:
-                sequence = getattr(item.utilities, "first_sequence_percent_dr", 0.0)
-                if sequence > 0:
-                    base_dr = 1.0((1.0 - base_dr) * (1.0 - sequence))
+                seq_dr = getattr(item.utilities, "first_sequence_percent_dr", 0.0)
+                if seq_dr > 0:
+                    base_dr = 1.0 - ((1.0 - base_dr) * (1.0 - seq_dr))
 
             perma_dr = getattr(item.utilities, "perma_percent_dr", 0.0)
             if perma_dr > 0:
                 base_dr = 1.0 - ((1.0 - base_dr) * (1.0 - perma_dr))
 
-        # check bonuses
-        for status_name in self.combatant_states[striker.target].unit.active_statuses:
+        # B. Check Active Statuses
+        from .jsonbootupstuff import STATUS_EFFECT_DATABASE
+        for status_name in target.active_statuses:
             if status_data := STATUS_EFFECT_DATABASE.get(status_name):
                 utilities = status_data["utilities"]
-                if is_first_strike:
+                
+                if is_absolute_first_strike:
                     status_first_dr = getattr(utilities, "first_hit_percent_dr", 0.0)
                     if status_first_dr > 0:
                         base_dr = 1.0 - ((1.0 - base_dr) * (1.0 - status_first_dr))
 
                 if is_first_sequence:
-                    status_sequence_dr = getattr(
-                        utilities, "first_sequence_percent_dr", 0.0
-                    )
-                    if status_sequence_dr > 0:
-                        base_dr = 1.0 - ((1.0 - base_dr) * (1.0 - status_sequence_dr))
+                    status_seq_dr = getattr(utilities, "first_sequence_percent_dr", 0.0)
+                    if status_seq_dr > 0:
+                        base_dr = 1.0 - ((1.0 - base_dr) * (1.0 - status_seq_dr))
 
                 status_perma_dr = getattr(utilities, "perma_percent_dr", 0.0)
                 if status_perma_dr > 0:
                     base_dr = 1.0 - ((1.0 - base_dr) * (1.0 - status_perma_dr))
-        # ------------------------------------------------------------------------
-        # final touches
+
+        # Apply Pierce & Calculate Post-% DR Damage
         effective_dr = base_dr * pierce_mult
         damage_multiplier = 1.0 - effective_dr
         final_damage = math.trunc(final_damage * damage_multiplier)
-        
+
         self.combatant_states[strike.target].damage_mitigated_bucket += mitigated_amount
         # ------------------------------------
         # Collapsed Star
@@ -242,12 +248,13 @@ class CombatEngine:
         # ------------------------------------
         # ------------------------------------
         # TODO: Future Slot for Y!Edel's 1 Damage Style
-        # TODO: IGNORE ABOVE TODO, MUST MAKE IT SCALIABLE. 
+        # TODO: IGNORE ABOVE TODO, MUST MAKE IT SCALIABLE.
         # ------------------------------------
         self.combatant_states[strike.target].current_hp -= final_damage
         hit_heal = sum(
             item.utilities.heal_hit_logic(strike.striker.unit, strike.target.unit)
-            for item in strike.striker.unit.equipped_items if getattr(item.utilities, 'heal_hit_logic', None)
+            for item in strike.striker.unit.equipped_items
+            if getattr(item.utilities, "heal_hit_logic", None)
         )
         self._apply_healing(strike.striker.unit, hit_heal)
 
@@ -434,7 +441,7 @@ class CombatEngine:
 
     def _phase_start_of_combat(self):
         """Pre-combat damage and healing effects."""
-        
+
         # 1. HP SNAPSHOT (For conditional HP checks)
         self.attacker.start_of_combat_hp = self.attacker.current_hp
         self.defender.start_of_combat_hp = self.defender.current_hp
@@ -442,24 +449,30 @@ class CombatEngine:
         # 2. PRE-COMBAT DAMAGE
         atk_predmg = sum(
             item.utilities.predmg_logic(self.attacker, self.defender)
-            for item in self.attacker.equipped_items if getattr(item.utilities, 'predmg_logic', None)
+            for item in self.attacker.equipped_items
+            if getattr(item.utilities, "predmg_logic", None)
         )
         def_predmg = sum(
             item.utilities.predmg_logic(self.defender, self.attacker)
-            for item in self.defender.equipped_items if getattr(item.utilities, 'predmg_logic', None)
+            for item in self.defender.equipped_items
+            if getattr(item.utilities, "predmg_logic", None)
         )
 
         if atk_predmg > 0:
             self.defender.current_hp = max(1, self.defender.current_hp - atk_predmg)
-            
+
         if def_predmg > 0:
             self.attacker.current_hp = max(1, self.attacker.current_hp - def_predmg)
 
         # 3. START OF COMBAT HEALING
-        for combatant, opponent in [(self.attacker, self.defender), (self.defender, self.attacker)]:
+        for combatant, opponent in [
+            (self.attacker, self.defender),
+            (self.defender, self.attacker),
+        ]:
             heal = sum(
                 item.utilities.heal_start_logic(combatant, opponent)
-                for item in combatant.equipped_items if getattr(item.utilities, 'heal_start_logic', None)
+                for item in combatant.equipped_items
+                if getattr(item.utilities, "heal_start_logic", None)
             )
             self._apply_healing(combatant, heal)
 
