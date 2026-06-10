@@ -6,8 +6,7 @@
   "Atk Liberate": {
     "type": "bonus",
     "utilities": {
-      "keywords": ["atk_liberate"],
-      "logic_tag": "single_stats"
+      "keywords": ["atk_liberate"]
     }
   },
   "Bonus Doubler": {
@@ -43,7 +42,8 @@
   "Collapsed Star": {
     "type": "bonus",
     "utilities": {
-      "set_to_one_tag": "collapsed_star_logic"
+      "keywords": ["collapsed_star"],
+      "set_to_one_tag": "set_to_one"
     }
   },
   "Dark Emblem": {
@@ -59,8 +59,7 @@
   "Def Liberate": {
     "type": "bonus",
     "utilities": {
-      "keywords": ["def_liberate"],
-      "logic_tag": "single_stats"
+      "keywords": ["def_liberate"]
     }
   },
   "Desperation": {
@@ -77,12 +76,12 @@
       "heal_start_tag": "heal_start_of_combat"
     }
   },
-  "Divinely Inspiring": {
+  "Divinely Inspired": {
     "type": "bonus",
     "utilities": {
-      "keywords": ["divinely_inspiring"]
+        "keywords": ["divinely_inspiring"]
     }
-  },
+},
   "Dodge": {
     "type": "bonus"
   },
@@ -252,9 +251,7 @@
   "Paranoia": {
     "type": "bonus",
     "utilities" : {
-      "keywords": ["paranoia"],
-      "logic_tag": "single_stats"
-
+      "keywords": ["paranoia"]
     }
   },
   "Potent Follow": {
@@ -317,8 +314,7 @@
   "Res Liberate": {
     "type": "bonus",
     "utilities": {
-      "keywords": ["res_liberate"],
-      "logic_tag": "single_stats"
+      "keywords": ["res_liberate"]
     }
   },
   "Resonance: Blades": {
@@ -328,7 +324,9 @@
   "Resonance: Shields": {
     "type": "bonus",
     "combat_stats": {"defense": 4, "res": 4},
-    "TODO: ADD FU DENIAL ONCE ITS DONE" : "pass"
+     "utilities": {
+        "keywords": ["foe_cannot_follow_up"]
+    }
   },
   "Spd Rift +10": {
     "type": "bonus"
@@ -336,8 +334,7 @@
   "Spd Liberate": {
     "type": "bonus",
     "utilities": {
-      "keywords": ["spd_liberate"],
-      "logic_tag": "single_stats"
+      "keywords": ["spd_liberate"]
     }
   },
   "Special Cooldown Charge +1": {
@@ -370,8 +367,11 @@
   "Atk Shackle": {
     "type": "penalty"
   },
-  "Counterattacks disrupted": {
-    "type": "penalty"
+  "Flash": {
+    "type": "penalty",
+    "utilities": {
+        "keywords": ["flash"]
+    }
   },
   "Deep Wounds": {
     "type": "penalty",

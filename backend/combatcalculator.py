@@ -457,10 +457,9 @@ class CombatEngine:
         attacker_spd_check = 1 if spd_diff > 5 else 0
         defender_spd_check = 1 if spd_diff < -5 else 0
 
-        #check if they can counterattack while flashed
+        # check if they can counterattack while flashed
         defender_NCD = self.defender.count_keyword("NCD")
         attacker_Flash = self.attacker.count_keyword("flash")
-
 
         nb_attacker_GFU = self.attacker.count_keyword("guaranteed_follow_up")
         nb_defender_GFU = self.defender.count_keyword("guaranteed_follow_up")
@@ -490,7 +489,7 @@ class CombatEngine:
         attacker_spd = self.combatant_states["attacker"].combat_stats.spd
         defender_spd = self.combatant_states["defender"].combat_stats.spd
         spd_diff = attacker_spd - defender_spd
-    
+
         attacker_potent = self.attacker.has_keyword("potent") and spd_diff >= 25
         defender_potent = self.defender.has_keyword("potent") and spd_diff <= -25
 
@@ -570,12 +569,15 @@ class CombatEngine:
         attacker_desp_effect = self.attacker.has_keyword("dualphasedesperation")
         defender_desp_effect = self.defender.has_keyword("dualphasedesperation")
 
-        attacker_flash_effective = attacker_Flash > 0 or self.defender.has_keyword("counterattacks_disrupted") and defender_NCD == 0
+        attacker_flash_effective = (
+            attacker_Flash > 0
+            or self.defender.has_keyword("counterattacks_disrupted")
+            and defender_NCD == 0
+        )
 
         if attacker_flash_effective:
             defender_first = []
             defender_followups = []
-
 
         attacker_package = attacker_first + attacker_followups
         defender_package = defender_first + defender_followups
@@ -586,7 +588,8 @@ class CombatEngine:
         defender_vantage = self.defender.has_keyword("vantage")
         attacker_bunches = attacker_desperation or attacker_desp_effect
         defender_bunches = defender_desp_effect
-        #psuedo code
+
+        # psuedo code
         # if hardy bearing:
         # strike_sequence = ()
         if defender_vantage and defender_bunches:
@@ -653,6 +656,12 @@ class CombatEngine:
                 if getattr(item.utilities, "heal_start_logic", None)
             )
             self._apply_healing(combatant, heal)
+        self.combatant_states["attacker"].current_cooldown -= self.attacker.get_pulse_amount(
+        "before_first_attack", self.defender
+    )
+        self.combatant_states["defender"].current_cooldown -= self.defender.get_pulse_amount(
+            "before_first_attack", self.attacker
+        )
 
     def _phase_after_combat(self):
         # self.attacker.current_cooldown -= self.attacker.get_pulse_amount(

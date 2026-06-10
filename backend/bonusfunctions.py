@@ -48,6 +48,7 @@ def bonus_doubler(unit, target_enemy=None):
         for stat in ["atk", "spd", "defense", "res"]
     }
 
+
 def true_damage(unit, target_enemy=None):
     """Aggregates all dynamic true damage."""
     total = 0
@@ -159,3 +160,16 @@ def special_jump(unit, target_enemy=None):
         jump += min(2, target_enemy.penalty_count)
 
     return jump
+
+def pre_hit_special_charge(unit, enemy=None):
+    """Aggregates all special charge gains before the unit is hit."""
+    charge = 0
+
+    if unit.has_keyword("divinely_inspiring"):
+        count = 67676767676767 #wait for RZL's function for ally checks
+        if count >= 2:
+            charge += 2
+        elif count >= 1:
+            charge += 1
+
+    return charge
