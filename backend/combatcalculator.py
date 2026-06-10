@@ -457,6 +457,11 @@ class CombatEngine:
         attacker_spd_check = 1 if spd_diff > 5 else 0
         defender_spd_check = 1 if spd_diff < -5 else 0
 
+        attacker_NCD = self.attacker.count_keyword("NCD")
+        defender_NCD = self.defender.count_keyword("NCD")
+        attacker_Flash = self.attacker.count_keyword("Flash")
+        defender_Flash = self.defender.count_keyword("Flash")
+        
         nb_attacker_GFU = self.attacker.count_keyword("guaranteed_follow_up")
         nb_defender_GFU = self.defender.count_keyword("guaranteed_follow_up")
 
@@ -485,7 +490,7 @@ class CombatEngine:
         attacker_spd = self.combatant_states["attacker"].combat_stats.spd
         defender_spd = self.combatant_states["defender"].combat_stats.spd
         spd_diff = attacker_spd - defender_spd
-
+    
         attacker_potent = self.attacker.has_keyword("potent") and spd_diff >= 25
         defender_potent = self.defender.has_keyword("potent") and spd_diff <= -25
 
@@ -574,7 +579,9 @@ class CombatEngine:
         defender_vantage = self.defender.has_keyword("vantage")
         attacker_bunches = attacker_desperation or attacker_desp_effect
         defender_bunches = defender_desp_effect
-
+        #psuedo code
+        # if hardy bearing:
+        # strike_sequence = ()
         if defender_vantage and defender_bunches:
             strike_sequence = defender_package + attacker_package
         elif defender_vantage:
