@@ -656,10 +656,14 @@ class CombatEngine:
                 if getattr(item.utilities, "heal_start_logic", None)
             )
             self._apply_healing(combatant, heal)
-        self.combatant_states["attacker"].current_cooldown -= self.attacker.get_pulse_amount(
-        "before_first_attack", self.defender
-    )
-        self.combatant_states["defender"].current_cooldown -= self.defender.get_pulse_amount(
+        self.combatant_states[
+            "attacker"
+        ].current_cooldown -= self.attacker.get_pulse_amount(
+            "before_first_attack", self.defender
+        )
+        self.combatant_states[
+            "defender"
+        ].current_cooldown -= self.defender.get_pulse_amount(
             "before_first_attack", self.attacker
         )
 

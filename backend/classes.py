@@ -104,6 +104,7 @@ class Unit:
         res: int,
         dragonflower: int = 0,
         merges: int = 0,
+        engage_ring_level: int = 0,
         superboon: list[str] | None = None,
         superbane: list[str] | None = None,
         boon: str | None = None,
@@ -142,8 +143,46 @@ class Unit:
         self.penalty_count = 0
 
         self._initialize_stats()
-        self.current_hp = self.base_stats.hp
         self.first_combat_of_turn = True
+        self.is_engaged = False
+
+        # APPLY PROGRESSION STATS
+
+        temp_max_flower_cap = 30
+        applied_flowers = min(self.dragonflower, temp_max_flower_cap)
+        self._distribute_sequential_stats(applied_flowers)
+
+        if self.is_engaged:
+            applied_engage_stats = min(self.engage_ring_level, 10)
+            self._distribute_sequential_stats(applied_engage_stats)
+
+        self.current_hp = self.base_stats.hp
+        self.start_of_combat_hp = self.base_stats.hp
+
+    def _distribute_sequential_stats(self, total_points: int):
+        """
+        Universally handles FEH stat distribution.
+        Sorts by highest Level 40 stat (Descending).
+        Ties are broken by FEH order: HP -> Atk -> Spd -> Def -> Res.
+        """
+        if total_points <= 0:
+            return
+
+        tie_breaker_order = ["hp", "atk", "spd", "defense", "res"]
+
+        # Sort directly using the unit's actual base_stats!
+        sorted_stats = sorted(
+            tie_breaker_order,
+            key=lambda stat: (
+                -getattr(self.base_stats, stat, 0),
+                tie_breaker_order.index(stat),
+            ),
+        )
+
+        for i in range(total_points):
+            stat_to_buff = sorted_stats[i % 5]
+            current_val = getattr(self.base_stats, stat_to_buff)
+            setattr(self.base_stats, stat_to_buff, current_val + 1)
 
     def _initialize_stats(self):
         """
