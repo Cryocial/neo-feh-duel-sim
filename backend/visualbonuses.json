@@ -104,7 +104,10 @@
     "combat_stats": {"atk": 4, "spd": 4, "defense": 4, "res": 4}
   },
   "Dual Strike": {
-    "type": "bonus"
+    "type": "bonus",
+    "utilities": {
+      "keywords": ["brave"]
+    }
   },
   "Effective against dragons": {
     "type": "bonus",
@@ -140,10 +143,17 @@
     }
   },
   "Fell Spirit": {
-    "type": "bonus"
+    "type": "bonus",
+    "utilities": {
+      "keywords": ["null_c_disrupt", "PLACEHOLDER"]
+    }
   },
   "Fire Emblem": {
-    "type": "bonus"
+    "type": "bonus",
+    "utilities": {
+      "keywords": ["neutralize_effective_class"],
+      "truedr": 10
+    }
   },
   "Foe Cannot Follow-Up": {
     "type": "bonus",
@@ -171,7 +181,10 @@
     }
 },
   "Halves non-Special damage reduction": {
-    "type": "bonus"
+    "type": "bonus",
+    "utilities": {
+      "keywords": ["pierce_50"]
+    }
   },
   "Hexblade": {
     "type": "bonus",
@@ -337,7 +350,10 @@
     }
   },
   "Triangle Attack": {
-    "type": "bonus"
+    "type": "bonus",
+    "utilities": {
+      "keywords": ["brave"]
+    }
   },
   "Truly Incited": {
     "type": "bonus"
