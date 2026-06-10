@@ -41,6 +41,17 @@ def omni_boost(unit, enemy=None):
     return {stat: boost for stat in ["atk", "spd", "defense", "res"]}
 
 
+def omni_debuff(unit, enemy=None):
+    """Aggregates all dynamic omni-stat debuffs."""
+    debuff = 0
+    if unit.has_keyword("fell_spirit") and enemy is not None:
+        if unit.is_engaged or enemy.is_engaged:
+            debuff -= 6
+        else:
+            debuff -= 4
+    return {stat: debuff for stat in ["atk", "spd", "defense", "res"]}
+
+
 def bonus_doubler(unit, target_enemy=None):
     """Calculates the Bonus Doubler effect."""
     return {
@@ -161,12 +172,13 @@ def special_jump(unit, target_enemy=None):
 
     return jump
 
+
 def pre_hit_special_charge(unit, enemy=None):
     """Aggregates all special charge gains before the unit is hit."""
     charge = 0
 
     if unit.has_keyword("divinely_inspiring"):
-        count = 67676767676767 #wait for RZL's function for ally checks
+        count = 67676767676767  # wait for RZL's function for ally checks
         if count >= 2:
             charge += 2
         elif count >= 1:
