@@ -144,7 +144,7 @@
   "Fell Spirit": {
     "type": "bonus",
     "utilities": {
-      "keywords": ["null_c_disrupt", "PLACEHOLDER"]
+      "keywords": ["NCD", "PLACEHOLDER"]
     }
   },
   "Fire Emblem": {
