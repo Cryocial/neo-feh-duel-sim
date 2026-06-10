@@ -457,11 +457,11 @@ class CombatEngine:
         attacker_spd_check = 1 if spd_diff > 5 else 0
         defender_spd_check = 1 if spd_diff < -5 else 0
 
-        attacker_NCD = self.attacker.count_keyword("NCD")
+        #check if they can counterattack while flashed
         defender_NCD = self.defender.count_keyword("NCD")
-        attacker_Flash = self.attacker.count_keyword("Flash")
-        defender_Flash = self.defender.count_keyword("Flash")
-        
+        attacker_Flash = self.attacker.count_keyword("flash")
+
+
         nb_attacker_GFU = self.attacker.count_keyword("guaranteed_follow_up")
         nb_defender_GFU = self.defender.count_keyword("guaranteed_follow_up")
 
@@ -569,6 +569,13 @@ class CombatEngine:
         # Special version — no initiation requirement, can apply on ep (Marth for example)
         attacker_desp_effect = self.attacker.has_keyword("dualphasedesperation")
         defender_desp_effect = self.defender.has_keyword("dualphasedesperation")
+
+        attacker_flash_effective = attacker_Flash > 0 or self.defender.has_keyword("counterattacks_disrupted") and defender_NCD == 0
+
+        if attacker_flash_effective:
+            defender_first = []
+            defender_followups = []
+
 
         attacker_package = attacker_first + attacker_followups
         defender_package = defender_first + defender_followups
