@@ -48,7 +48,6 @@ def bonus_doubler(unit, target_enemy=None):
         for stat in ["atk", "spd", "defense", "res"]
     }
 
-
 def true_damage(unit, target_enemy=None):
     """Aggregates all dynamic true damage."""
     total = 0
