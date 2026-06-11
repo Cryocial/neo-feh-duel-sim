@@ -101,6 +101,19 @@ def true_dr(unit, target_enemy=None):
         dr += 10
     return dr
 
+def percent_dr(unit, target_enemy=None):
+    """Aggregates conditional  Damage Reduction."""
+    dr = 0.0
+    if unit.has_keyword("dodge") and target_enemy is not None:
+        unit_spd = unit.get_combat_stat("spd", target_enemy)
+        enemy_spd = target_enemy.get_combat_stat("spd", unit)
+        spd_diff = unit_spd - enemy_spd
+        if spd_diff > 0:
+            max_dodge = min(10, spd_diff)
+            dr += (max_dodge * 4) / 100
+    return dr
+
+
 
 def hexblade_logic(unit, target_enemy=None):
     """Hexblade status: Targets the lower of foe's Def/Res."""
