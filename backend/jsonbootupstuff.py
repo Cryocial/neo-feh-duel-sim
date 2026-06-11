@@ -66,7 +66,8 @@ def initialize_status_database():
             utilities.first_hit_dmg_floor_logic = resolve_logic(tag)
         if tag := util_data.get("dmg_floor_tag"):
             utilities.dmg_floor_logic = resolve_logic(tag)
-            # ADD MORE SOON
+        if tag := util_data.get("percent_dr_logic_tag"):
+            utilities.percent_dr_logic = resolve_logic(tag)
 
         STATUS_EFFECT_DATABASE[name] = {
             "combat_stats": combat_stats,
