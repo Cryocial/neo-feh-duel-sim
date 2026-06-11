@@ -39,3 +39,58 @@ class StrikeType(Enum):
     FIRST = auto()
     FOLLOW_UP = auto()
     POTENT = auto()
+
+
+class EffectType(str, Enum):
+    # ── AoE ───────────────────────────────────────────────────────────────────
+    TRIGGER_AOE     = "TRIGGER_AOE"
+    FLAT_DAMAGE_AOE = "FLAT_DAMAGE_AOE"
+    FLAT_DR_AOE     = "FLAT_DR_AOE"
+    HEXBLADE_AOE    = "HEXBLADE_AOE"
+    PULSE_AOE       = "PULSE_AOE"
+
+    # ── Stat modifications ────────────────────────────────────────────────────
+    STAT_BOOST      = "STAT_BOOST"
+    STAT_DAUNT      = "STAT_DAUNT"
+    BONUS_NEUT      = "BONUS_NEUT"
+    PENALTY_NEUT    = "PENALTY_NEUT"
+
+    # ── Strike sequence ───────────────────────────────────────────────────────
+    FU_DENY          = "FU_DENY"
+    GFU              = "GFU"
+    BRAVE            = "BRAVE"
+    POTENT           = "POTENT"
+    VANTAGE          = "VANTAGE"
+    DESPERATION      = "DESPERATION"
+    DESPERATION_NEUT = "DESPERATION_NEUT"
+    FLASH            = "FLASH"
+
+    # ── Pre-combat ────────────────────────────────────────────────────────────
+    PRE_CBT_DAMAGE   = "PRE_CBT_DAMAGE"
+    PRE_CBT_HEAL     = "PRE_CBT_HEAL"
+
+    # ── On-strike ─────────────────────────────────────────────────────────────
+    DR_PIERCE               = "DR_PIERCE"
+    HEXBLADE_STRIKE         = "HEXBLADE_STRIKE"
+    EFFECTIVE               = "EFFECTIVE"
+    NEUT_EFFECTIVE          = "NEUT_EFFECTIVE"
+    SPECIAL_TRIGGER_NEUT    = "SPECIAL_TRIGGER_NEUT"
+    FLAT_DR_STRIKE          = "FLAT_DR_STRIKE"
+    PERC_DR_STRIKE          = "PERC_DR_STRIKE"
+    FLAT_DAMAGE_STRIKE      = "FLAT_DAMAGE_STRIKE"
+    PULSE_STRIKE            = "PULSE_STRIKE"
+    SCOWL_STRIKE            = "SCOWL_STRIKE"
+    HEAL_STRIKE             = "HEAL_STRIKE"
+    OFF_BREATH              = "OFF_BREATH"
+    DEF_BREATH              = "DEF_BREATH"
+    OFF_TEMPO               = "OFF_TEMPO"
+    DEF_TEMPO               = "DEF_TEMPO"
+    DR_FLOOR                = "DR_FLOOR"
+    DEEP_WOUNDS_STRIKE      = "DEEP_WOUNDS_STRIKE"
+    NEUT_DEEP_WOUNDS_STRIKE = "NEUT_DEEP_WOUNDS_STRIKE"
+
+    # ── Post-combat ───────────────────────────────────────────────────────────
+    HEAL_POST_CBT               = "HEAL_POST_CBT"
+    DAMAGE_POST_CBT             = "DAMAGE_POST_CBT"
+    DEEP_WOUNDS_POST_CBT        = "DEEP_WOUNDS_POST_CBT"
+    NEUT_DEEP_WOUNDS_POST_CBT   = "NEUT_DEEP_WOUNDS_POST_CBT"

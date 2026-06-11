@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Callable, Any, Self
+from typing import Callable, Any, Self, Literal
 from .constants import MovementType, WeaponType, Color
 
 
@@ -46,45 +46,28 @@ class StatBlock:
         )
 
 
-@dataclass
-class UtilityBlock:
-    """
-    Container for non-stat skill effects like damage reduction,
-    true damage logic, and cooldown modifiers.
-    """
-
-    aoe_coefficient: float | None = None
-    truedr: int = 0
-    truedr_logic: Callable | None = None
-    truedmg: int = 0
-    truedmg_logic: Callable | None = None
-    heal_precombat_logic: Callable | None = None
-    heal_on_hit_logic: Callable | None = None
-    heal_after_logic: Callable | None = None
-    predmg_logic: Callable | None = None
-    dynamic_stats_logic: Callable | None = None
-    cooldown_modifiers: dict[str, Any] = field(default_factory=dict)
-    percent_dr: float = 0.0
-    percent_dr_logic : Callable | None = None
-    potent_logic: Callable | None = None
-    set_to_one_logic: Callable | None = None
-    adaptive_logic: Callable | None = None
-    first_hit_dmg_floor_logic: Callable | None = None
-    dmg_floor_logic: Callable | None = None
-    keywords: list[str] = field(default_factory=list)
-
-
-@dataclass
+@dataclass(frozen=True)
 class Skill:
     """Represents an equipped skill (Weapon, A/B/C slot, etc.)."""
 
     name: str
     slot: str
-    visible_stats: StatBlock = field(default_factory=StatBlock)
-    combat_stats: StatBlock = field(default_factory=StatBlock)
-    utilities: UtilityBlock = field(default_factory=UtilityBlock)
-    enemy_combat_stats: StatBlock = field(default_factory=StatBlock)
+    might: int
+    slaying: int
+    cooldown: int
+    visible_stats: StatBlock
+    effects: list[dict]
+    allowed_movement_types: list[MovementType]
+    allowed_weapon_types: list[WeaponType]
+    is_arcane: bool = False
+    is_prf: bool = False
+    
 
+@dataclass(frozen=True)
+class Status:
+    name:    str
+    type:    Literal["bonus", "penalty"]
+    effects: list[dict]     # raw effect definitions from the JSON
 
 class Unit:
     """
@@ -137,11 +120,10 @@ class Unit:
 
         self.visible_buffs = StatBlock()
         self.visible_debuffs = StatBlock()
-        self.active_statuses: list[str] = []
-        self.current_cooldown = 0
-        self.damage_mitigated_bucket = 0  # Used for specific reflex-style skills
-        self.bonus_count = 0
-        self.penalty_count = 0
+        self.active_statuses: list[Status] = []
+        
+        self.max_cooldown = 0
+        self.pre_charge = 0
 
         self._initialize_stats()
         self.first_combat_of_turn = True
@@ -287,35 +269,6 @@ class Unit:
                 if info := STATUS_EFFECT_DATABASE.get(s):
                     total += getattr(info["enemy_combat_stats"], name)
         return total
-
-    def has_keyword(self, keyword: str) -> bool:
-        """Checks if the unit has a specific keyword (e.g. 'null_follow_up') from skills or statuses."""
-        from .jsonbootupstuff import STATUS_EFFECT_DATABASE
-
-        if any(keyword in item.utilities.keywords for item in self.equipped_items):
-            return True
-        return any(
-            keyword in STATUS_EFFECT_DATABASE[s]["utilities"].keywords
-            for s in self.active_statuses
-            if s in STATUS_EFFECT_DATABASE
-        )
-
-    def count_keyword(self, target_keyword: str) -> int:
-        """Counts how many times a keyword appears across all items and statuses."""
-        count = sum(
-            1
-            for item in self.equipped_items
-            if target_keyword in getattr(item.utilities, "keywords", [])
-        )
-
-        from .jsonbootupstuff import STATUS_EFFECT_DATABASE
-
-        for status_name in self.active_statuses:
-            if status_data := STATUS_EFFECT_DATABASE.get(status_name):
-                if target_keyword in status_data["utilities"].keywords:
-                    count += 1
-
-        return count
 
     def is_physical(self) -> bool:
         """Returns True if the unit's weapon type is physical (not magic/staff/beast)."""

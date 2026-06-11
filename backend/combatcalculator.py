@@ -1,9 +1,10 @@
 import math
 from dataclasses import dataclass, field
 from typing import Literal
-from .classes import Unit, StatBlock
-from .constants import Color, StrikeType, MovementType, WeaponType
-from .jsonbootupstuff import STATUS_EFFECT_DATABASE
+from .build import Unit, StatBlock
+from .constants import Color, StrikeType, MovementType, WeaponType, EffectType
+from .effects import Effect, build_effect, EFFECT_LIST_MAP
+from .conditions import Phase, Condition, AtomicCondition, AnyOf
 
 UnitRole = Literal["attacker", "defender"]
 
@@ -14,7 +15,19 @@ class CombatantState:
     current_hp: int
     current_cooldown: int
     combat_stats: StatBlock | None = None
-    defensive_stat: Literal["def", "res"] | None = None
+    defensive_stat: Literal["defense", "res"] | None = None
+    damage_mitigated_bucket: int = 0
+    bonus_count: int = 0
+    penalty_count: int = 0
+    special_use_count: int = 0
+    strike_count: int = 0
+    has_entered_combat: bool = False
+    effects_AoE: list[Effect] = field(default_factory=list)
+    effects_start_of_combat: list[Effect] = field(default_factory=list)
+    effects_strike_sequence: list[Effect] = field(default_factory=list)
+    effects_pre_combat: list[Effect] = field(default_factory=list)
+    effects_on_strike: list[Effect] = field(default_factory=list)
+    effects_after_combat: list[Effect] = field(default_factory=list)
 
 
 @dataclass
@@ -26,6 +39,103 @@ class Strike:
     strike_type: StrikeType
     brave_second_hit: bool = False
     consecutive: bool = False
+
+
+def _distribute_effects(attacker: CombatantState, defender: CombatantState) -> None:
+    attacker_skills = [
+        attacker.unit.weapon, attacker.unit.special,
+        attacker.unit.a_slot, attacker.unit.b_slot, attacker.unit.c_slot,
+        attacker.unit.s_slot, attacker.unit.x_slot
+    ]
+    for skill in attacker_skills:
+        for desc in skill.effects:
+            effect = build_effect(desc, applied_by="self")
+            target = attacker if desc["target"] == "self" else defender
+            _add_to_bucket(target, effect)
+
+    for status in attacker.unit.active_statuses:
+        for desc in status.effects:
+            effect = build_effect(desc, applied_by=status.type)
+            target = attacker if desc["target"] == "self" else defender
+            _add_to_bucket(target, effect)
+
+    defender_skills = [
+        defender.unit.weapon, defender.unit.special,
+        attacker.unit.a_slot, defender.unit.b_slot, defender.unit.c_slot,
+        defender.unit.s_slot, defender.unit.x_slot
+    ]
+    for skill in defender_skills:
+        for desc in skill.effects:
+            effect = build_effect(desc, applied_by="self")
+            target = defender if desc["target"] == "self" else attacker
+            _add_to_bucket(target, effect)
+
+    for status in defender.unit.active_statuses:
+        for desc in status.effects:
+            effect = build_effect(desc, applied_by=status.type)
+            target = defender if desc["target"] == "self" else attacker
+            _add_to_bucket(target, effect)
+
+
+def _add_to_bucket(state: CombatantState, effect: Effect) -> None:
+    list_name = EFFECT_LIST_MAP.get(effect.type)
+    if list_name is not None:
+        getattr(state, list_name).append(effect)
+
+
+def _evaluate_conditions_for_effect(
+    effect: Effect,
+    unit_state: CombatantState,
+    foe_state: CombatantState,
+    phase: Phase,
+) -> tuple[bool, list[Condition]]:
+    if effect.applied_by == "foe":
+        owner, opponent = foe_state, unit_state
+    else:
+        owner, opponent = unit_state, foe_state
+    return _check_phase(effect.conditions, phase, owner, opponent)
+
+
+def _check_phase(
+    conditions: list[Condition],
+    phase: Phase,
+    unit: CombatantState,
+    foe: CombatantState,
+) -> tuple[bool, list[Condition]]:
+    remaining = []
+    for cond in conditions:
+        result = _check_condition(cond, phase, unit, foe)
+        if result is False:
+            return False, []
+        if result is None:
+            remaining.append(cond)
+    return True, remaining
+
+
+def _check_condition(
+    cond: Condition,
+    phase: Phase,
+    unit: CombatantState,
+    foe: CombatantState,
+) -> bool | None:
+    if isinstance(cond, AtomicCondition):
+        if cond.phase != phase:
+            return None
+        return cond.func(unit, foe)
+    return _check_anyof(cond, phase, unit, foe)
+
+
+def _check_anyof(
+    anyof: AnyOf,
+    phase: Phase,
+    unit: CombatantState,
+    foe: CombatantState,
+) -> bool | None:
+    results = [_check_condition(c, phase, unit, foe) for c in anyof.conditions]
+    phase_results = [r for r in results if r is not None]
+    if not phase_results:
+        return None
+    return any(phase_results)
 
 
 @dataclass
@@ -43,32 +153,37 @@ class CombatEngine:
         """
         Runs the full combat simulation and returns the final HP for both units.
         """
-        self.combatant_states = {
-            "attacker": CombatantState(
+        attacker_state = CombatantState(
                 unit=self.attacker,
                 current_hp=self.attacker.current_hp,
-                current_cooldown=self.attacker.current_cooldown,
-            ),
-            "defender": CombatantState(
+                current_cooldown=self.attacker.max_cooldown - self.attacker.pre_charge,
+            )
+        defender_state = CombatantState(
                 unit=self.defender,
                 current_hp=self.defender.current_hp,
-                current_cooldown=self.defender.current_cooldown,
-            ),
+                current_cooldown=self.defender.max_cooldown - self.defender.pre_charge,
+            )
+
+        self.combatant_states = {
+            "attacker": attacker_state,
+            "defender": defender_state
         }
 
-        self._start_of_turn()
+        _distribute_effects(attacker_state, defender_state)
 
-        self._phase_before_combat()
+        self._evaluate_conditions("pre_aoe")
+
+        self._phase_AoE()
 
         self._combat_stat_calculations()
 
+        self._evaluate_conditions("start_of_combat")
+
         strike_sequence = self._determine_strike_sequence()
 
-        self._phase_start_of_combat()
+        self._evaluate_conditions("post_sequence")
 
-        # tracks dmg mitigated for reflex
-        self.attacker.damage_mitigated_bucket = 0
-        self.defender.damage_mitigated_bucket = 0
+        self._phase_pre_combat()
 
         while (
             len(strike_sequence) > 0
@@ -84,6 +199,22 @@ class CombatEngine:
             "attacker_final_hp": self.combatant_states["attacker"].current_hp,
             "defender_final_hp": self.combatant_states["defender"].current_hp,
         }
+
+    def _evaluate_conditions(self, phase: Phase) -> None:
+        for role, foe_role in (("attacker", "defender"), ("defender", "attacker")):
+            state = self.combatant_states[role]
+            foe_state = self.combatant_states[foe_role]
+            for list_name in (
+                "effects_AoE", "effects_start_of_combat", "effects_strike_sequence",
+                "effects_pre_combat", "effects_on_strike", "effects_after_combat",
+            ):
+                updated_conditions = []
+                for effect in getattr(state, list_name):
+                    keep, remaining_conditions = _evaluate_conditions_for_effect(effect, state, foe_state, phase)
+                    if keep:
+                        effect.conditions = remaining_conditions
+                        updated_conditions.append(effect)
+                setattr(state, list_name, updated_conditions)
 
     def _apply_healing(self, unit: Unit, amount: int):
         """Enforces Deep Wounds, Imbue, and Max HP caps."""
@@ -110,23 +241,18 @@ class CombatEngine:
         new_hp = unit.current_hp + amount
         unit.current_hp = min(unit.base_stats.hp, new_hp)
 
-    def _process_AoE(self, striker: Unit, target: Unit):
+    def _process_AoE(self, effect: Effect):
         """Applies AoE damage"""
         # TODO: include bonus damage and DR effects
         striker = self.combatant_states["attacker"]
         target = self.combatant_states["defender"]
-
-        coefficient = striker.unit.special.utilities.aoe_coefficient
+        
         visible_atk = striker.unit.get_visible_stat("atk")
-        visible_defensive_stat = (
-            target.unit.get_visible_stat("defense")
-            if striker.unit.is_physical()
-            else target.unit.get_visible_stat("res")
-        )
+        visible_defensive_stat = target.unit.get_visible_stat("defense") if striker.unit.is_physical() else target.unit.get_visible_stat("res")
+        
+        coefficient = effect.params['coefficient']
 
-        damage = max(
-            0, math.floor(coefficient * (visible_atk - visible_defensive_stat))
-        )
+        damage = max(0, math.floor(coefficient * (visible_atk - visible_defensive_stat)))
         target.current_hp = max(1, target.current_hp - damage)
 
     def _process_strike(self, strike: Strike):
@@ -140,7 +266,7 @@ class CombatEngine:
         raw_atk = striker_state.combat_stats.atk
         defensive_stat = (
             target_state.combat_stats.defense
-            if target_state.defensive_stat == "def"
+            if target_state.defensive_stat == "defense"
             else target_state.combat_stats.res
         )
 
@@ -391,18 +517,54 @@ class CombatEngine:
             case _:
                 return 0
 
+    def _resolve_formula(self, params: dict, unit_state: CombatantState, foe_state: CombatantState) -> int:
+        formula = params.get("formula", "")
+        multiplier = params.get("multiplier", 0)
+        flat = params.get("flat", 0)
+        min_val = params.get("min", 0)
+        max_val = params.get("max", -1)
+        variable = 0.0
+        if formula:
+            cs = unit_state.combat_stats
+            match formula:
+                case "unit_cbt_atk": 
+                    variable = cs.atk if cs else unit_state.unit.get_visible_stat("atk")
+                case "unit_cbt_spd":
+                    variable = cs.spd if cs else unit_state.unit.get_visible_stat("spd")
+                case "unit_cbt_def":
+                    variable = cs.defense if cs else unit_state.unit.get_visible_stat("defense")
+                case "unit_cbt_res":
+                    variable = cs.res if cs else unit_state.unit.get_visible_stat("res")
+                case "max_cooldown":
+                    variable = unit_state.unit.max_cooldown
+                case "num_bonus_and_penalties_on_unit":
+                    variable = unit_state.bonus_count + unit_state.penalty_count
+
+        value = math.floor(variable * multiplier) + flat
+        if min_val >= 0: value = max(value, min_val)
+        if max_val >= 0: value = min(value, max_val)
+        return value
+
+    def _strike_matches(self, strike: Strike, params: dict) -> bool:
+        match params.get("strike", "every_strike"):
+            case "every_strike":
+                return True
+            case "first_strike":
+                return strike.strike_type is StrikeType.FIRST and not strike.brave_second_hit
+            case "first_sequence":
+                return strike.strike_type is StrikeType.FIRST
+            case "first_strike_with_brave":
+                return strike.strike_type is StrikeType.FIRST and strike.brave_second_hit
+
     def _start_of_turn(self):
         """"""
         # update cooldowns
 
-    def _phase_before_combat(self):
+    def _phase_AoE(self):
         """AoE"""
-        if self.attacker.has_AoE:
-            self.attacker.current_cooldown -= self.attacker.get_pulse_amount(
-                "before_AoE", self.defender
-            )
-            if self.attacker.current_cooldown == 0:
-                self._process_AoE()
+        for effect in self.combatant_states["attacker"].effects_AoE:
+            if effect.type == EffectType.TRIGGER_AOE and self.combatant_states["attacker"].current_cooldown == 0:
+                self._process_AoE(effect)
 
     def _combat_stat_calculations(self):
         """Calculates combat stats for both units."""
@@ -418,7 +580,7 @@ class CombatEngine:
         self.defender.combat_stats = self.combatant_states["defender"].combat_stats
 
         # Determine targeting for Attacker targeting Defender
-        attacker_targets = "def" if self.attacker.is_physical() else "res"
+        attacker_targets = "defense" if self.attacker.is_physical() else "res"
         for item in self.attacker.equipped_items:
             if item.utilities.adaptive_logic:
                 attacker_targets = item.utilities.adaptive_logic(
@@ -433,7 +595,7 @@ class CombatEngine:
         self.combatant_states["defender"].defensive_stat = attacker_targets
 
         # Determine targeting for Defender targeting Attacker
-        defender_targets = "def" if self.defender.is_physical() else "res"
+        defender_targets = "defense" if self.defender.is_physical() else "res"
         for item in self.defender.equipped_items:
             if item.utilities.adaptive_logic:
                 defender_targets = item.utilities.adaptive_logic(
@@ -620,7 +782,7 @@ class CombatEngine:
 
         return strike_sequence
 
-    def _phase_start_of_combat(self):
+    def _phase_pre_combat(self):
         """Pre-combat damage and healing effects."""
 
         # 1. HP SNAPSHOT (For conditional HP checks)
@@ -676,3 +838,5 @@ class CombatEngine:
         # )
         pass
         ...
+
+
