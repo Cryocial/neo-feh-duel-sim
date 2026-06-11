@@ -76,14 +76,17 @@
       "heal_start_tag": "heal_start_of_combat"
     }
   },
-  "Divinely Inspired": {
+  "Divinely Inspiring": {
     "type": "bonus",
     "utilities": {
         "keywords": ["divinely_inspiring"]
     }
 },
   "Dodge": {
-    "type": "bonus"
+    "type": "bonus",
+    "utilities": {
+      "keywords": ["dodge"]
+    }
   },
   "Dominance": {
     "type": "bonus",

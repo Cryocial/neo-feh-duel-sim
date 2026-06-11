@@ -64,7 +64,8 @@ class UtilityBlock:
     predmg_logic: Callable | None = None
     dynamic_stats_logic: Callable | None = None
     cooldown_modifiers: dict[str, Any] = field(default_factory=dict)
-    percentdr: float = 0.0
+    percent_dr: float = 0.0
+    percent_dr_logic : Callable | None = None
     potent_logic: Callable | None = None
     set_to_one_logic: Callable | None = None
     adaptive_logic: Callable | None = None
