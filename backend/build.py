@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Self, Literal
+from typing import Literal
 from .constants import MovementType, WeaponType, Color
 
 
@@ -242,35 +242,6 @@ class Unit:
             val += getattr(item.visible_stats, name)
         return val
 
-    def get_combat_stat(self, name: str, target: Self | None = None) -> int:
-        """
-        Calculates the final combat value, including in-combat buffs, status effects,
-        and enemy-inflicted penalties.
-        """
-        from .jsonbootupstuff import STATUS_EFFECT_DATABASE
-
-        ignore_buffs = target.has_keyword("neutralize_foe_bonuses") if target else False
-        ignore_debuffs = self.has_keyword("neutralize_unit_penalties")
-
-        total = self.get_visible_stat(
-            name, ignore_buffs=ignore_buffs, ignore_debuffs=ignore_debuffs
-        )
-
-        for item in self.equipped_items:
-            total += getattr(item.combat_stats, name)
-
-        for s in self.active_statuses:
-            if info := STATUS_EFFECT_DATABASE.get(s):
-                total += getattr(info["combat_stats"], name)
-
-        if target:
-            for item in target.equipped_items:
-                total += getattr(item.enemy_combat_stats, name)
-            for s in target.active_statuses:
-                if info := STATUS_EFFECT_DATABASE.get(s):
-                    total += getattr(info["enemy_combat_stats"], name)
-        return total
-
     def is_physical(self) -> bool:
         """Returns True if the unit's weapon type is physical (not magic/staff/beast)."""
         return self.weapon_type not in {
@@ -280,20 +251,8 @@ class Unit:
             WeaponType.BEAST,
         }
 
-    def get_pulse_amount(self, phase: str, target: Self | None = None) -> int:
-        """Scans all sources for cooldown modifiers during a specific combat phase."""
-        from .jsonbootupstuff import STATUS_EFFECT_DATABASE
-
-        total = 0
-        for item in self.equipped_items:
-            mod = item.utilities.cooldown_modifiers.get(phase, 0)
-            total += mod(self, target) if callable(mod) else mod
-        for s in self.active_statuses:
-            if info := STATUS_EFFECT_DATABASE.get(s):
-                mod = info["utilities"].cooldown_modifiers.get(phase, 0)
-                total += mod(self, target) if callable(mod) else mod
-        return total
-
     @property
     def has_AoE(self):
-        return self.special and self.special.utilities.aoe_coefficient
+        if not self.special:
+            return False
+        return any(e.get("effect") == "TRIGGER_AOE" for e in self.special.effects)
