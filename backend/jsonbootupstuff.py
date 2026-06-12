@@ -1,79 +1,73 @@
 import json
 import os
-from .classes import StatBlock, UtilityBlock
-from . import bonusfunctions
+from .build import StatBlock, Skill, Status
+from .constants import MovementType, WeaponType
 
-STATUS_EFFECT_DATABASE = {}
+SKILL_DATABASE: dict[str, Skill]  = {}
+BONUS_DATABASE: dict[str, Status] = {}
+PENALTY_DATABASE: dict[str, Status] = {}
+UNIT_DATABASE: dict[str, dict]   = {}
 
 
-def initialize_status_database():
-    """
-    Builds the STATUS_EFFECT_DATABASE by loading 'visualbonuses.json'
-    and resolving string references to actual Python functions in 'bonusfunctions.py'.
-    """
-    try:
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        json_path = os.path.join(base_dir, "visualbonuses.json")
-        with open(json_path, "r") as file:
-            data = json.load(file)
-    except FileNotFoundError:
-        print(
-            f"Error: 'visualbonuses.json' not found at {json_path}. Status database will be empty."
+def _load_statuses(path: str) -> None:
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    for name, entry in data.items():
+        status = Status(
+            name=name,
+            type=entry["type"],
+            effects=entry.get("effects", []),
         )
-        return
+        if status.type == "bonus":
+            BONUS_DATABASE[name] = status
+        else:
+            PENALTY_DATABASE[name] = status
 
-    for name, info in data.items():
-        combat_stats = StatBlock.from_dict(info.get("combat_stats", {}))
-        enemy_combat_stats = StatBlock.from_dict(info.get("enemy_combat_stats", {}))
 
-        util_data = info.get("utilities", {})
-
-        def resolve_logic(logic_name):
-            if not logic_name:
-                return None
-            return getattr(bonusfunctions, logic_name, None)
-
-        utilities = UtilityBlock(
-            keywords=util_data.get("keywords", []),
-            cooldown_modifiers={
-                phase: (resolve_logic(mod) if isinstance(mod, str) else mod)
-                for phase, mod in util_data.get("cooldown_modifiers", {}).items()
-            },
+def _load_skills(path: str) -> None:
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    for name, entry in data.items():
+        visible = entry.get("visible", {})
+        SKILL_DATABASE[name] = Skill(
+            name=name,
+            slot=entry["type"],
+            might=visible.get("might", 0),
+            slaying=visible.get("slaying", 0),
+            cooldown=visible.get("cooldown", 0),
+            visible_stats=StatBlock.from_dict(visible.get("grants", {})),
+            effects=entry.get("effects", []),
+            allowed_movement_types=[
+                MovementType[m] for m in entry.get("allowed_movement_types", [])
+            ],
+            allowed_weapon_types=[
+                WeaponType[w] for w in entry.get("allowed_weapon_types", [])
+            ],
+            is_arcane=entry.get("is_arcane", False),
+            is_prf=entry.get("is_prf", False),
         )
 
-        if tag := util_data.get("logic_tag"):
-            utilities.truedmg_logic = resolve_logic(tag)
 
-        if tag := util_data.get("truedr_logic_tag"):
-            utilities.truedr_logic = resolve_logic(tag)
-
-        if tag := util_data.get("predmg_tag"):
-            utilities.predmg_logic = resolve_logic(tag)
-
-        if tag := util_data.get("heal_start_tag"):
-            utilities.heal_precombat_logic = resolve_logic(tag)
-
-        if tag := util_data.get("heal_hit_tag"):
-            utilities.heal_on_hit_logic = resolve_logic(tag)
-
-        if tag := util_data.get("heal_after_tag"):
-            utilities.heal_after_logic = resolve_logic(tag)
-        if tag := util_data.get("set_to_one_tag"):
-            utilities.set_to_one_logic = resolve_logic(tag)
-        if tag := util_data.get("adaptive_tag"):
-            utilities.adaptive_logic = resolve_logic(tag)
-        if tag := util_data.get("first_hit_dmg_floor_tag"):
-            utilities.first_hit_dmg_floor_logic = resolve_logic(tag)
-        if tag := util_data.get("dmg_floor_tag"):
-            utilities.dmg_floor_logic = resolve_logic(tag)
-        if tag := util_data.get("percent_dr_logic_tag"):
-            utilities.percent_dr_logic = resolve_logic(tag)
-
-        STATUS_EFFECT_DATABASE[name] = {
-            "combat_stats": combat_stats,
-            "enemy_combat_stats": enemy_combat_stats,
-            "utilities": utilities,
-        }
+def _load_units(path: str) -> None:
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    for name, entry in data.items():
+        UNIT_DATABASE[name] = entry
 
 
-initialize_status_database()
+def _initialize_databases() -> None:
+    base = os.path.dirname(os.path.abspath(__file__))
+    loaders = [
+        (_load_statuses, "statuses.json"),
+        (_load_skills, "skills.json"),
+        (_load_units, "units.json"),
+    ]
+    for loader, filename in loaders:
+        path = os.path.join(base, filename)
+        try:
+            loader(path)
+        except FileNotFoundError:
+            print(f"{filename} not found.")
+
+
+_initialize_databases()
