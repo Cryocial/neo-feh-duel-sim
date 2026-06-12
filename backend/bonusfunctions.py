@@ -101,6 +101,7 @@ def true_dr(unit, target_enemy=None):
         dr += 10
     return dr
 
+
 def percent_dr(unit, target_enemy=None):
     """Aggregates conditional  Damage Reduction."""
     dr = 0.0
@@ -112,7 +113,6 @@ def percent_dr(unit, target_enemy=None):
             max_dodge = min(10, spd_diff)
             dr += (max_dodge * 4) / 100
     return dr
-
 
 
 def hexblade_logic(unit, target_enemy=None):

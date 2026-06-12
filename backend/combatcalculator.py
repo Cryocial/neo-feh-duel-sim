@@ -1,10 +1,9 @@
 import math
 from dataclasses import dataclass, field
 from typing import Literal
-from .classes import Unit, StatBlock
-from .jsonbootupstuff import STATUS_EFFECT_DATABASE
+
 from .build import Unit, StatBlock
-from .constants import Color, StrikeType, MovementType, WeaponType, EffectType
+from .constants import StrikeType, EffectType
 from .effects import Effect, build_effect, EFFECT_LIST_MAP
 from .conditions import Phase, Condition, AtomicCondition, AnyOf
 
@@ -45,9 +44,13 @@ class Strike:
 
 def _distribute_effects(attacker: CombatantState, defender: CombatantState) -> None:
     attacker_skills = [
-        attacker.unit.weapon, attacker.unit.special,
-        attacker.unit.a_slot, attacker.unit.b_slot, attacker.unit.c_slot,
-        attacker.unit.s_slot, attacker.unit.x_slot
+        attacker.unit.weapon,
+        attacker.unit.special,
+        attacker.unit.a_slot,
+        attacker.unit.b_slot,
+        attacker.unit.c_slot,
+        attacker.unit.s_slot,
+        attacker.unit.x_slot,
     ]
     for skill in attacker_skills:
         for desc in skill.effects:
@@ -62,9 +65,13 @@ def _distribute_effects(attacker: CombatantState, defender: CombatantState) -> N
             _add_to_bucket(target, effect)
 
     defender_skills = [
-        defender.unit.weapon, defender.unit.special,
-        attacker.unit.a_slot, defender.unit.b_slot, defender.unit.c_slot,
-        defender.unit.s_slot, defender.unit.x_slot
+        defender.unit.weapon,
+        defender.unit.special,
+        attacker.unit.a_slot,
+        defender.unit.b_slot,
+        defender.unit.c_slot,
+        defender.unit.s_slot,
+        defender.unit.x_slot,
     ]
     for skill in defender_skills:
         for desc in skill.effects:
@@ -152,26 +159,23 @@ class CombatEngine:
     combatant_states: dict[UnitRole, CombatantState] = field(init=False)
 
     def simulate(self) -> dict[str, int]:
-        """
-        Runs the full combat simulation and returns the final HP for both units.
-        """
-        attacker_state = CombatantState(
+        """Runs the full combat simulation following the 10-step timeline."""
+        # 1. Initialize States & Distribute Effects
+        self.combatant_states = {
+            "attacker": CombatantState(
                 unit=self.attacker,
                 current_hp=self.attacker.current_hp,
                 current_cooldown=self.attacker.max_cooldown - self.attacker.pre_charge,
-            )
-        defender_state = CombatantState(
+            ),
+            "defender": CombatantState(
                 unit=self.defender,
                 current_hp=self.defender.current_hp,
                 current_cooldown=self.defender.max_cooldown - self.defender.pre_charge,
-            )
-
-        self.combatant_states = {
-            "attacker": attacker_state,
-            "defender": defender_state
+            ),
         }
-
-        _distribute_effects(attacker_state, defender_state)
+        _distribute_effects(
+            self.combatant_states["attacker"], self.combatant_states["defender"]
+        )
 
         self._evaluate_conditions("pre_aoe")
 
@@ -193,7 +197,7 @@ class CombatEngine:
             and self.combatant_states["defender"].current_hp > 0
         ):
             strike = strike_sequence.pop(0)
-            self._process_strike(strike)  # CD pulses and healing calc in there too
+            self._process_strike(strike)
 
         self._phase_after_combat()
 
@@ -207,434 +211,169 @@ class CombatEngine:
             state = self.combatant_states[role]
             foe_state = self.combatant_states[foe_role]
             for list_name in (
-                "effects_AoE", "effects_start_of_combat", "effects_strike_sequence",
-                "effects_pre_combat", "effects_on_strike", "effects_after_combat",
+                "effects_AoE",
+                "effects_start_of_combat",
+                "effects_strike_sequence",
+                "effects_pre_combat",
+                "effects_on_strike",
+                "effects_after_combat",
             ):
                 updated_conditions = []
                 for effect in getattr(state, list_name):
-                    keep, remaining_conditions = _evaluate_conditions_for_effect(effect, state, foe_state, phase)
+                    keep, remaining_conditions = _evaluate_conditions_for_effect(
+                        effect, state, foe_state, phase
+                    )
                     if keep:
                         effect.conditions = remaining_conditions
                         updated_conditions.append(effect)
                 setattr(state, list_name, updated_conditions)
 
-    def _apply_healing(self, unit: Unit, amount: int):
-        """Enforces Deep Wounds, Imbue, and Max HP caps."""
+    def _apply_healing(self, unit_state: CombatantState, amount: int):
+        """Applies healing while checking for Deep Wounds effects."""
+        # TODO DOUBLE CHECK THIS LATER
         if amount <= 0:
             return
+
         heal_multiplier = 1.0
 
-        if unit.has_keyword("deep_wounds") and not unit.has_keyword(
-            "neutralize_deep_wounds"
-        ):
-            base_penalty = 1.0
+        has_deep_wounds = any(
+            e.type == EffectType.DEEP_WOUNDS_STRIKE
+            for e in unit_state.effects_on_strike
+        )
+        neut_deep_wounds = any(
+            e.type == EffectType.NEUT_DEEP_WOUNDS_STRIKE
+            for e in unit_state.effects_on_strike
+        )
 
-            partial_stacks = unit.count_keyword("partial_deep_wounds")
+        if has_deep_wounds and not neut_deep_wounds:
+            heal_multiplier = 0.0
 
-            actual_penalty = base_penalty * (0.5**partial_stacks)
-
-            heal_multiplier -= actual_penalty
-
-            amount = math.trunc(amount * heal_multiplier)
-
+        amount = math.trunc(amount * heal_multiplier)
         if amount <= 0:
             return
 
-        new_hp = unit.current_hp + amount
-        unit.current_hp = min(unit.base_stats.hp, new_hp)
-
-    def _process_AoE(self, effect: Effect):
-        """Applies AoE damage"""
-        # TODO: include bonus damage and DR effects
-        striker = self.combatant_states["attacker"]
-        target = self.combatant_states["defender"]
-        
-        visible_atk = striker.unit.get_visible_stat("atk")
-        visible_defensive_stat = target.unit.get_visible_stat("defense") if striker.unit.is_physical() else target.unit.get_visible_stat("res")
-        
-        coefficient = effect.params['coefficient']
-
-        damage = max(0, math.floor(coefficient * (visible_atk - visible_defensive_stat)))
-        target.current_hp = max(1, target.current_hp - damage)
-
-    def _process_strike(self, strike: Strike):
-        """Calculates and applies damage for a single weapon swing."""
-        striker_state = self.combatant_states[strike.striker]
-        target_state = self.combatant_states[strike.target]
-
-        striker = striker_state.unit
-        target = target_state.unit
-
-        raw_atk = striker_state.combat_stats.atk
-        defensive_stat = (
-            target_state.combat_stats.defense
-            if target_state.defensive_stat == "defense"
-            else target_state.combat_stats.res
-        )
-
-        special_triggered = False
-        if striker_state.current_cooldown == 0 and striker.special is not None:
-            is_defensive = "defensive_special" in striker.special.utilities.keywords
-            is_aoe = "aoe_special" in striker.special.utilities.keywords
-            if not is_defensive and not is_aoe:
-                special_triggered = True
-
-        wta = self._get_wta_multiplier(striker, target)
-
-        # Effectiveness calculation
-        is_effective = False
-        if target.movement_type == MovementType.ARMOR and striker.has_keyword(
-            "effective_armor"
-        ):
-            if not target.has_keyword("neutralize_effective_armor"):
-                is_effective = True
-        elif target.movement_type == MovementType.CAVALRY and striker.has_keyword(
-            "effective_cavalry"
-        ):
-            if not target.has_keyword("neutralize_effective_cavalry"):
-                is_effective = True
-        elif target.movement_type == MovementType.FLIER and striker.has_keyword(
-            "effective_flier"
-        ):
-            if not target.has_keyword("neutralize_effective_flying"):
-                is_effective = True
-        elif target.weapon_type == WeaponType.DRAGON and striker.has_keyword(
-            "effective_dragon"
-        ):
-            if not target.has_keyword("neutralize_effective_dragon"):
-                is_effective = True
-
-        if is_effective:
-            raw_atk = math.trunc(raw_atk * 1.5)
-
-        modified_atk = math.trunc(raw_atk * wta)
-
-        base_damage = max(0, modified_atk - defensive_stat)
-        # ------------------------------------------------------------------------
-        # CALCULATE DR PIERCE
-
-        pierce_mult = 1.0
-
-        if striker.has_keyword("pierce_100"):
-            pierce_mult = 0.0
-
-        if striker.has_keyword("pierce_special_100") and special_triggered:
-            pierce_mult = 0.0
-
-        if pierce_mult > 0.0:
-            pierce_50_count = sum(
-                1
-                for item in striker.equipped_items
-                if "pierce_50" in item.utilities.keywords
-            )
-
-            from .jsonbootupstuff import STATUS_EFFECT_DATABASE
-
-            for status_name in striker.active_statuses:
-                if status_data := STATUS_EFFECT_DATABASE.get(status_name):
-                    if "pierce_50" in status_data["utilities"].keywords:
-                        pierce_50_count += 1
-
-            pierce_mult *= 0.5**pierce_50_count
-        # ------------------------------------------------------------------------
-        # true dmg stuff here
-        true_damage = sum(
-            item.utilities.truedmg_logic(striker, target)
-            for item in striker.equipped_items
-            if item.utilities.truedmg_logic is not None
-        )
-
-        true_damage += sum(
-            item.utilities.truedmg
-            for item in striker.equipped_items
-            if hasattr(item.utilities, "truedmg")
-        )
-
-        for status_name in striker.active_statuses:
-            status_data = STATUS_EFFECT_DATABASE.get(status_name)
-            if status_data:
-                utilities = status_data["utilities"]
-
-                # Add flat status true damage
-                true_damage += getattr(utilities, "truedmg", 0)
-
-                # Add dynamic status true damage
-                if getattr(utilities, "truedmg_logic", None) is not None:
-                    true_damage += utilities.truedmg_logic(striker, target)
-        # ------------------------------------------------------------------------
-        final_damage = base_damage + true_damage
-        pre_mitigation_damage = final_damage
-        # for reflex
-        mitigated_amount = 0
-        # ------------------------------------------------------------------------
-        # CALCULATE PERCENT DAMAGE REDUCTION
-        base_dr = 0.0
-
-        is_first_sequence = strike.strike_type is StrikeType.FIRST
-        is_absolute_first_strike = (
-            strike.strike_type is StrikeType.FIRST and not strike.brave_second_hit
-        )
-
-        # A CHECK FOR LEGACY DR THAT IS ONLY FIRST HIT (NO BRAVE)
-        is_first_strike = (
-            strike.strike_type is StrikeType.FIRST and not strike.brave_second_hit
-        )
-        for item in target.equipped_items:
-            # check weapons/skills
-            if is_first_strike:
-                first_dr = getattr(item.utilities, "first_hit_percent_dr", 0.0)
-                if first_dr > 0:
-                    base_dr = 1.0 - ((1.0 - base_dr) * (1.0 - first_dr))
-
-            if is_first_sequence:
-                seq_dr = getattr(item.utilities, "first_sequence_percent_dr", 0.0)
-                if seq_dr > 0:
-                    base_dr = 1.0 - ((1.0 - base_dr) * (1.0 - seq_dr))
-
-            perma_dr = getattr(item.utilities, "perma_percent_dr", 0.0)
-            if perma_dr > 0:
-                base_dr = 1.0 - ((1.0 - base_dr) * (1.0 - perma_dr))
-
-        # B. Check Active Statuses
-        for status_name in target.active_statuses:
-            if status_data := STATUS_EFFECT_DATABASE.get(status_name):
-                utilities = status_data["utilities"]
-
-                if is_absolute_first_strike:
-                    status_first_dr = getattr(utilities, "first_hit_percent_dr", 0.0)
-                    if status_first_dr > 0:
-                        base_dr = 1.0 - ((1.0 - base_dr) * (1.0 - status_first_dr))
-
-                if is_first_sequence:
-                    status_seq_dr = getattr(utilities, "first_sequence_percent_dr", 0.0)
-                    if status_seq_dr > 0:
-                        base_dr = 1.0 - ((1.0 - base_dr) * (1.0 - status_seq_dr))
-
-                status_perma_dr = getattr(utilities, "perma_percent_dr", 0.0)
-                if status_perma_dr > 0:
-                    base_dr = 1.0 - ((1.0 - base_dr) * (1.0 - status_perma_dr))
-
-        # Apply Pierce & Calculate Post-% DR Damage
-        effective_dr = base_dr * pierce_mult
-        damage_multiplier = 1.0 - effective_dr
-        final_damage = math.trunc(final_damage * damage_multiplier)
-        # ------------------------------------
-        # First-hit damage floor (Collapsed Star and similar)
-        if is_first_sequence:
-            for status_name in target.active_statuses:
-                if status_data := STATUS_EFFECT_DATABASE.get(status_name):
-                    if fn := status_data["utilities"].first_hit_dmg_floor_logic:
-                        dmg_floor = fn(target, striker)
-                        if final_damage > dmg_floor:
-                            mitigated_amount += final_damage - dmg_floor
-                            final_damage = dmg_floor
-        # ------------------------------------
-        dmg_floor = None
-
-        for item in target.equipped_items:
-            if getattr(item.utilities, "dmg_floor_logic", None):
-                floor = item.utilities.dmg_floor_logic(target, striker, strike)
-                if floor is not None:
-                    dmg_floor = floor if dmg_floor is None else min(dmg_floor, floor)
-
-        for status_name in target.active_statuses:
-            if status_data := STATUS_EFFECT_DATABASE.get(status_name):
-                utilities = status_data["utilities"]
-                if getattr(utilities, "dmg_floor_logic", None):
-                    floor = utilities.dmg_floor_logic(target, striker, strike)
-                    if floor is not None:
-                        dmg_floor = (
-                            floor if dmg_floor is None else min(dmg_floor, floor)
-                        )
-
-        if dmg_floor is not None and final_damage > dmg_floor:
-            mitigated_amount += final_damage - dmg_floor
-            final_damage = dmg_floor
-        # ------------------------------------
-
-        mitigated_amount = pre_mitigation_damage - final_damage
-
-        target.damage_mitigated_bucket += mitigated_amount
-
-        target_state.current_hp -= final_damage
-
-        hit_heal = sum(
-            item.utilities.heal_hit_logic(striker, target)
-            for item in striker.equipped_items
-            if getattr(item.utilities, "heal_hit_logic", None)
-        )
-        self._apply_healing(striker, hit_heal)
-
-        charge = (
-            1
-            + striker.get_pulse_amount("per_unit_attack", target)
-            + target.get_pulse_amount("per_foe_attack", striker)
-        )
-        striker_state.current_cooldown -= max(0, charge)
-
-    def _get_wta_multiplier(self, striker: Unit, target: Unit) -> float:
-        """Calculates the final WTA multiplier, including Triangle Adept/Cancel Affinity."""
-        advantage = self._check_color_advantage(striker, target)
-        if advantage == 0:
-            return 1.0
-
-        mult = 1.0 + (0.20 * advantage)
-        has_ta = striker.has_keyword("triangle_adept") or target.has_keyword(
-            "triangle_adept"
-        )
-        has_ca = striker.has_keyword("cancel_affinity") or target.has_keyword(
-            "cancel_affinity"
-        )
-
-        if has_ta and not has_ca:
-            mult += 0.20 * advantage
-        return mult
-
-    def _check_color_advantage(self, striker: Unit, target: Unit) -> int:
-        """Determines if the striker has color advantage (1), disadvantage (-1), or neutral (0)."""
-        if striker.has_keyword("raven_tome") and target.color == Color.COLORLESS:
-            return 1
-        if target.has_keyword("raven_tome") and striker.color == Color.COLORLESS:
-            return -1
-
-        match striker.color:
-            case Color.RED:
-                return (
-                    1
-                    if target.color == Color.GREEN
-                    else (-1 if target.color == Color.BLUE else 0)
-                )
-            case Color.GREEN:
-                return (
-                    1
-                    if target.color == Color.BLUE
-                    else (-1 if target.color == Color.RED else 0)
-                )
-            case Color.BLUE:
-                return (
-                    1
-                    if target.color == Color.RED
-                    else (-1 if target.color == Color.GREEN else 0)
-                )
-            case _:
-                return 0
-
-    def _resolve_formula(self, params: dict, unit_state: CombatantState, foe_state: CombatantState) -> int:
-        formula = params.get("formula", "")
-        multiplier = params.get("multiplier", 0)
-        flat = params.get("flat", 0)
-        min_val = params.get("min", 0)
-        max_val = params.get("max", -1)
-        variable = 0.0
-        if formula:
-            cs = unit_state.combat_stats
-            match formula:
-                case "unit_cbt_atk": 
-                    variable = cs.atk if cs else unit_state.unit.get_visible_stat("atk")
-                case "unit_cbt_spd":
-                    variable = cs.spd if cs else unit_state.unit.get_visible_stat("spd")
-                case "unit_cbt_def":
-                    variable = cs.defense if cs else unit_state.unit.get_visible_stat("defense")
-                case "unit_cbt_res":
-                    variable = cs.res if cs else unit_state.unit.get_visible_stat("res")
-                case "max_cooldown":
-                    variable = unit_state.unit.max_cooldown
-                case "num_bonus_and_penalties_on_unit":
-                    variable = unit_state.bonus_count + unit_state.penalty_count
-
-        value = math.floor(variable * multiplier) + flat
-        if min_val >= 0: value = max(value, min_val)
-        if max_val >= 0: value = min(value, max_val)
-        return value
-
-    def _strike_matches(self, strike: Strike, params: dict) -> bool:
-        match params.get("strike", "every_strike"):
-            case "every_strike":
-                return True
-            case "first_strike":
-                return strike.strike_type is StrikeType.FIRST and not strike.brave_second_hit
-            case "first_sequence":
-                return strike.strike_type is StrikeType.FIRST
-            case "first_strike_with_brave":
-                return strike.strike_type is StrikeType.FIRST and strike.brave_second_hit
-
-    def _start_of_turn(self):
-        """"""
-        # update cooldowns
-
-    def _phase_AoE(self):
-        """AoE"""
-        for effect in self.combatant_states["attacker"].effects_AoE:
-            if effect.type == EffectType.TRIGGER_AOE and self.combatant_states["attacker"].current_cooldown == 0:
-                self._process_AoE(effect)
+        new_hp = unit_state.current_hp + amount
+        unit_state.current_hp = min(unit_state.unit.base_stats.hp, new_hp)
 
     def _combat_stat_calculations(self):
-        """Calculates combat stats for both units."""
-        atk_vals, def_vals = {}, {}
-        for stat in ["hp", "atk", "spd", "defense", "res"]:
-            atk_vals[stat] = self.attacker.get_combat_stat(stat, self.defender)
-            def_vals[stat] = self.defender.get_combat_stat(stat, self.attacker)
+        """Calculates combat stats incorporating STAT_BOOST and STAT_debuff effects."""
+        # Initialize with visible stats
+        atk_vals = {
+            stat: self.attacker.get_visible_stat(stat)
+            for stat in ["hp", "atk", "spd", "defense", "res"]
+        }
+        def_vals = {
+            stat: self.defender.get_visible_stat(stat)
+            for stat in ["hp", "atk", "spd", "defense", "res"]
+        }
 
         self.combatant_states["attacker"].combat_stats = StatBlock(**atk_vals)
         self.combatant_states["defender"].combat_stats = StatBlock(**def_vals)
 
+        # 2. Apply stat boosts/debuff
+        for state, foe_state in [
+            (self.combatant_states["attacker"], self.combatant_states["defender"]),
+            (self.combatant_states["defender"], self.combatant_states["attacker"]),
+        ]:
+            for effect in state.effects_start_of_combat:
+                if effect.type in (EffectType.STAT_BUFF, EffectType.STAT_DEBUFF):
+                    stats_to_mod = effect.params.get("stats", [])
+                    val = self._resolve_formula(effect.params, state, foe_state)
+
+                    if effect.type == EffectType.STAT_DEBUFF:
+                        val = -abs(val)
+
+                    for stat in stats_to_mod:
+                        current = getattr(state.combat_stats, stat)
+                        setattr(state.combat_stats, stat, current + val)
+
         self.attacker.combat_stats = self.combatant_states["attacker"].combat_stats
         self.defender.combat_stats = self.combatant_states["defender"].combat_stats
 
-        # Determine targeting for Attacker targeting Defender
-        attacker_targets = "defense" if self.attacker.is_physical() else "res"
-        for item in self.attacker.equipped_items:
-            if item.utilities.adaptive_logic:
-                attacker_targets = item.utilities.adaptive_logic(
-                    self.attacker, self.defender
-                )
-        for s in self.attacker.active_statuses:
-            if info := STATUS_EFFECT_DATABASE.get(s):
-                if info["utilities"].adaptive_logic:
-                    attacker_targets = info["utilities"].adaptive_logic(
-                        self.attacker, self.defender
-                    )
-        self.combatant_states["defender"].defensive_stat = attacker_targets
+        # Adaptive damage targeting
+        self.combatant_states[
+            "defender"
+        ].defensive_stat = self._determine_defensive_stat(
+            striker_state=self.combatant_states["attacker"],
+            target_state=self.combatant_states["defender"],
+        )
 
-        # Determine targeting for Defender targeting Attacker
-        defender_targets = "defense" if self.defender.is_physical() else "res"
-        for item in self.defender.equipped_items:
-            if item.utilities.adaptive_logic:
-                defender_targets = item.utilities.adaptive_logic(
-                    self.defender, self.attacker
-                )
-        for s in self.defender.active_statuses:
-            if info := STATUS_EFFECT_DATABASE.get(s):
-                if info["utilities"].adaptive_logic:
-                    defender_targets = info["utilities"].adaptive_logic(
-                        self.defender, self.attacker
-                    )
-        self.combatant_states["attacker"].defensive_stat = defender_targets
+        self.combatant_states[
+            "attacker"
+        ].defensive_stat = self._determine_defensive_stat(
+            striker_state=self.combatant_states["defender"],
+            target_state=self.combatant_states["attacker"],
+        )
+
+    def _determine_defensive_stat(
+        self, striker_state: CombatantState, target_state: CombatantState
+    ) -> Literal["defense", "res"]:
+        """Checks for Hexblade/Adaptive effects and returns the correct targeted stat."""
+        target_stat = "defense" if striker_state.unit.is_physical() else "res"
+        has_hexblade = any(
+            e.type == EffectType.HEXBLADE_STRIKE
+            for e in striker_state.effects_on_strike
+        )
+
+        if has_hexblade:
+            if target_state.combat_stats.res < target_state.combat_stats.defense:
+                target_stat = "res"
+            else:
+                target_stat = "defense"
+
+        return target_stat
 
     def _determine_strike_sequence(self) -> list[Strike]:
-        """Determines the number and order of strikes."""
-        # Assuming no effects preventing defender's counterattacks or effects that change attack priority
-        spd_diff = (
-            self.combatant_states["attacker"].combat_stats.spd
-            - self.combatant_states["defender"].combat_stats.spd
-        )
+        """Calculates the combat sequence using effects_strike_sequence instead of keywords."""
+        atk_state = self.combatant_states["attacker"]
+        def_state = self.combatant_states["defender"]
+
+        spd_diff = atk_state.combat_stats.spd - def_state.combat_stats.spd
         attacker_spd_check = 1 if spd_diff > 5 else 0
         defender_spd_check = 1 if spd_diff < -5 else 0
 
-        # check if they can counterattack while flashed
-        defender_NCD = self.defender.count_keyword("NCD")
-        attacker_Flash = self.attacker.count_keyword("flash")
+        nb_attacker_GFU = sum(
+            1 for e in atk_state.effects_strike_sequence if e.type == EffectType.GFU
+        )
+        nb_defender_GFU = sum(
+            1 for e in def_state.effects_strike_sequence if e.type == EffectType.GFU
+        )
 
-        nb_attacker_GFU = self.attacker.count_keyword("guaranteed_follow_up")
-        nb_defender_GFU = self.defender.count_keyword("guaranteed_follow_up")
+        nb_attacker_FU_denial = sum(
+            1 for e in def_state.effects_strike_sequence if e.type == EffectType.FU_DENY
+        )
+        nb_defender_FU_denial = sum(
+            1 for e in atk_state.effects_strike_sequence if e.type == EffectType.FU_DENY
+        )
 
-        nb_attacker_FU_denial = self.defender.count_keyword("foe_cannot_follow_up")
-        nb_defender_FU_denial = self.attacker.count_keyword("foe_cannot_follow_up")
-
-        attacker_off_NFU = 1 if self.attacker.has_keyword("null_follow_up") else 0
-        attacker_def_NFU = 1 if self.attacker.has_keyword("null_follow_up") else 0
-        defender_off_NFU = 1 if self.defender.has_keyword("null_follow_up") else 0
-        defender_def_NFU = 1 if self.defender.has_keyword("null_follow_up") else 0
+        attacker_off_NFU = (
+            1
+            if any(
+                e.type == EffectType.FU_DENY for e in atk_state.effects_strike_sequence
+            )
+            else 0
+        )
+        attacker_def_NFU = (
+            1
+            if any(
+                e.type == EffectType.FU_DENY for e in atk_state.effects_strike_sequence
+            )
+            else 0
+        )
+        defender_off_NFU = (
+            1
+            if any(
+                e.type == EffectType.FU_DENY for e in def_state.effects_strike_sequence
+            )
+            else 0
+        )
+        defender_def_NFU = (
+            1
+            if any(
+                e.type == EffectType.FU_DENY for e in def_state.effects_strike_sequence
+            )
+            else 0
+        )
 
         attacker_FU = (
             nb_attacker_GFU * (1 - defender_def_NFU)
@@ -647,22 +386,27 @@ class CombatEngine:
             + defender_spd_check
         )
 
-        attacker_brave = self.attacker.has_keyword("brave_weapon")
-        defender_brave = self.defender.has_keyword("brave_weapon")
+        # Check for Brave and Potent via effects
+        attacker_brave = any(
+            e.type == EffectType.BRAVE for e in atk_state.effects_strike_sequence
+        )
+        defender_brave = any(
+            e.type == EffectType.BRAVE for e in def_state.effects_strike_sequence
+        )
 
-        attacker_spd = self.combatant_states["attacker"].combat_stats.spd
-        defender_spd = self.combatant_states["defender"].combat_stats.spd
-        spd_diff = attacker_spd - defender_spd
-
-        attacker_potent = self.attacker.has_keyword("potent") and spd_diff >= 25
-        defender_potent = self.defender.has_keyword("potent") and spd_diff <= -25
+        attacker_potent = (
+            any(e.type == EffectType.POTENT for e in atk_state.effects_strike_sequence)
+            and spd_diff >= 25
+        )
+        defender_potent = (
+            any(e.type == EffectType.POTENT for e in def_state.effects_strike_sequence)
+            and spd_diff <= -25
+        )
 
         attacker_brave_fu = attacker_brave and not attacker_potent
         defender_brave_fu = defender_brave and not defender_potent
 
-        attacker_first = [
-            Strike("attacker", "defender", StrikeType.FIRST, is_first_hit=True)
-        ]
+        attacker_first = [Strike("attacker", "defender", StrikeType.FIRST)]
         if attacker_brave:
             attacker_first.append(
                 Strike(
@@ -679,7 +423,7 @@ class CombatEngine:
             attacker_followups.append(
                 Strike("attacker", "defender", StrikeType.FOLLOW_UP)
             )
-            if attacker_brave_fu:  # brave doubles FU only if no potent
+            if attacker_brave_fu:
                 attacker_followups.append(
                     Strike(
                         "attacker",
@@ -726,19 +470,9 @@ class CombatEngine:
                 Strike("defender", "attacker", StrikeType.POTENT, consecutive=True)
             )
 
-        # Standard desperation — PP Only
-        attacker_desperation = self.attacker.has_keyword("desperation")
-
-        # Special version — no initiation requirement, can apply on ep (Marth for example)
-        attacker_desp_effect = self.attacker.has_keyword("dualphasedesperation")
-        defender_desp_effect = self.defender.has_keyword("dualphasedesperation")
-
-        attacker_flash_effective = (
-            attacker_Flash > 0
-            or self.defender.has_keyword("counterattacks_disrupted")
-            and defender_NCD == 0
+        attacker_flash_effective = any(
+            e.type == EffectType.FLASH for e in atk_state.effects_strike_sequence
         )
-
         if attacker_flash_effective:
             defender_first = []
             defender_followups = []
@@ -746,18 +480,20 @@ class CombatEngine:
         attacker_package = attacker_first + attacker_followups
         defender_package = defender_first + defender_followups
 
-        attacker_package = attacker_first + attacker_followups
-        defender_package = defender_first + defender_followups
+        defender_vantage = any(
+            e.type == EffectType.VANTAGE for e in def_state.effects_strike_sequence
+        )
+        attacker_desperation = any(
+            e.type == EffectType.DESPERATION for e in atk_state.effects_strike_sequence
+        )
 
-        defender_vantage = self.defender.has_keyword("vantage")
-        attacker_bunches = attacker_desperation or attacker_desp_effect
-        defender_bunches = defender_desp_effect
-
-        # psuedo code
-        # if hardy bearing:
-        # strike_sequence = ()
-        if defender_vantage and defender_bunches:
-            strike_sequence = defender_package + attacker_package
+        if defender_vantage and attacker_desperation:
+            strike_sequence = (
+                defender_first
+                + attacker_first
+                + attacker_followups
+                + defender_followups
+            )
         elif defender_vantage:
             strike_sequence = (
                 defender_first
@@ -765,15 +501,8 @@ class CombatEngine:
                 + defender_followups
                 + attacker_followups
             )
-        elif attacker_bunches:
+        elif attacker_desperation:
             strike_sequence = attacker_package + defender_package
-        elif defender_vantage and attacker_bunches:
-            strike_sequence = (
-                defender_first
-                + attacker_first
-                + attacker_followups
-                + defender_followups
-            )
         else:
             strike_sequence = (
                 attacker_first
@@ -785,60 +514,147 @@ class CombatEngine:
         return strike_sequence
 
     def _phase_pre_combat(self):
-        """Pre-combat damage and healing effects."""
+        """Processes PRE_CBT_DAMAGE and PRE_CBT_HEAL."""
+        atk_state = self.combatant_states["attacker"]
+        def_state = self.combatant_states["defender"]
 
-        # 1. HP SNAPSHOT (For conditional HP checks)
-        self.attacker.start_of_combat_hp = self.attacker.current_hp
-        self.defender.start_of_combat_hp = self.defender.current_hp
+        atk_state.unit.start_of_combat_hp = atk_state.current_hp
+        def_state.unit.start_of_combat_hp = def_state.current_hp
 
-        # 2. PRE-COMBAT DAMAGE
+        # Process Pre-Combat Damage
         atk_predmg = sum(
-            item.utilities.predmg_logic(self.attacker, self.defender)
-            for item in self.attacker.equipped_items
-            if getattr(item.utilities, "predmg_logic", None)
+            self._resolve_formula(e.params, atk_state, def_state)
+            for e in atk_state.effects_pre_combat
+            if e.type == EffectType.PRE_CBT_DAMAGE
         )
         def_predmg = sum(
-            item.utilities.predmg_logic(self.defender, self.attacker)
-            for item in self.defender.equipped_items
-            if getattr(item.utilities, "predmg_logic", None)
+            self._resolve_formula(e.params, def_state, atk_state)
+            for e in def_state.effects_pre_combat
+            if e.type == EffectType.PRE_CBT_DAMAGE
         )
 
         if atk_predmg > 0:
-            self.defender.current_hp = max(1, self.defender.current_hp - atk_predmg)
-
+            def_state.current_hp = max(1, def_state.current_hp - atk_predmg)
         if def_predmg > 0:
-            self.attacker.current_hp = max(1, self.attacker.current_hp - def_predmg)
+            atk_state.current_hp = max(1, atk_state.current_hp - def_predmg)
 
-        # 3. START OF COMBAT HEALING
-        for combatant, opponent in [
-            (self.attacker, self.defender),
-            (self.defender, self.attacker),
-        ]:
-            heal = sum(
-                item.utilities.heal_start_logic(combatant, opponent)
-                for item in combatant.equipped_items
-                if getattr(item.utilities, "heal_start_logic", None)
-            )
-            self._apply_healing(combatant, heal)
-        self.combatant_states[
-            "attacker"
-        ].current_cooldown -= self.attacker.get_pulse_amount(
-            "before_first_attack", self.defender
+        # Process Pre-Combat Heal
+        atk_preheal = sum(
+            self._resolve_formula(e.params, atk_state, def_state)
+            for e in atk_state.effects_pre_combat
+            if e.type == EffectType.PRE_CBT_HEAL
         )
-        self.combatant_states[
-            "defender"
-        ].current_cooldown -= self.defender.get_pulse_amount(
-            "before_first_attack", self.attacker
+        def_preheal = sum(
+            self._resolve_formula(e.params, def_state, atk_state)
+            for e in def_state.effects_pre_combat
+            if e.type == EffectType.PRE_CBT_HEAL
         )
 
-    def _phase_after_combat(self):
-        # self.attacker.current_cooldown -= self.attacker.get_pulse_amount(
-        #     "after_combat", self.defender
-        # )
-        # self.defender.current_cooldown -= self.defender.get_pulse_amount(
-        #     "after_combat", self.attacker
-        # )
-        pass
-        ...
+        self._apply_healing(atk_state, atk_preheal)
+        self._apply_healing(def_state, def_preheal)
 
+    def _process_strike(self, strike: Strike):
+        """Fully data-driven strike processing via effects_on_strike."""
+        striker_state = self.combatant_states[strike.striker]
+        target_state = self.combatant_states[strike.target]
 
+        raw_atk = striker_state.combat_stats.atk
+        defensive_stat = getattr(target_state.combat_stats, target_state.defensive_stat)
+
+        wta = self._get_wta_multiplier(striker_state.unit, target_state.unit)
+        is_effective = any(
+            e.type == EffectType.EFFECTIVE and self._strike_matches(strike, e.params)
+            for e in striker_state.effects_on_strike
+        )
+        is_neut_effective = any(
+            e.type == EffectType.NEUT_EFFECTIVE for e in target_state.effects_on_strike
+        )
+
+        if is_effective and not is_neut_effective:
+            raw_atk = math.trunc(raw_atk * 1.5)
+
+        modified_atk = math.trunc(raw_atk * wta)
+        base_damage = max(0, modified_atk - defensive_stat)
+
+        true_damage = 0
+        for effect in striker_state.effects_on_strike:
+            if effect.type == EffectType.FLAT_DAMAGE_STRIKE and self._strike_matches(
+                strike, effect.params
+            ):
+                true_damage += self._resolve_formula(
+                    effect.params, striker_state, target_state
+                )
+
+        final_damage = base_damage + true_damage
+        pre_mitigation_damage = final_damage
+
+        pierce_mult = 1.0
+        for effect in striker_state.effects_on_strike:
+            if effect.type == EffectType.DR_PIERCE and self._strike_matches(
+                strike, effect.params
+            ):
+                pierce_value = effect.params.get("value", 0) / 100.0
+                pierce_mult *= 1.0 - pierce_value
+
+        base_dr = 0.0
+        for effect in target_state.effects_on_strike:
+            if effect.type == EffectType.PERC_DR_STRIKE and self._strike_matches(
+                strike, effect.params
+            ):
+                dr_val = (
+                    self._resolve_formula(effect.params, target_state, striker_state)
+                    / 100.0
+                )
+                base_dr = 1.0 - ((1.0 - base_dr) * (1.0 - dr_val))
+
+        effective_dr = base_dr * pierce_mult
+        damage_multiplier = 1.0 - effective_dr
+        final_damage = math.trunc(final_damage * damage_multiplier)
+
+        flat_dr = 0
+        for effect in target_state.effects_on_strike:
+            if effect.type == EffectType.FLAT_DR_STRIKE and self._strike_matches(
+                strike, effect.params
+            ):
+                flat_dr += self._resolve_formula(
+                    effect.params, target_state, striker_state
+                )
+
+        final_damage = max(0, final_damage - flat_dr)
+
+        dmg_floor = None
+        for effect in target_state.effects_on_strike:
+            if effect.type == EffectType.DR_FLOOR and self._strike_matches(
+                strike, effect.params
+            ):
+                floor = self._resolve_formula(
+                    effect.params, target_state, striker_state
+                )
+                dmg_floor = floor if dmg_floor is None else min(dmg_floor, floor)
+
+        if dmg_floor is not None and final_damage > dmg_floor:
+            final_damage = dmg_floor
+
+        mitigated_amount = pre_mitigation_damage - final_damage
+        target_state.damage_mitigated_bucket += mitigated_amount
+        target_state.current_hp -= final_damage
+
+        hit_heal = 0
+        for effect in striker_state.effects_on_strike:
+            if effect.type == EffectType.HEAL_STRIKE and self._strike_matches(
+                strike, effect.params
+            ):
+                hit_heal += self._resolve_formula(
+                    effect.params, striker_state, target_state
+                )
+        self._apply_healing(striker_state, hit_heal)
+
+        pulse_charge = 1
+        for effect in striker_state.effects_on_strike:
+            if effect.type == EffectType.PULSE_STRIKE and self._strike_matches(
+                strike, effect.params
+            ):
+                pulse_charge += self._resolve_formula(
+                    effect.params, striker_state, target_state
+                )
+        striker_state.current_cooldown -= max(0, pulse_charge)

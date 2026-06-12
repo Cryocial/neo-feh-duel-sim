@@ -1,0 +1,76 @@
+547d6bc Proteus26 <lohithds52@gmail.com> refactor: refactored backend to be a bit more practical
+e711879 Cryocial <cryocial@gmail.com> test
+11301ba Cryocial <cryocial@gmail.com> commit fixes
+d2c2761 Cryocial <cryocial@gmail.com> test
+56a6c8f Proteus26 <lohithds52@gmail.com> feat: Implemented foe bonus neutralization and null penalties
+fbfccd6 Proteus26 <lohithds52@gmail.com> feat: Fixed a small bug in combat calcualtion and added hexblade support
+1de042b Cryocial <74069614+Cryocial@users.noreply.github.com> Rename project to FEH Duel Simulator
+ec0b2ea Cryocial <cryocial@gmail.com> slight tweaks to some bonuses
+5afe86e Cryocial <cryocial@gmail.com> formatting fixes
+db7eb95 Cryocial <cryocial@gmail.com> test
+857434c Cryocial <cryocial@gmail.com> made 1 dmg flooring more modular
+c4e73a4 Cryocial <cryocial@gmail.com> made 1 dmg flooring more modular
+b91f0ce BC-37 <bc776776@gmail.com> creation pulse does not have stats
+14d8934 BC-37 <bc776776@gmail.com> fixed minor spacing issue
+bac256c BC-37 <bc776776@gmail.com> added liberates and paranoia stat boost
+6c5fe57 Cryocial <cryocial@gmail.com> bug fixes in like every file
+cfa3ec8 Cryocial <cryocial@gmail.com> finished most start of combat healing sources
+ad33718 Cryocial <cryocial@gmail.com> starting to work on divine nectar implant
+d447981 Cryocial <cryocial@gmail.com> more bug fixes to combat
+47b45f3 Cryocial <cryocial@gmail.com> test2
+fe332e0 Cryocial <cryocial@gmail.com> test2
+52a7170 Cryocial <cryocial@gmail.com> test
+785d93b cryocial <cryocial@gmail.com> combatclass fixes
+06951c0 Kevin Do <cryocial@gmail.com> temp push
+a83d811 BC-37 <bc776776@gmail.com> removed irrevelant bonuses/penalties and minor stat fix
+8dac4d9 Kevin Do <cryocial@gmail.com> even more bug fixes to % dr
+903cf8f Kevin Do <cryocial@gmail.com> more fixes to % dr
+d8b4775 Kevin Do <cryocial@gmail.com> format fix
+ffdc7e3 Kevin Do <cryocial@gmail.com> made the calculations for % dr more scaliable
+6e87e2e Kevin Do <cryocial@gmail.com> temp push, will need to rework the DR functions later to make the more scalable.
+eb4a6eb Cryocial <74069614+Cryocial@users.noreply.github.com> Merge pull request #10 from Cryocial/CryoBranch
+b01060c Cryocial <74069614+Cryocial@users.noreply.github.com> Merge pull request #9 from Cryocial/feat/combat-engine
+9f47f7a Nassim Bouberbachene <nassimbouberbachene@gmail.com> fix: strikes were executed in reverse order, use pop(0) instead of pop()
+7e71303 Cryocial <74069614+Cryocial@users.noreply.github.com> Merge pull request #8 from Cryocial/main
+75e4646 Nassim Bouberbachene <nassimbouberbachene@gmail.com> feat: implement _determine_strike_sequence skeleton
+9c699c6 Nassim Bouberbachene <nassimbouberbachene@gmail.com> refactor: rename infos to combatant_states and CombatantInfo into CombatantState
+d8a02b2 Nassim Bouberbachene <nassimbouberbachene@gmail.com> feat: introduce CombatantInfo dataclass and refactor Strike dataclass
+4e8d82d Kevin Do <cryocial@gmail.com> cleanup onbonus functions
+0222ff3 Kevin Do <cryocial@gmail.com> format fixes
+d9f4b07 Kevin Do <cryocial@gmail.com> removed my old method of tracking hits
+86f2fee Cryocial <74069614+Cryocial@users.noreply.github.com> actually merged the combatengine
+3c5e7f5 Cryocial <74069614+Cryocial@users.noreply.github.com> Merge branch 'main' into feat/combat-engine
+e892165 Kevin Do <cryocial@gmail.com> temp push
+efcac8d Kevin Do <cryocial@gmail.com> added a lot of logic to combat calc
+7adb6e0 Kevin Do <cryocial@gmail.com> added ruff, fixed a lot of other errors
+2c1ff21 Kevin Do <cryocial@gmail.com> removed dupe stuff
+ab88845 Kevin Do <cryocial@gmail.com> emergency fix
+04efdad Kevin Do <cryocial@gmail.com> adding more stuff to jsons
+a50aa45 Kevin Do <cryocial@gmail.com> fixed some minor typos, added empathy math, removed legacy code
+edae8a0 Cryocial <74069614+Cryocial@users.noreply.github.com> Merge pull request #5 from Cryocial/main
+4707f99 Cryocial <74069614+Cryocial@users.noreply.github.com> Merge pull request from Cryocial/CryoBranch
+495f4e7 Kevin Do <cryocial@gmail.com> changed names again, removed a useless file made from uv
+26136bb Cryocial <74069614+Cryocial@users.noreply.github.com> Merge pull request #3 from Cryocial/CryoBranch
+71b6e4e Kevin Do <cryocial@gmail.com> added uv and initialized it, added flask
+24b983e BC-37 <bc776776@gmail.com> Added some bonus functions
+536fbea Kevin Do <cryocial@gmail.com> renamed some files
+753bcc6 Nassim Bouberbachene <nassimbouberbachene@gmail.com> feat: reorganize combat timeline + implement Strike dataclass + add fields to CombatEngine dataclass
+c03eae4 Cryocial <74069614+Cryocial@users.noreply.github.com> Merge pull request #1 from Cryocial/refactor
+c706cc0 Proteus26 <lohithds52@gmail.com> refactor: refactored backend to be a bit more practical
+21f8afc Kevin Do <cryocial@gmail.com> test
+11ffdcc Kevin Do <cryocial@gmail.com> commit fixes
+6537eba Kevin Do <cryocial@gmail.com> test
+229947a Cryocial <cryocial@gmail.com> added the base calculator, and even MORE json stuff, various bug fixes, yada yada
+f40f41f Cryocial <cryocial@gmail.com> more json stuff done... too much left still
+017f238 Cryocial <cryocial@gmail.com> more skills added to the json
+427dc84 Cryocial <cryocial@gmail.com> reworked the buff list
+a38ef37 Cryocial <cryocial@gmail.com> working on the json
+7fae49f Cryocial <cryocial@gmail.com> made the structure of code more clear
+f57e8f9 Cryocial <cryocial@gmail.com> bug fixes
+7f6df58 Cryocial <cryocial@gmail.com> formatting fixes + redid the classes to be more modular
+ff8ebd3 Cryocial <cryocial@gmail.com> finished the base for units
+e702f40 Cryocial <cryocial@gmail.com> more progress on the basics
+6a2a422 Cryocial <cryocial@gmail.com> getting started with the classes, unfinished
+0531c2d Cryocial <cryocial@gmail.com> set up a barebones calculator
+6404258 Cryocial <74069614+Cryocial@users.noreply.github.com> Update README.md
+39664c7 Cryocial <74069614+Cryocial@users.noreply.github.com> Initial commit
