@@ -3,10 +3,10 @@ import os
 from .build import StatBlock, Skill, Status
 from .constants import MovementType, WeaponType
 
-SKILL_DATABASE: dict[str, Skill]  = {}
+SKILL_DATABASE: dict[str, Skill] = {}
 BONUS_DATABASE: dict[str, Status] = {}
 PENALTY_DATABASE: dict[str, Status] = {}
-UNIT_DATABASE: dict[str, dict]   = {}
+UNIT_DATABASE: dict[str, dict] = {}
 
 
 def _load_statuses(path: str) -> None:

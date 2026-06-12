@@ -1,5 +1,5 @@
-from dataclasses import dataclass, field
-from typing import Callable, Any, Self, Literal
+from dataclasses import dataclass
+from typing import Self, Literal
 from .constants import MovementType, WeaponType, Color
 
 
@@ -61,13 +61,14 @@ class Skill:
     allowed_weapon_types: list[WeaponType]
     is_arcane: bool = False
     is_prf: bool = False
-    
+
 
 @dataclass(frozen=True)
 class Status:
-    name:    str
-    type:    Literal["bonus", "penalty"]
-    effects: list[dict]     # raw effect definitions from the JSON
+    name: str
+    type: Literal["bonus", "penalty"]
+    effects: list[dict]  # raw effect definitions from the JSON
+
 
 class Unit:
     """
@@ -121,7 +122,7 @@ class Unit:
         self.visible_buffs = StatBlock()
         self.visible_debuffs = StatBlock()
         self.active_statuses: list[Status] = []
-        
+
         self.max_cooldown = 0
         self.pre_charge = 0
 
