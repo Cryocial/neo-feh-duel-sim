@@ -39,4 +39,37 @@
       }
     ]
   }
-}
+,
+  "Paranoia": {
+    "type": "bonus",
+    "effects": [
+      { 
+        "effect": "STAT_BUFF",
+        "target": "self",
+        "params": {
+          "stats": ["atk"],
+          "flat": 5
+        },
+        "conditions": [
+          {
+            "type": "hp_below_pct",
+            "params": {"threshold": 100, "target": "self"}
+          }
+        ]
+      },
+      { 
+        "effect": "VANTAGE",
+        "target": "self",
+        "params": {},
+        "conditions": [
+          {
+            "type": "hp_below_pct",
+            "params": {"threshold": 100, "target": "self"}
+          }
+        ]
+      }
+    ]
+  }
+
+
+  }
