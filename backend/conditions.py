@@ -89,8 +89,8 @@ def _evaluate_cbt_stat_check(params: dict) -> Callable:
 
     return evaluate
 
-def _evaluate_bonus_penalty_total(params: dict) -> Callable:
-    """Salvaged from Empathy/Change of Fate: Checks total active effects."""
+def _evaluate_num_bonus_penalty_total(params: dict) -> Callable:
+    """Checks total active effects."""
     min_count = params.get("min_count", 1)
     include_foe = params.get("include_foe", False)
     
@@ -128,7 +128,7 @@ CONDITION_REGISTRY: dict[str, (Phase, Callable[[dict], Callable])] = {
     "hp_above_pct": ("start_of_combat", _evaluate_hp_above_pct),
     "cbt_stat_check": ("start_of_combat", _evaluate_cbt_stat_check),
     "triggers_brave": ("post_sequence", _evaluate_triggers_brave),
-    "bonus_penalty_total":  ("pre_aoe",         _evaluate_bonus_penalty_total),
+    "bonus_penalty_total":  ("pre_aoe",         _evaluate_num_bonus_penalty_total),
     "is_engaged":           ("pre_aoe",         _evaluate_is_engaged),
     "foe_weapon_type":      ("pre_aoe",         _evaluate_foe_weapon_type),
     "triggers_brave":       ("post_sequence",   _evaluate_triggers_brave),
