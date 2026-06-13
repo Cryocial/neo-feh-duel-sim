@@ -50,8 +50,8 @@ class EffectType(str, Enum):
     PULSE_AOE = "PULSE_AOE"
 
     # ── Stat modifications ────────────────────────────────────────────────────
-    STAT_BOOST = "STAT_BOOST"
-    STAT_DAUNT = "STAT_DAUNT"
+    STAT_BUFF = "STAT_BUFF"
+    STAT_DEBUFF = "STAT_DEBUFF"
     BONUS_NEUT = "BONUS_NEUT"
     PENALTY_NEUT = "PENALTY_NEUT"
 
