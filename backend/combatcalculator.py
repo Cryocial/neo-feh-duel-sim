@@ -41,6 +41,7 @@ class Strike:
     brave_second_hit: bool = False
     consecutive: bool = False
     is_first_hit: bool = False
+    potent_mult: float = 1.0
 
 
 def _distribute_effects(attacker: CombatantState, defender: CombatantState) -> None:
@@ -413,6 +414,29 @@ class CombatEngine:
 
         return target_stat
 
+    def _potent_active(self, effects, spd_diff, is_attacker, made_fu):
+        """Returns the Potent damage multiplier if active, else None.
+
+        made_natural_fu: whether this unit landed a natural follow-up,
+        which some Potent skills use to reduce their effectiveness.
+        """
+        relevant_diff = spd_diff if is_attacker else -spd_diff
+        best_mult = None
+        for e in effects:
+            if e.type == EffectType.POTENT:
+                threshold = e.params.get("spd_threshold", 25)
+                if relevant_diff >= threshold:
+                    if made_fu and "damage_pct_if_fu" in e.params:
+                        pct = e.params["damage_pct_if_fu"]
+                    else:
+                        pct = e.params.get("damage_pct", 100)
+                    mult = pct / 100.0
+                    if best_mult is None or mult > best_mult:
+                        best_mult = mult
+        return best_mult
+
+    # TODO CHECK POTENT LOGIC TMR
+
     def _determine_strike_sequence(self) -> list[Strike]:
         """Calculates the combat sequence using effects_strike_sequence instead of keywords."""
         atk_state = self.combatant_states["attacker"]
@@ -465,15 +489,15 @@ class CombatEngine:
             e.type == EffectType.BRAVE for e in def_state.effects_strike_sequence
         )
 
-        attacker_potent = (
-            any(e.type == EffectType.POTENT for e in atk_state.effects_strike_sequence)
-            and spd_diff >= 25
-            # TODO CHANGE THIS SO ITS NOT A STATIC 25 AND IT DEPENDS
+        attacker_potent_mult = self._potent_active(
+            atk_state.effects_strike_sequence, spd_diff, is_attacker=True
         )
-        defender_potent = (
-            any(e.type == EffectType.POTENT for e in def_state.effects_strike_sequence)
-            and spd_diff <= -25
+        defender_potent_mult = self._potent_active(
+            def_state.effects_strike_sequence, spd_diff, is_attacker=False
         )
+
+        attacker_potent = attacker_potent_mult is not None
+        defender_potent = defender_potent_mult is not None
 
         attacker_brave_fu = attacker_brave and not attacker_potent
         defender_brave_fu = defender_brave and not defender_potent
