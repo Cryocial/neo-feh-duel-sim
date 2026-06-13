@@ -43,19 +43,17 @@
   "Paranoia": {
     "type": "bonus",
     "effects": [
-      { 
-        "effect": "STAT_BUFF",
+      { "effect": "STAT_BOOST",
         "target": "self",
         "params": {
           "stats": ["atk"],
-          "flat": 5
+          "formula": "",
+          "multiplier": 0,
+          "flat": 5,
+          "min": 5,
+          "max": 5
         },
-        "conditions": [
-          {
-            "type": "hp_below_pct",
-            "params": {"threshold": 100, "target": "self"}
-          }
-        ]
+        "conditions": []
       },
       { 
         "effect": "VANTAGE",
