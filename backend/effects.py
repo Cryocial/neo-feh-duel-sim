@@ -10,17 +10,14 @@ EFFECT_LIST_MAP: dict[EffectType, str] = {
     EffectType.FLAT_DR_AOE: "effects_AoE",
     EffectType.HEXBLADE_AOE: "effects_AoE",
     EffectType.PULSE_AOE: "effects_AoE",
-
     # ── Stat modifications ──────────────────────────────────────────────
     EffectType.STAT_BUFF: "effects_start_of_combat",
     EffectType.STAT_DEBUFF: "effects_start_of_combat",
     EffectType.BONUS_NEUT: "effects_start_of_combat",
     EffectType.PENALTY_NEUT: "effects_start_of_combat",
-
     # ── Strike sequence ─────────────────────────────────────────────────
     EffectType.FU_DENY: "effects_strike_sequence",
     EffectType.NFU: "effects_strike_sequence",
-
     EffectType.GFU: "effects_strike_sequence",
     EffectType.BRAVE: "effects_strike_sequence",
     EffectType.POTENT: "effects_strike_sequence",
@@ -28,11 +25,9 @@ EFFECT_LIST_MAP: dict[EffectType, str] = {
     EffectType.DESPERATION: "effects_strike_sequence",
     EffectType.DESPERATION_NEUT: "effects_strike_sequence",
     EffectType.FLASH: "effects_strike_sequence",
-
     # ── Pre-combat ───────────────────────────────────────────────────────
     EffectType.PRE_CBT_DAMAGE: "effects_pre_combat",
     EffectType.PRE_CBT_HEAL: "effects_pre_combat",
-
     # ── On-strike ────────────────────────────────────────────────────────
     EffectType.DR_PIERCE: "effects_on_strike",
     EffectType.HEXBLADE_STRIKE: "effects_on_strike",
@@ -53,7 +48,6 @@ EFFECT_LIST_MAP: dict[EffectType, str] = {
     EffectType.DEEP_WOUNDS_STRIKE: "effects_on_strike",
     EffectType.NEUT_DEEP_WOUNDS_STRIKE: "effects_on_strike",
     EffectType.REDUCE_DEEP_WOUNDS_STRIKE: "effects_on_strike",
-
     # ── Post-combat ──────────────────────────────────────────────────────
     EffectType.HEAL_POST_CBT: "effects_after_combat",
     EffectType.DAMAGE_POST_CBT: "effects_after_combat",
