@@ -279,68 +279,54 @@ class CombatEngine:
         unit_state.current_hp = min(unit_state.unit.base_stats.hp, new_hp)
 
     def _phase_AoE(self):
-        """Processes effects_AoE: triggers Special AoE damage if cooldown has reached 0."""
-        for role, foe_role in (("attacker", "defender"), ("defender", "attacker")):
-            state = self.combatant_states[role]
-            foe_state = self.combatant_states[foe_role]
+        """Processes effects_AoE. Only the initiator can trigger an AoE special."""
+        state = self.combatant_states["attacker"]
+        foe_state = self.combatant_states["defender"]
 
-            triggers = [
-                e for e in state.effects_AoE if e.type == EffectType.TRIGGER_AOE
-            ]
-            if not triggers or state.current_cooldown > 0:
-                continue
+        pulse = sum(
+            self._resolve_formula(e.params, state, foe_state)
+            for e in state.effects_AoE
+            if e.type == EffectType.PULSE_AOE
+        )
+        state.current_cooldown -= max(0, pulse)
 
-            coefficient = triggers[0].params.get("coefficient", 0.0)
-            visible_atk = state.unit.get_visible_stat("atk")
+        triggers = [e for e in state.effects_AoE if e.type == EffectType.TRIGGER_AOE]
+        if not triggers or state.current_cooldown > 0:
+            return
+
+        has_hexblade_aoe = any(e.type == EffectType.HEXBLADE_AOE for e in state.effects_AoE)
+        if has_hexblade_aoe:
+            visible_def = min(
+                foe_state.unit.get_visible_stat("defense"),
+                foe_state.unit.get_visible_stat("res"),
+            )
+        else:
             visible_def = (
                 foe_state.unit.get_visible_stat("defense")
                 if state.unit.is_physical()
                 else foe_state.unit.get_visible_stat("res")
             )
-            damage = max(0, math.floor(coefficient * (visible_atk - visible_def)))
 
-            # Bonus true-damage-style additions (e.g. Change of Fate's AoE clause)
-            for e in state.effects_AoE:
-                if e.type == EffectType.FLAT_DAMAGE_AOE:
-                    damage += self._resolve_formula(e.params, state, foe_state)
+        coefficient = triggers[0].params.get("coefficient", 0.0)
+        visible_atk = state.unit.get_visible_stat("atk")
+        damage = max(0, math.floor(coefficient * (visible_atk - visible_def)))
 
-            # Flat DR on the receiving side
-            flat_dr = 0
-            for e in foe_state.effects_AoE:
-                if e.type == EffectType.FLAT_DR_AOE:
-                    flat_dr += self._resolve_formula(e.params, foe_state, state)
-            damage = max(0, damage - flat_dr)
+        for e in state.effects_AoE:
+            if e.type == EffectType.FLAT_DAMAGE_AOE:
+                damage += self._resolve_formula(e.params, state, foe_state)
 
-            # hexblade calc
-            has_hexblade_aoe = any(
-                e.type == EffectType.HEXBLADE_AOE for e in state.effects_AoE
-            )
-            if has_hexblade_aoe:
-                foe_def = foe_state.unit.get_visible_stat("defense")
-                foe_res = foe_state.unit.get_visible_stat("res")
-                visible_def = min(foe_def, foe_res)
-            else:
-                visible_def = (
-                    foe_state.unit.get_visible_stat("res")
-                    if not state.unit.is_physical()
-                    else foe_state.unit.get_visible_stat("defense")
-                )
+        flat_dr = sum(
+            self._resolve_formula(e.params, foe_state, state)
+            for e in foe_state.effects_AoE
+            if e.type == EffectType.FLAT_DR_AOE
+        )
+        damage = max(0, damage - flat_dr)
 
-            foe_state.current_hp = max(1, foe_state.current_hp - damage)
-            state.special_use_count += 1
-            state.current_cooldown = state.unit.max_cooldown
+        foe_state.current_hp = max(1, foe_state.current_hp - damage)
+        state.special_use_count += 1
+        state.current_cooldown = state.unit.max_cooldown
 
-            # PULSE_AOE — cooldown charge granted on AoE trigger
-            pulse = sum(
-                self._resolve_formula(e.params, state, foe_state)
-                for e in state.effects_AoE
-                if e.type == EffectType.PULSE_AOE
-            )
-            state.current_cooldown -= max(0, pulse)
-
-            foe_state.current_hp = max(1, foe_state.current_hp - damage)
-            state.special_use_count += 1
-            state.current_cooldown = state.unit.max_cooldown
+            
 
     def _combat_stat_calculations(self):
         """Calculates combat stats incorporating STAT_BUFF and STAT_DEBUFF effects."""
@@ -460,27 +446,21 @@ class CombatEngine:
             1 for e in atk_state.effects_strike_sequence if e.type == EffectType.FU_DENY
         )
 
-        attacker_NFU = (
-            1
-            if any(e.type == EffectType.NFU for e in atk_state.effects_strike_sequence)
-            else 0
-        )
-        defender_NFU = (
-            1
-            if any(e.type == EffectType.NFU for e in def_state.effects_strike_sequence)
-            else 0
-        )
+        attacker_OFF_NFU = 1 if any(e.type == EffectType.OFF_NFU for e in atk_state.effects_strike_sequence) else 0
+        attacker_DEF_NFU = 1 if any(e.type == EffectType.DEF_NFU for e in atk_state.effects_strike_sequence) else 0
+        defender_OFF_NFU = 1 if any(e.type == EffectType.OFF_NFU for e in def_state.effects_strike_sequence) else 0
+        defender_DEF_NFU = 1 if any(e.type == EffectType.DEF_NFU for e in def_state.effects_strike_sequence) else 0
 
         attacker_FU = (
-            nb_attacker_GFU * (1 - defender_NFU)
-            - nb_defender_FU_denial * (1 - attacker_NFU)
-            + attacker_spd_check
-        )
+        nb_attacker_GFU * (1 - defender_DEF_NFU)      
+        - nb_defender_FU_denial * (1 - attacker_OFF_NFU)
+        + attacker_spd_check
+    )
         defender_FU = (
-            nb_defender_GFU * (1 - attacker_NFU)
-            - nb_attacker_FU_denial * (1 - defender_NFU)
-            + defender_spd_check
-        )
+        nb_defender_GFU * (1 - attacker_DEF_NFU)
+        - nb_attacker_FU_denial * (1 - defender_OFF_NFU)
+        + defender_spd_check
+    )
 
         attacker_brave = any(
             e.type == EffectType.BRAVE for e in atk_state.effects_strike_sequence
@@ -709,7 +689,7 @@ class CombatEngine:
                 pierce_value = effect.params.get("value", 0) / 100.0
                 pierce_mult *= 1.0 - pierce_value
 
-        base_dr = 0.0
+        perc_dr = 0.0
         for effect in target_state.effects_on_strike:
             if effect.type == EffectType.PERC_DR_STRIKE and self._strike_matches(
                 strike,
@@ -721,9 +701,9 @@ class CombatEngine:
                     self._resolve_formula(effect.params, target_state, striker_state)
                     / 100.0
                 )
-                base_dr = 1.0 - ((1.0 - base_dr) * (1.0 - dr_val))
+                perc_dr = 1.0 - ((1.0 - perc_dr) * (1.0 - dr_val))
 
-        effective_dr = base_dr * pierce_mult
+        effective_dr = perc_dr * pierce_mult
         damage_multiplier = 1.0 - effective_dr
         final_damage = math.trunc(final_damage * damage_multiplier)
 

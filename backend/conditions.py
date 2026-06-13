@@ -30,26 +30,12 @@ def _evaluate_foe_initiates(params: dict) -> Callable:
 
 
 def _evaluate_spaces_moved(params: dict) -> Callable:
-    """Checks the number of spaces moved by the unit or foe (e.g., Clash skills)."""
+    """Spaces moved. Only the initiator moves into combat, so non-initiator
+    movement is always 0 — clash-style skills should use the default."""
     min_spaces = params.get("min_spaces", 1)
-    target_str = params.get("target", "initiator")
-
-    def evaluate(unit: "CombatantState", foe: "CombatantState") -> bool:
-        unit_moved = getattr(unit, "spaces_moved", 0)
-        foe_moved = getattr(foe, "spaces_moved", 0)
-
-        if target_str == "self":
-            return unit_moved >= min_spaces
-        elif target_str == "foe":
-            return foe_moved >= min_spaces
-        elif target_str == "either":
-            return unit_moved >= min_spaces or foe_moved >= min_spaces
-        elif target_str == "initiator":
-            initiator = unit if getattr(unit, "is_initiator", False) else foe
-            return getattr(initiator, "spaces_moved", 0) >= min_spaces
-
-        return False
-
+    def evaluate(unit, foe) -> bool:
+        initiator = unit if getattr(unit, "is_initiator", False) else foe
+        return getattr(initiator, "spaces_moved", 0) >= min_spaces
     return evaluate
 
 
