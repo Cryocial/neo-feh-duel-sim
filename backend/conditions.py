@@ -25,7 +25,28 @@ def _evaluate_foe_initiates(params: dict) -> Callable:
     return evaluate
 
 
-def _evaluate_spaces_moved(params: dict) -> Callable: ...
+def _evaluate_spaces_moved(params: dict) -> Callable:
+    """Checks the number of spaces moved by the unit or foe (e.g., Clash skills)."""
+    min_spaces = params.get("min_spaces", 1)
+    target_str = params.get("target", "initiator")
+    
+    def evaluate(unit: 'CombatantState', foe: 'CombatantState') -> bool:
+        unit_moved = getattr(unit, "spaces_moved", 0)
+        foe_moved = getattr(foe, "spaces_moved", 0)
+        
+        if target_str == "self":
+            return unit_moved >= min_spaces
+        elif target_str == "foe":
+            return foe_moved >= min_spaces
+        elif target_str == "either":
+            return unit_moved >= min_spaces or foe_moved >= min_spaces
+        elif target_str == "initiator":
+            initiator = unit if getattr(unit, "is_initiator", False) else foe
+            return getattr(initiator, "spaces_moved", 0) >= min_spaces
+            
+        return False
+        
+    return evaluate
 
 
 def _evaluate_ally_within_spaces(params: dict) -> Callable:
@@ -68,8 +89,33 @@ def _evaluate_cbt_stat_check(params: dict) -> Callable:
 
     return evaluate
 
+def _evaluate_bonus_penalty_total(params: dict) -> Callable:
+    """Salvaged from Empathy/Change of Fate: Checks total active effects."""
+    min_count = params.get("min_count", 1)
+    include_foe = params.get("include_foe", False)
+    
+    def evaluate(unit: 'CombatantState', foe: 'CombatantState') -> bool:
+        total = unit.bonus_count + unit.penalty_count
+        if include_foe:
+            total += foe.bonus_count + foe.penalty_count
+        return total >= min_count
+    return evaluate
 
-def _evaluate_triggers_brave(params: dict) -> Callable: ...
+def _evaluate_triggers_brave(params: dict) -> Callable:
+    """Checks if the unit triggered the 'attacks twice' effect."""
+    target_str = params.get("target", "self")
+    
+    def evaluate(unit: 'CombatantState', foe: 'CombatantState') -> bool:
+        target = unit if target_str == "self" else foe
+        return any(e.type == "BRAVE" for e in target.effects_strike_sequence)
+        
+    return evaluate
+
+def _evaluate_is_engaged(params: dict) -> Callable:
+    """Salvaged from Fell Spirit: Checks if either unit is Engaged."""
+    def evaluate(unit: 'CombatantState', foe: 'CombatantState') -> bool:
+        return unit.unit.is_engaged or foe.unit.is_engaged
+    return evaluate
 
 # ── registry ─────────────────────────────────────────────────────────────────
 
@@ -82,8 +128,8 @@ CONDITION_REGISTRY: dict[str, (Phase, Callable[[dict], Callable])] = {
     "hp_above_pct": ("start_of_combat", _evaluate_hp_above_pct),
     "cbt_stat_check": ("start_of_combat", _evaluate_cbt_stat_check),
     "triggers_brave": ("post_sequence", _evaluate_triggers_brave),
-    #"bonus_penalty_total":  ("pre_aoe",         _evaluate_bonus_penalty_total),
-    #"is_engaged":           ("pre_aoe",         _evaluate_is_engaged),
+    "bonus_penalty_total":  ("pre_aoe",         _evaluate_bonus_penalty_total),
+    "is_engaged":           ("pre_aoe",         _evaluate_is_engaged),
     "foe_weapon_type":      ("pre_aoe",         _evaluate_foe_weapon_type),
     "triggers_brave":       ("post_sequence",   _evaluate_triggers_brave),
 }
