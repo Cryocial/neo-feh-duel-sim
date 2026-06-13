@@ -1,16 +1,28 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Callable, Literal
+from typing import Callable, Literal, TYPE_CHECKING
+
+#prevents circular imports with combatcalculator.py
+if TYPE_CHECKING:
+    from .combatcalculator import CombatantState
 
 Phase = Literal["pre_aoe", "start_of_combat", "post_sequence"]
 
 # ── evaluator functions ──────────────────────────────────────────────────────
 
 
-def _evaluate_unit_initiates(params: dict) -> Callable: ...
+def _evaluate_unit_initiates(params: dict) -> Callable:
+    """Checks if the unit initiated combat (Player Phase)."""
+    def evaluate(unit: 'CombatantState', foe: 'CombatantState') -> bool:
+        return getattr(unit, "is_initiator", False)
+    return evaluate
 
 
-def _evaluate_foe_initiates(params: dict) -> Callable: ...
+def _evaluate_foe_initiates(params: dict) -> Callable:
+    """Checks if the foe initiated combat (Enemy Phase)."""
+    def evaluate(unit: 'CombatantState', foe: 'CombatantState') -> bool:
+        return getattr(foe, "is_initiator", False)
+    return evaluate
 
 
 def _evaluate_spaces_moved(params: dict) -> Callable: ...
@@ -22,16 +34,23 @@ def _evaluate_ally_within_spaces(params: dict) -> Callable:
     ...
 
 
-def _evaluate_foe_weapon_type(params: dict) -> Callable: ...
+def _evaluate_foe_weapon_type(params: dict) -> Callable:
+    """Checks if the foe's weapon matches a specific list."""
+    valid_types = params.get("types", [])
+    
+    def evaluate(unit: 'CombatantState', foe: 'CombatantState') -> bool:
+        return foe.unit.weapon_type.name in valid_types
+    return evaluate
 
 
 def _evaluate_hp_above_pct(params: dict) -> Callable:
-    threshold = params["threshold"]
-    target = params.get("unit", "self")
+    """Checks if start-of-combat HP is >= a threshold."""
+    threshold = params.get("threshold", 0)
+    target_str = params.get("target", "self")
 
-    def evaluate(unit, foe) -> bool:
-        combatant = unit if target == "self" else foe
-        return combatant.current_hp * 100 >= combatant.unit.base_stats.hp * threshold
+    def evaluate(unit: 'CombatantState', foe: 'CombatantState') -> bool:
+        target = unit if target_str == "self" else foe
+        return (target.unit.start_of_combat_hp / target.unit.base_stats.hp) * 100 >= threshold
 
     return evaluate
 
@@ -47,6 +66,7 @@ def _evaluate_cbt_spd_check(params: dict) -> Callable:
 
 def _evaluate_triggers_brave(params: dict) -> Callable: ...
 
+# ── registry ─────────────────────────────────────────────────────────────────
 
 CONDITION_REGISTRY: dict[str, (Phase, Callable[[dict], Callable])] = {
     "unit_initiates": ("pre_aoe", _evaluate_unit_initiates),
@@ -59,6 +79,7 @@ CONDITION_REGISTRY: dict[str, (Phase, Callable[[dict], Callable])] = {
     "triggers_brave": ("post_sequence", _evaluate_triggers_brave),
 }
 
+# ── classes ─────────────────────────────────────────────────────────────────
 
 @dataclass
 class AtomicCondition:
@@ -72,29 +93,39 @@ class AtomicCondition:
 class AnyOf:
     conditions: list[Condition]
 
+@dataclass
+class AllOf:
+    conditions: list[Condition]
 
-Condition = AtomicCondition | AnyOf
+Condition = AtomicCondition | AnyOf | AllOf
 
 
 # ── builders ─────────────────────────────────────────────────────────────────
 
 
 def _build_atomic_condition(data: dict) -> AtomicCondition:
-    type = data["type"]
+    c_type = data["type"]
     params = data.get("params", {})
+    
+    if c_type not in CONDITION_REGISTRY:
+        raise ValueError(f"Unknown condition type: {c_type}")
+        
+    phase, func_builder = CONDITION_REGISTRY[c_type]
+    
     return AtomicCondition(
-        type=type,
+        type=c_type,
         params=params,
-        phase=CONDITION_REGISTRY[type][0],
-        func=CONDITION_REGISTRY[type][1](params),
+        phase=phase,
+        func=func_builder(params),
     )
 
 
 def _build_condition(data: dict) -> Condition:
     if "any_of" in data:
         return AnyOf(conditions=[_build_condition(c) for c in data["any_of"]])
+    if "all_of" in data:
+        return AllOf(conditions=[_build_condition(c) for c in data["all_of"]])
     return _build_atomic_condition(data)
-
 
 def build_conditions(data_list: list[dict]) -> list[Condition]:
     return [_build_condition(c) for c in data_list]
