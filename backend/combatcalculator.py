@@ -302,8 +302,30 @@ class CombatEngine:
                     flat_dr += self._resolve_formula(e.params, foe_state, state)
             damage = max(0, damage - flat_dr)
 
-            # TODO: HEXBLADE_AOE (adaptive targeting for AoE) and PULSE_AOE
-            # (cooldown charge on AoE trigger) aren't handled yet.
+            #hexblade calc
+            has_hexblade_aoe = any(e.type == EffectType.HEXBLADE_AOE for e in state.effects_AoE)
+            if has_hexblade_aoe:
+                foe_def = foe_state.unit.get_visible_stat("defense")
+                foe_res = foe_state.unit.get_visible_stat("res")
+                visible_def = min(foe_def, foe_res)
+            else:
+                visible_def = (
+                    foe_state.unit.get_visible_stat("res")
+                    if not state.unit.is_physical()
+                    else foe_state.unit.get_visible_stat("defense")
+    )
+
+            foe_state.current_hp = max(1, foe_state.current_hp - damage)
+            state.special_use_count += 1
+            state.current_cooldown = state.unit.max_cooldown
+
+            # PULSE_AOE — cooldown charge granted on AoE trigger
+            pulse = sum(
+                self._resolve_formula(e.params, state, foe_state)
+                for e in state.effects_AoE
+                if e.type == EffectType.PULSE_AOE
+            )
+            state.current_cooldown -= max(0, pulse)
 
             foe_state.current_hp = max(1, foe_state.current_hp - damage)
             state.special_use_count += 1
@@ -311,44 +333,40 @@ class CombatEngine:
 
     def _combat_stat_calculations(self):
         """Calculates combat stats incorporating STAT_BUFF and STAT_DEBUFF effects."""
-        # Snapshot HP at start of combat (post-AoE) for hp_above_pct/hp_below_pct.
         self.attacker.start_of_combat_hp = self.combatant_states["attacker"].current_hp
         self.defender.start_of_combat_hp = self.combatant_states["defender"].current_hp
 
+        atk_state = self.combatant_states["attacker"]
+        def_state = self.combatant_states["defender"]
+
+        atk_ignore_debuffs = any(
+            e.type == EffectType.PENALTY_NEUT for e in atk_state.effects_start_of_combat
+        )
+        def_ignore_debuffs = any(
+            e.type == EffectType.PENALTY_NEUT for e in def_state.effects_start_of_combat
+        )
+        atk_ignore_buffs = any(
+            e.type == EffectType.BONUS_NEUT for e in def_state.effects_start_of_combat
+        )
+        def_ignore_buffs = any(
+            e.type == EffectType.BONUS_NEUT for e in atk_state.effects_start_of_combat
+        )
+
         atk_vals = {
-            stat: self.attacker.get_visible_stat(stat)
+            stat: self.attacker.get_visible_stat(
+                stat, ignore_buffs=atk_ignore_buffs, ignore_debuffs=atk_ignore_debuffs
+            )
             for stat in ["hp", "atk", "spd", "defense", "res"]
         }
         def_vals = {
-            stat: self.defender.get_visible_stat(stat)
+            stat: self.defender.get_visible_stat(
+                stat, ignore_buffs=def_ignore_buffs, ignore_debuffs=def_ignore_debuffs
+            )
             for stat in ["hp", "atk", "spd", "defense", "res"]
         }
 
-        self.combatant_states["attacker"].combat_stats = StatBlock(**atk_vals)
-        self.combatant_states["defender"].combat_stats = StatBlock(**def_vals)
-
-        for state, foe_state in [
-            (self.combatant_states["attacker"], self.combatant_states["defender"]),
-            (self.combatant_states["defender"], self.combatant_states["attacker"]),
-        ]:
-            for effect in state.effects_start_of_combat:
-                if effect.type in (EffectType.STAT_BUFF, EffectType.STAT_DEBUFF):
-                    stats_to_mod = effect.params.get("stats", [])
-                    val = self._resolve_formula(effect.params, state, foe_state)
-
-                    if effect.type == EffectType.STAT_DAUNT:
-                        val = -abs(val)
-
-                    # StatBlock is frozen — build a new instance via replace()
-                    updates = {
-                        stat: getattr(state.combat_stats, stat) + val
-                        for stat in stats_to_mod
-                    }
-                    state.combat_stats = replace(state.combat_stats, **updates)
-
-        # TODO: BONUS_NEUT / PENALTY_NEUT (Neutralize Bonuses/Penalties) aren't
-        # consumed yet — they'd need to zero out visible_buffs/visible_debuffs
-        # contributions before get_visible_stat runs, or be applied here.
+        atk_state.combat_stats = StatBlock(**atk_vals)
+        def_state.combat_stats = StatBlock(**def_vals)
 
         self.attacker.combat_stats = self.combatant_states["attacker"].combat_stats
         self.defender.combat_stats = self.combatant_states["defender"].combat_stats
@@ -404,22 +422,21 @@ class CombatEngine:
             1 for e in atk_state.effects_strike_sequence if e.type == EffectType.FU_DENY
         )
 
-        # NOTE: there's no dedicated "Null Follow-Up" EffectType yet, so the
-        # NFU terms below are placeholders (always 0) rather than reusing
-        # FU_DENY incorrectly. See chat notes for what EffectType this needs.
-        attacker_off_NFU = 0
-        attacker_def_NFU = 0
-        defender_off_NFU = 0
-        defender_def_NFU = 0
+        attacker_NFU = 1 if any(
+        e.type == EffectType.NFU for e in atk_state.effects_strike_sequence
+        ) else 0
+        defender_NFU = 1 if any(
+            e.type == EffectType.NFU for e in def_state.effects_strike_sequence
+        ) else 0
 
         attacker_FU = (
-            nb_attacker_GFU * (1 - defender_def_NFU)
-            - nb_defender_FU_denial * (1 - attacker_off_NFU)
+            nb_attacker_GFU * (1 - defender_NFU)        
+            - nb_defender_FU_denial * (1 - attacker_NFU)  
             + attacker_spd_check
         )
         defender_FU = (
-            nb_defender_GFU * (1 - attacker_def_NFU)
-            - nb_attacker_FU_denial * (1 - defender_off_NFU)
+            nb_defender_GFU * (1 - attacker_NFU)   
+            - nb_attacker_FU_denial * (1 - defender_NFU)
             + defender_spd_check
         )
 
@@ -432,7 +449,8 @@ class CombatEngine:
 
         attacker_potent = (
             any(e.type == EffectType.POTENT for e in atk_state.effects_strike_sequence)
-            and spd_diff >= 25
+            and spd_diff >= 25 
+            #TODO CHANGE THIS SO ITS NOT A STATIC 25 AND IT DEPENDS
         )
         defender_potent = (
             any(e.type == EffectType.POTENT for e in def_state.effects_strike_sequence)

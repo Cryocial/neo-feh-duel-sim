@@ -19,6 +19,8 @@ EFFECT_LIST_MAP: dict[EffectType, str] = {
 
     # ── Strike sequence ─────────────────────────────────────────────────
     EffectType.FU_DENY: "effects_strike_sequence",
+    EffectType.NFU: "effects_strike_sequence",
+
     EffectType.GFU: "effects_strike_sequence",
     EffectType.BRAVE: "effects_strike_sequence",
     EffectType.POTENT: "effects_strike_sequence",
