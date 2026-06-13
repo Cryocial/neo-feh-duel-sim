@@ -330,7 +330,7 @@ class CombatEngine:
             
 
     def _combat_stat_calculations(self):
-        """Calculates combat stats incorporating STAT_BUFF and STAT_DEBUFF effects."""
+        """Calculates combat stats incorporating STAT_BOOST and STAT_DAUNT effects."""
         self.attacker.start_of_combat_hp = self.combatant_states["attacker"].current_hp
         self.defender.start_of_combat_hp = self.combatant_states["defender"].current_hp
 
