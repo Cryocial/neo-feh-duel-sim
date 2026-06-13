@@ -24,6 +24,7 @@ class CombatantState:
     strike_count: int = 0
     has_entered_combat: bool = False
     is_initiator: bool = False
+    triggers_brave: bool = False
     spaces_moved: int = 0
     effects_AoE: list[Effect] = field(default_factory=list)
     effects_start_of_combat: list[Effect] = field(default_factory=list)
@@ -468,7 +469,9 @@ class CombatEngine:
         defender_brave = any(
             e.type == EffectType.BRAVE for e in def_state.effects_strike_sequence
         )
-
+        atk_state.triggers_brave = attacker_brave
+        def_state.triggers_brave = defender_brave
+        
         attacker_potent_mult = self._potent_active(
             atk_state.effects_strike_sequence, spd_diff, is_attacker=True
         )
