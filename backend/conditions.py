@@ -55,11 +55,16 @@ def _evaluate_hp_above_pct(params: dict) -> Callable:
     return evaluate
 
 
-def _evaluate_cbt_spd_check(params: dict) -> Callable:
+def _evaluate_cbt_stat_check(params: dict) -> Callable:
+    """Generic in-combat stat comparison (handles Spd, Def, Res, etc)."""
+    stat = params.get("stat", "spd")
     margin = params.get("margin", 0)
 
-    def evaluate(unit, foe) -> bool:
-        return unit.combat_stats.spd >= foe.combat_stats.spd + margin
+    def evaluate(unit: 'CombatantState', foe: 'CombatantState') -> bool:
+        # Failsafe fallback to visible stats if combat stats aren't built yet
+        unit_stat = getattr(unit.combat_stats, stat, unit.unit.get_visible_stat(stat))
+        foe_stat = getattr(foe.combat_stats, stat, foe.unit.get_visible_stat(stat))
+        return unit_stat >= (foe_stat + margin)
 
     return evaluate
 
@@ -75,8 +80,12 @@ CONDITION_REGISTRY: dict[str, (Phase, Callable[[dict], Callable])] = {
     "ally_within_spaces": ("pre_aoe", _evaluate_ally_within_spaces),
     "foe_weapon_type": ("pre_aoe", _evaluate_foe_weapon_type),
     "hp_above_pct": ("start_of_combat", _evaluate_hp_above_pct),
-    "cbt_spd_check": ("start_of_combat", _evaluate_cbt_spd_check),
+    "cbt_stat_check": ("start_of_combat", _evaluate_cbt_stat_check),
     "triggers_brave": ("post_sequence", _evaluate_triggers_brave),
+    #"bonus_penalty_total":  ("pre_aoe",         _evaluate_bonus_penalty_total),
+    #"is_engaged":           ("pre_aoe",         _evaluate_is_engaged),
+    "foe_weapon_type":      ("pre_aoe",         _evaluate_foe_weapon_type),
+    "triggers_brave":       ("post_sequence",   _evaluate_triggers_brave),
 }
 
 # ── classes ─────────────────────────────────────────────────────────────────
