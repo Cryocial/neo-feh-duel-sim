@@ -122,6 +122,14 @@ def _evaluate_is_engaged(params: dict) -> Callable:
 
     return evaluate
 
+def _evaluate_triggers_brave(params: dict) -> Callable:
+    """Checks if the Brave effect is active"""
+    target_str = params.get("target", "self")
+    def evaluate(unit, foe) -> bool:
+        target = unit if target_str == "self" else foe
+        return target.triggers_brave
+    return evaluate
+
 
 # ── registry ─────────────────────────────────────────────────────────────────
 
