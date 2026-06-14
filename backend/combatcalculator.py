@@ -727,14 +727,9 @@ class CombatEngine:
         dmg_floor = None
         for effect in target_state.effects_on_strike:
             if effect.type == EffectType.DR_FLOOR and self._strike_matches(
-                strike,
-                effect.params,
-                unit_special=target_special,
-                foe_special=striker_special,
+                strike, effect.params, unit_special=target_special, foe_special=striker_special
             ):
-                floor = self._resolve_formula(
-                    effect.params, target_state, striker_state
-                )
+                floor = self._resolve_formula(effect.params, target_state, striker_state)
                 dmg_floor = floor if dmg_floor is None else min(dmg_floor, floor)
 
         if dmg_floor is not None and final_damage > dmg_floor:
