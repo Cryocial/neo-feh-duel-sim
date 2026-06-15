@@ -98,7 +98,7 @@ def _evaluate_cbt_stat_check(params: dict) -> Callable:
         unit_stat = getattr(unit.combat_stats, stat, unit.unit.get_visible_stat(stat))
         foe_stat = getattr(foe.combat_stats, stat, foe.unit.get_visible_stat(stat))
         threshold = foe_stat + margin
-        if comparison == "less_than":
+        if comparison == "lesser_than":
             return unit_stat < threshold
         return unit_stat >= threshold
 
