@@ -2,8 +2,7 @@
   "Change of Fate": {
     "type": "bonus",
     "effects": [
-      { "effect": "STAT_BOOST",
-        "target": "self",
+      { "effect": "STAT_BOOST", "target": "self",
         "params": {
           "stats": ["atk", "spd", "defense", "res"],
           "formula": "",
@@ -12,10 +11,8 @@
           "min": 5,
           "max": 5
         },
-        "conditions": []
-      },
-      { "effect": "FLAT_DAMAGE_AOE",
-        "target": "self",
+        "conditions": [] },
+      { "effect": "FLAT_DAMAGE_AOE", "target": "self",
         "params": {
           "formula": "num_bonus_and_penalties_on_unit",
           "multiplier": 3,
@@ -23,10 +20,8 @@
           "min": 0,
           "max": 15
         },
-        "conditions": []
-      },
-      { "effect": "FLAT_DAMAGE_STRIKE",
-        "target": "self",
+        "conditions": [] },
+      { "effect": "FLAT_DAMAGE_STRIKE", "target": "self",
         "params": {
           "formula": "num_bonus_and_penalties_on_unit",
           "multiplier": 3,
@@ -35,16 +30,14 @@
           "max": 15,
           "strike": "every_strike"
         },
-        "conditions": []
-      }
+        "conditions": [] }
     ]
   }
 ,
   "Paranoia": {
     "type": "bonus",
     "effects": [
-      { "effect": "STAT_BOOST",
-        "target": "self",
+      { "effect": "STAT_BOOST", "target": "self",
         "params": {
           "stats": ["atk"],
           "formula": "",
@@ -53,11 +46,8 @@
           "min": 5,
           "max": 5
         },
-        "conditions": []
-      },
-      { 
-        "effect": "VANTAGE",
-        "target": "self",
+        "conditions": [] },
+      { "effect": "VANTAGE", "target": "self",
         "params": {},
         "conditions": [
           {
@@ -165,6 +155,21 @@
         "conditions": [
           { "type": "cbt_stat_check", "params": { "stat": "defense", "margin": -5, "comparison": "less_than" } }
         ] }
+    ]
+  },
+   "Dark Emblem": {
+    "type": "bonus",
+    "effects": [
+      { "effect": "STAT_BOOST", "target": "self",
+        "params": {
+          "stats": ["atk", "spd", "defense", "res"],
+          "formula": "",
+          "multiplier": 0,
+          "flat": 5,
+          "min": 5,
+          "max": 5
+        },
+        "conditions": [] }
     ]
   }
 
