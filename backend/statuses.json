@@ -66,6 +66,30 @@
         "conditions": [] }
     ]
   },
+  "Spd Liberate": {
+    "type": "bonus",
+    "effects": [
+      { "effect": "STAT_BOOST", "target": "self",
+        "params": { "stats": ["spd"], "formula": "bonus_count_plus_4", "multiplier": 1, "max": 8 },
+        "conditions": [] }
+    ]
+  },
+  "Def Liberate TECHNICALLY DOES NOT EXIST YET": {
+    "type": "bonus",
+    "effects": [
+      { "effect": "STAT_BOOST", "target": "self",
+        "params": { "stats": ["defense"], "formula": "bonus_count_plus_4", "multiplier": 1, "max": 8 },
+        "conditions": [] }
+    ]
+  },
+  "Res Liberate": {
+    "type": "bonus",
+    "effects": [
+      { "effect": "STAT_BOOST", "target": "self",
+        "params": { "stats": ["res"], "formula": "bonus_count_plus_4", "multiplier": 1, "max": 8 },
+        "conditions": [] }
+    ]
+  },
   "Empathy": {
     "type": "bonus",
     "effects": [
