@@ -295,7 +295,9 @@ class CombatEngine:
         if not triggers or state.current_cooldown > 0:
             return
 
-        has_hexblade_aoe = any(e.type == EffectType.HEXBLADE_AOE for e in state.effects_AoE)
+        has_hexblade_aoe = any(
+            e.type == EffectType.HEXBLADE_AOE for e in state.effects_AoE
+        )
         if has_hexblade_aoe:
             visible_def = min(
                 foe_state.unit.get_visible_stat("defense"),
@@ -326,8 +328,6 @@ class CombatEngine:
         foe_state.current_hp = max(1, foe_state.current_hp - damage)
         state.special_use_count += 1
         state.current_cooldown = state.unit.max_cooldown
-
-            
 
     def _combat_stat_calculations(self):
         """Calculates combat stats incorporating STAT_BOOST and STAT_DAUNT effects."""
@@ -447,21 +447,45 @@ class CombatEngine:
             1 for e in atk_state.effects_strike_sequence if e.type == EffectType.FU_DENY
         )
 
-        attacker_OFF_NFU = 1 if any(e.type == EffectType.OFF_NFU for e in atk_state.effects_strike_sequence) else 0
-        attacker_DEF_NFU = 1 if any(e.type == EffectType.DEF_NFU for e in atk_state.effects_strike_sequence) else 0
-        defender_OFF_NFU = 1 if any(e.type == EffectType.OFF_NFU for e in def_state.effects_strike_sequence) else 0
-        defender_DEF_NFU = 1 if any(e.type == EffectType.DEF_NFU for e in def_state.effects_strike_sequence) else 0
+        attacker_OFF_NFU = (
+            1
+            if any(
+                e.type == EffectType.OFF_NFU for e in atk_state.effects_strike_sequence
+            )
+            else 0
+        )
+        attacker_DEF_NFU = (
+            1
+            if any(
+                e.type == EffectType.DEF_NFU for e in atk_state.effects_strike_sequence
+            )
+            else 0
+        )
+        defender_OFF_NFU = (
+            1
+            if any(
+                e.type == EffectType.OFF_NFU for e in def_state.effects_strike_sequence
+            )
+            else 0
+        )
+        defender_DEF_NFU = (
+            1
+            if any(
+                e.type == EffectType.DEF_NFU for e in def_state.effects_strike_sequence
+            )
+            else 0
+        )
 
         attacker_FU = (
-        nb_attacker_GFU * (1 - defender_DEF_NFU)      
-        - nb_defender_FU_denial * (1 - attacker_OFF_NFU)
-        + attacker_spd_check
-    )
+            nb_attacker_GFU * (1 - defender_DEF_NFU)
+            - nb_defender_FU_denial * (1 - attacker_OFF_NFU)
+            + attacker_spd_check
+        )
         defender_FU = (
-        nb_defender_GFU * (1 - attacker_DEF_NFU)
-        - nb_attacker_FU_denial * (1 - defender_OFF_NFU)
-        + defender_spd_check
-    )
+            nb_defender_GFU * (1 - attacker_DEF_NFU)
+            - nb_attacker_FU_denial * (1 - defender_OFF_NFU)
+            + defender_spd_check
+        )
 
         attacker_brave = any(
             e.type == EffectType.BRAVE for e in atk_state.effects_strike_sequence
@@ -471,7 +495,7 @@ class CombatEngine:
         )
         atk_state.triggers_brave = attacker_brave
         def_state.triggers_brave = defender_brave
-        
+
         attacker_potent_mult = self._potent_active(
             atk_state.effects_strike_sequence, spd_diff, is_attacker=True
         )
@@ -727,9 +751,14 @@ class CombatEngine:
         dmg_floor = None
         for effect in target_state.effects_on_strike:
             if effect.type == EffectType.DR_FLOOR and self._strike_matches(
-                strike, effect.params, unit_special=target_special, foe_special=striker_special
+                strike,
+                effect.params,
+                unit_special=target_special,
+                foe_special=striker_special,
             ):
-                floor = self._resolve_formula(effect.params, target_state, striker_state)
+                floor = self._resolve_formula(
+                    effect.params, target_state, striker_state
+                )
                 dmg_floor = floor if dmg_floor is None else min(dmg_floor, floor)
 
         if dmg_floor is not None and final_damage > dmg_floor:
@@ -833,26 +862,44 @@ class CombatEngine:
         if formula:
             cs = unit_state.combat_stats
             match formula:
-                case "bonus_count_plus_4":           # strictly for the Liberates: min(8, bonus_count + 4)
+                case "bonus_count_plus_4":  # strictly for the Liberates
                     variable = unit_state.bonus_count + 4
-                case "all_bonus_penalty_both":       # Empathy: own + foe bonus/penalty counts
-                    variable = (unit_state.bonus_count + unit_state.penalty_count
-                                + foe_state.bonus_count + foe_state.penalty_count)
-                case "spaces_moved":                 # Incited / Truly Incited
+                case "debuff_count_plus_4":  # strictly for the shackles
+                    variable = foe_state.penalty_count + 4
+                case "all_bonus_penalty_both":  # mainly for empathy
+                    variable = (
+                        unit_state.bonus_count
+                        + unit_state.penalty_count
+                        + foe_state.bonus_count
+                        + foe_state.penalty_count
+                    )
+                case "spaces_moved":
                     variable = unit_state.spaces_moved
-                case "sum_visible_buffs":            # Treachery
+                case "sum_visible_buffs":
                     vb = unit_state.unit.visible_buffs
-                    variable = max(0, vb.atk) + max(0, vb.spd) + max(0, vb.defense) + max(0, vb.res)
-                case "sum_foe_visible_debuffs":      # Dominance
+                    variable = (
+                        max(0, vb.atk)
+                        + max(0, vb.spd)
+                        + max(0, vb.defense)
+                        + max(0, vb.res)
+                    )
+                case "sum_foe_visible_debuffs":
                     vd = foe_state.unit.visible_debuffs
-                    variable = max(0, vd.atk) + max(0, vd.spd) + max(0, vd.defense) + max(0, vd.res)
-                case "mitigated_bucket":             # Reflex (see note below — no reset here)
+                    variable = (
+                        max(0, vd.atk)
+                        + max(0, vd.spd)
+                        + max(0, vd.defense)
+                        + max(0, vd.res)
+                    )
+                case "mitigated_bucket":  # Reflex
                     variable = unit_state.damage_mitigated_bucket
                 case "unit_max_hp":
                     variable = unit_state.unit.base_stats.hp
-                case "spd_diff_capped":              # Dodge: max(0, spd_diff), cap via max param
-                    variable = max(0, unit_state.combat_stats.spd - foe_state.combat_stats.spd)
-                case "foe_penalty_count":            # Creation Pulse (cap via max param)
+                case "spd_diff_capped":
+                    variable = max(
+                        0, unit_state.combat_stats.spd - foe_state.combat_stats.spd
+                    )
+                case "foe_penalty_count":
                     variable = foe_state.penalty_count
                 case "unit_cbt_atk":
                     variable = cs.atk if cs else unit_state.unit.get_visible_stat("atk")
