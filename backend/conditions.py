@@ -41,6 +41,15 @@ def _evaluate_spaces_moved(params: dict) -> Callable:
 
 def _evaluate_ally_within_spaces(params: dict) -> Callable: ...
 
+def _evaluate_first_combat_of_turn(params: dict) -> Callable:
+    """True if this is the unit's first combat this turn (Divine Nectar, etc.)."""
+    target_str = params.get("target", "self")
+
+    def evaluate(unit: 'CombatantState', foe: 'CombatantState') -> bool:
+        target = unit if target_str == "self" else foe
+        return getattr(target.unit, "first_combat_of_turn", False)
+
+    return evaluate
 
 def _evaluate_foe_weapon_type(params: dict) -> Callable:
     """Checks if the foe's weapon matches a specific list."""
@@ -50,6 +59,7 @@ def _evaluate_foe_weapon_type(params: dict) -> Callable:
         return foe.unit.weapon_type.name in valid_types
 
     return evaluate
+
 
 
 def _make_hp_pct_evaluator(
@@ -76,15 +86,19 @@ _evaluate_hp_below_pct = _make_hp_pct_evaluator(lambda pct, threshold: pct < thr
 
 
 def _evaluate_cbt_stat_check(params: dict) -> Callable:
-    """Generic in-combat stat comparison (handles Spd, Def, Res, etc)."""
+    """Generic in-combat stat comparison (handles Spd, Def, Res, etc).
+    """
     stat = params.get("stat", "spd")
     margin = params.get("margin", 0)
+    comparison = params.get("comparison", "greater_or_equal")
 
-    def evaluate(unit: "CombatantState", foe: "CombatantState") -> bool:
-        # Failsafe fallback to visible stats if combat stats aren't built yet
+    def evaluate(unit: 'CombatantState', foe: 'CombatantState') -> bool:
         unit_stat = getattr(unit.combat_stats, stat, unit.unit.get_visible_stat(stat))
         foe_stat = getattr(foe.combat_stats, stat, foe.unit.get_visible_stat(stat))
-        return unit_stat >= (foe_stat + margin)
+        threshold = foe_stat + margin
+        if comparison == "less_than":
+            return unit_stat < threshold
+        return unit_stat >= threshold
 
     return evaluate
 
@@ -140,6 +154,7 @@ CONDITION_REGISTRY: dict[str, tuple[Phase, Callable[[dict], Callable]]] = {
     "spaces_moved": ("pre_aoe", _evaluate_spaces_moved),
     "ally_within_spaces": ("pre_aoe", _evaluate_ally_within_spaces),
     "foe_weapon_type": ("pre_aoe", _evaluate_foe_weapon_type),
+    "first_combat_of_turn": ("pre_aoe", _evaluate_first_combat_of_turn),
     "hp_above_pct": ("start_of_combat", _evaluate_hp_above_pct),
     "hp_below_pct": ("start_of_combat", _evaluate_hp_below_pct),
     "cbt_stat_check": ("start_of_combat", _evaluate_cbt_stat_check),

@@ -833,6 +833,27 @@ class CombatEngine:
         if formula:
             cs = unit_state.combat_stats
             match formula:
+                case "bonus_count_plus_4":           # strictly for the Liberates: min(8, bonus_count + 4)
+                    variable = unit_state.bonus_count + 4
+                case "all_bonus_penalty_both":       # Empathy: own + foe bonus/penalty counts
+                    variable = (unit_state.bonus_count + unit_state.penalty_count
+                                + foe_state.bonus_count + foe_state.penalty_count)
+                case "spaces_moved":                 # Incited / Truly Incited
+                    variable = unit_state.spaces_moved
+                case "sum_visible_buffs":            # Treachery
+                    vb = unit_state.unit.visible_buffs
+                    variable = max(0, vb.atk) + max(0, vb.spd) + max(0, vb.defense) + max(0, vb.res)
+                case "sum_foe_visible_debuffs":      # Dominance
+                    vd = foe_state.unit.visible_debuffs
+                    variable = max(0, vd.atk) + max(0, vd.spd) + max(0, vd.defense) + max(0, vd.res)
+                case "mitigated_bucket":             # Reflex (see note below — no reset here)
+                    variable = unit_state.damage_mitigated_bucket
+                case "unit_max_hp":
+                    variable = unit_state.unit.base_stats.hp
+                case "spd_diff_capped":              # Dodge: max(0, spd_diff), cap via max param
+                    variable = max(0, unit_state.combat_stats.spd - foe_state.combat_stats.spd)
+                case "foe_penalty_count":            # Creation Pulse (cap via max param)
+                    variable = foe_state.penalty_count
                 case "unit_cbt_atk":
                     variable = cs.atk if cs else unit_state.unit.get_visible_stat("atk")
                 case "unit_cbt_spd":
