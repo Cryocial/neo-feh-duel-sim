@@ -54,5 +54,28 @@
         "conditions": []
       }
     ]
+  },
+  "Breath of Life 4": {
+    "type": "bonus",
+    "effects": [
+      { "effect": "PRE_CBT_HEAL", "target": "self",
+        "params": {
+          "formula": "unit_max_hp",
+          "multiplier": 0.4
+        },
+        "conditions": [
+          { "type": "cbt_stat_check",
+            "params": { "stat": "defense", "margin": -5, "comparison": "greater_or_equal" } }
+        ] },
+      { "effect": "PRE_CBT_HEAL", "target": "self",
+        "params": {
+          "formula": "unit_max_hp",
+          "multiplier": 0.2
+        },
+        "conditions": [
+          { "type": "cbt_stat_check",
+            "params": { "stat": "defense", "margin": -5, "comparison": "lesser_than" } }
+        ] }
+    ]
   }
 }
