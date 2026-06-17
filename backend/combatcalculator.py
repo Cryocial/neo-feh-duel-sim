@@ -862,10 +862,10 @@ class CombatEngine:
         if formula:
             cs = unit_state.combat_stats
             match formula:
-                case "bonus_count_plus_4":  # strictly for the Liberates
-                    variable = unit_state.bonus_count + 4
-                case "debuff_count_plus_4":  # strictly for the shackles
-                    variable = foe_state.penalty_count + 4
+                case "bonus_count":  
+                    variable = unit_state.bonus_count
+                case "debuff_count":
+                    variable = foe_state.penalty_count
                 case "all_bonus_penalty_both":  # mainly for empathy
                     variable = (
                         unit_state.bonus_count
@@ -895,7 +895,7 @@ class CombatEngine:
                     variable = unit_state.damage_mitigated_bucket
                 case "unit_max_hp":
                     variable = unit_state.unit.base_stats.hp
-                case "spd_diff_capped":
+                case "spd_diff":
                     variable = max(
                         0, unit_state.combat_stats.spd - foe_state.combat_stats.spd
                     )

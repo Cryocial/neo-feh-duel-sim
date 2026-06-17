@@ -38,7 +38,7 @@
     "effects": [
       { "effect": "STAT_BOOST", "target": "self",
         "params": {
-          "stats": ["atk", "spd"],
+          "stats": ["atk"],
           "formula": "",
           "multiplier": 0,
           "flat": 5,
@@ -65,6 +65,7 @@
           "stats": ["atk"],
           "formula": "bonus_count_plus_4",
           "multiplier": 1,
+          "min": 4,
           "max": 8
         },
         "conditions": [] }
@@ -78,12 +79,13 @@
           "stats": ["spd"],
           "formula": "bonus_count_plus_4",
           "multiplier": 1,
+          "min": 4,
           "max": 8
         },
         "conditions": [] }
     ]
   },
-  "Def Liberate TECHNICALLY DOES NOT EXIST YET": {
+  "Def Liberate": {
     "type": "bonus",
     "effects": [
       { "effect": "STAT_BOOST", "target": "self",
@@ -91,6 +93,7 @@
           "stats": ["defense"],
           "formula": "bonus_count_plus_4",
           "multiplier": 1,
+          "min": 4,
           "max": 8
         },
         "conditions": [] }
@@ -104,6 +107,7 @@
           "stats": ["res"],
           "formula": "bonus_count_plus_4",
           "multiplier": 1,
+          "min": 4,
           "max": 8
         },
         "conditions": [] }
@@ -189,7 +193,7 @@
     "effects": [
       { "effect": "PERC_DR_STRIKE", "target": "self",
         "params": {
-          "formula": "spd_diff_capped",
+          "formula": "spd_diff",
           "multiplier": 4,
           "max": 40,
           "strike": "every_strike",
@@ -231,29 +235,6 @@
           "multiplier": 0.4
         },
         "conditions": [] }
-    ]
-  },
-  "Breath of Life 4": {
-    "type": "bonus",
-    "effects": [
-      { "effect": "PRE_CBT_HEAL", "target": "self",
-        "params": {
-          "formula": "unit_max_hp",
-          "multiplier": 0.4
-        },
-        "conditions": [
-          { "type": "cbt_stat_check",
-            "params": { "stat": "defense", "margin": -5, "comparison": "greater_or_equal" } }
-        ] },
-      { "effect": "PRE_CBT_HEAL", "target": "self",
-        "params": {
-          "formula": "unit_max_hp",
-          "multiplier": 0.2
-        },
-        "conditions": [
-          { "type": "cbt_stat_check",
-            "params": { "stat": "defense", "margin": -5, "comparison": "lesser_than" } }
-        ] }
     ]
   },
   "Dark Emblem": {
