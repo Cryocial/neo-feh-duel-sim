@@ -457,7 +457,11 @@ class AtomicCondition:
 class AnyOf:
     conditions: list[Condition]
 
-Condition = AtomicCondition | AnyOf
+@dataclass
+class AllOf:
+    conditions: list[Condition]
+
+Condition = AtomicCondition | AnyOf | AllOf
 ```
 
 **Phase `pre_aoe`** : evaluated before AoE. Covers conditions based on map context and visible stats: allies or foes within range, visible stats, transformation (beasts), `has_entered_combat`, active bonuses/penalties, Divine Vein or tile effects, initiation, weapon range, number of spaces moved, combat style, foe's movement type or color, Savior, equipped Special.
@@ -471,6 +475,7 @@ For an `Effect` `example`, `example.conditions` is a `list[Condition]`. The list
 **JSON encoding of conditions:**
 - A flat array is an implicit AND
 - `{ "any_of": [...] }` for OR
+- `{ "all_of": [...] }` for an explicit AND (useful nested inside an `any_of`)
 - Nodes are recursive and can be nested
 
 **Logical encoding example:**
@@ -487,6 +492,8 @@ For an `Effect` `example`, `example.conditions` is a `list[Condition]`. The list
 - `AtomicCondition` of another phase → ignored
 - `AnyOf` → applies the same logic recursively on children belonging to the current phase
 - Empty list → the effect is active
+- `AllOf` → like `AnyOf`, but all current-phase children must pass; recurses on children belonging to the current phase
+
 
 **Concrete condition examples:**
 
@@ -726,7 +733,8 @@ At startup, three JSON files are parsed to build the in-memory databases.
 | `DEF_BREATH` | Grants Special cooldown charge +1 per foe's attack | `{}` |
 | `OFF_TEMPO` | Neutralizes effects that inflict "Special cooldown charge -X" on unit | `{}` |
 | `DEF_TEMPO` | Neutralizes effects that grant "Special cooldown charge +X" on unit | `{}` |
-| `DR_FLOOR` | Reduces damage from specific unit's attack to a maximum of X during combat | `{ floor: int, strike: str }` |
+| `DR_FLOOR` | Reduces damage from specific unit's attack to a maximum of X during combat (X resolved via the formula block; "floor to 1" is `flat: 1`) | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
+
 | `DEEP_WOUNDS_STRIKE` | Unit cannot be healed during combat | `{}` |
 | `NEUT_DEEP_WOUNDS_STRIKE` | Neutralizes the effect of \[Deep Wounds] | `{}` |
 | `REDUCE_DEEP_WOUNDS_STRIKE` | Reduces the effect of \[Deep Wounds by X%] | `{}` |
@@ -759,7 +767,8 @@ Used in the `params` of `effects_on_strike` effects to specify which strikes the
 
 ### C - `formula` Value Reference
 
-Used in the `{ formula, multiplier, flat, min, max }` param block. The final value is `floor(variable × multiplier) + flat`, clamped to `[min, max]` if non-negative. Some formulas require extra keys in the same dict, placed after `max` and before effect-specific params (e.g. `strike`).
+Formula names resolve to raw game quantities; skill-specific offsets and caps live in the params (`flat` for offsets, `min`/`max` for clamps), not baked into the formula. For example, the Liberate "+4, max 8" is `"formula": "bonus_count", "multiplier": 1, "flat": 4, "max": 8`, and Dodge's "Spd diff ×4, max 40%" is `"formula": "spd_diff", "multiplier": 4, "min": 0, "max": 40`.
+.
 
 | Value | Resolves to | Extra params |
 |---|---|---|
@@ -767,7 +776,16 @@ Used in the `{ formula, multiplier, flat, min, max }` param block. The final val
 | `cbt_stat` | Unit or foe's in-combat stat | `"unit": "self"\|"foe", "stat": "atk"\|"spd"\|"def"\|"res"` |
 | `3R3C_foes` | Number of foes within 3 rows or 3 columns centered on unit or foe | `"unit": "self"\|"foe"` |
 | `max_cooldown` | Unit or foe's max Special cooldown count value | `"unit": "self"\|"foe"` |
-| `num_bonus_and_penalties` | Sum of unit or foe's active bonus count and penalty count | `"unit": "self"\|"foe"` |
+| `num_bonus_and_penalties_on_unit` | Sum of unit's active bonus count and penalty count | — |
+| `all_bonus_penalty_both` | Sum of bonus + penalty counts on **both** unit and foe (Empathy) | — |
+| `bonus_count` | Unit's active bonus count (Liberates: pair with `flat` for the offset) | — |
+| `spaces_moved` | Spaces the unit moved before combat (Incited / Truly Incited) | — |
+| `spd_diff` | `unit_spd - foe_spd`, in-combat (Dodge: pair with `multiplier`/`max` for the cap) | — |
+| `sum_visible_buffs` | Sum of unit's visible stat bonuses, each floored at 0 (Treachery) | — |
+| `sum_foe_visible_debuffs` | Sum of foe's visible stat penalties, each floored at 0 (Dominance) | — |
+| `mitigated_bucket` | Unit's accumulated mitigated-damage total (Reflex) | — |
+| `unit_max_hp` | Unit's max HP (percent heals: pair with `multiplier`) | — |
+| `foe_penalty_count` | Foe's active penalty count (Creation Pulse: pair with `max` for the cap) | — |
 
 ---
 
@@ -782,7 +800,12 @@ Used in the `{ formula, multiplier, flat, min, max }` param block. The final val
 | `foe_weapon_type` | `pre_aoe` | `{ "types": list[str] }` |
 | `bonus_penalty_total` | `pre_aoe` | `{ "min_count": int, "include_foe": bool }` |
 | `is_engaged` | `pre_aoe` | `{}` |
+| `first_combat_of_turn` | `pre_aoe` | `{ "target": "self"\|"foe" }` |
 | `hp_above_pct` | `start_of_combat` | `{ "unit": "self"\|"foe", "threshold": int }` |
 | `hp_below_pct` | `start_of_combat` | `{ "unit": "self"\|"foe", "threshold": int }` |
 | `cbt_stat_check` | `start_of_combat` | `{ "stat": str, "unit": "self"\|"foe" "margin": int }` |
 | `triggers_brave` | `post_sequence` | `{ "target": "self"\|"foe" }` |
+| `cbt_stat_check` | `start_of_combat` | `{ "stat": str, "unit": "self"\|"foe", "margin": int, "comparison": "greater_or_equal"\|"lesser_than" }` | *`cbt_stat_check`'s `comparison` is optional and defaults to `greater_or_equal` (`unit_stat >= foe_stat + margin`). `lesser_than` evaluates `unit_stat < foe_stat + margin`. The two are exact complements at the same `margin`, so a pair of effects with opposite comparisons partitions every case (e.g. Breath of Life 4's 40%/20% heal split on Def).*
+
+
+
