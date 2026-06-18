@@ -760,8 +760,10 @@ Used in the `params` of `effects_on_strike` effects to specify which strikes the
 | `every_strike` | Every strike of the sequence |
 | `first_strike` | First attack, excluding the brave second hit |
 | `first_attack` | First attack, including the brave second hit |
-| `follow_up` | First follow-up attack, including the brave second hit |
-| `on_special` | When Special triggers |
+| `follow_up` | Follow-up attack, including the brave second hit |
+| `first_follow_up` | First follow-up attack, excluding the brave second hit |
+| `on_unit_special` | When unit's Special triggers |
+| `on_foe_special` | When foe's Special triggers |
 
 ---
 
