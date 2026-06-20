@@ -253,31 +253,63 @@ class CombatEngine:
                         updated_conditions.append(effect)
                 setattr(state, list_name, updated_conditions)
 
-    def _apply_healing(self, unit_state: CombatantState, amount: int):
-        """Applies healing while checking for Deep Wounds effects."""
+    def _apply_healing(self, unit_state: CombatantState, amount: int, phase: str = "in_combat"):
+        """Applies healing, with respect to the Deep Wounds effect.
+
+        phase: "pre_combat" | "in_combat" | "post_combat"
+
+        How it works:
+        - Deep Wounds blocks ALL healing (all phases).
+        - Neutralize Deep Wounds turns it off entirely.
+        - Reduce Deep Wounds applies to pre_combat and in_combat by default;
+            post_combat is still fully blocked UNLESS a post-combat-relief
+            reduce effect is present (rn only L!Fae, but im adding this for a 
+            "just in case", check out _deep_wound_reduce_pct).
+        - Reduce rounds the surviving heal UP (ceil).
+        """
         if amount <= 0:
             return
-
-        heal_multiplier = 1.0
 
         has_deep_wounds = any(
-            e.type == EffectType.DEEP_WOUNDS_STRIKE
-            for e in unit_state.effects_on_strike
+            e.type == EffectType.DEEP_WOUNDS_STRIKE for e in unit_state.effects_on_strike
         )
-        neut_deep_wounds = any(
-            e.type == EffectType.NEUT_DEEP_WOUNDS_STRIKE
-            for e in unit_state.effects_on_strike
+        neut = any(
+            e.type == EffectType.NEUT_DEEP_WOUNDS_STRIKE for e in unit_state.effects_on_strike
         )
 
-        if has_deep_wounds and not neut_deep_wounds:
-            heal_multiplier = 0.0
+        if has_deep_wounds and not neut:
+            reduce_pct = self._deep_wounds_reduce_pct(unit_state, phase)
+            if reduce_pct <= 0:
+                return  # fully blocked
+            amount = math.ceil(amount * reduce_pct / 100)
 
-        amount = math.trunc(amount * heal_multiplier)
         if amount <= 0:
             return
-
         new_hp = unit_state.current_hp + amount
         unit_state.current_hp = min(unit_state.unit.base_stats.hp, new_hp)
+
+
+    def _deep_wounds_reduce_pct(self, unit_state: CombatantState, phase: str) -> int:
+        """Returns the % of healing that survives Deep Wounds for this phase (0 = fully blocked).
+
+        rn, since only fae has the post combat stuff, ive decided to just make it a flag of whether 
+        deep wounds should be removed for post combat.
+        """
+        survive_fraction = 1.0
+        found_any_sources = False
+        for e in unit_state.effects_on_strike:
+            if e.type != EffectType.REDUCE_DEEP_WOUNDS_STRIKE:
+                continue
+            applies_post = e.params.get("post_combat", False)
+            if phase == "post_combat" and not applies_post:
+                continue
+            pct = e.params.get("value", 50)   # % of healing this source lets survive
+            survive_fraction *= pct / 100
+            found_any_sources = True
+
+        if not found_any_sources:
+            return 0
+        return round(survive_fraction * 100)
 
     def _phase_AoE(self):
         """Processes effects_AoE. Only the initiator can trigger an AoE special."""
@@ -982,6 +1014,3 @@ class CombatEngine:
             )
             if dmg > 0:
                 foe_state.current_hp = max(1, foe_state.current_hp - dmg)
-
-        # TODO: DEEP_WOUNDS_POST_CBT / REDUCE_DEEP_WOUNDS_POST_CBT /
-        # NEUT_DEEP_WOUNDS_POST_CBT aren't handled yet.
