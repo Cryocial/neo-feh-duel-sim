@@ -303,7 +303,9 @@ class CombatEngine:
         for e in unit_state.effects_on_strike:
             if e.type != EffectType.REDUCE_DEEP_WOUNDS_STRIKE:
                 continue
-            applies_post = e.params.get("post_combat", False)
+            applies_post = e.params.get(
+                "post_combat", False
+            )  # the flag for if we should check post combat healing
             if phase == "post_combat" and not applies_post:
                 continue
             pct = e.params.get("value", 50)  # % of healing this source lets survive
