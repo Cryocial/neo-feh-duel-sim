@@ -253,7 +253,9 @@ class CombatEngine:
                         updated_conditions.append(effect)
                 setattr(state, list_name, updated_conditions)
 
-    def _apply_healing(self, unit_state: CombatantState, amount: int, phase: str = "in_combat"):
+    def _apply_healing(
+        self, unit_state: CombatantState, amount: int, phase: str = "pre_combat"
+    ):
         """Applies healing, with respect to the Deep Wounds effect.
 
         phase: "pre_combat" | "in_combat" | "post_combat"
@@ -263,7 +265,7 @@ class CombatEngine:
         - Neutralize Deep Wounds turns it off entirely.
         - Reduce Deep Wounds applies to pre_combat and in_combat by default;
             post_combat is still fully blocked UNLESS a post-combat-relief
-            reduce effect is present (rn only L!Fae, but im adding this for a 
+            reduce effect is present (rn only L!Fae, but im adding this for a
             "just in case", check out _deep_wound_reduce_pct).
         - Reduce rounds the surviving heal UP (ceil).
         """
@@ -271,10 +273,12 @@ class CombatEngine:
             return
 
         has_deep_wounds = any(
-            e.type == EffectType.DEEP_WOUNDS_STRIKE for e in unit_state.effects_on_strike
+            e.type == EffectType.DEEP_WOUNDS_STRIKE
+            for e in unit_state.effects_on_strike
         )
         neut = any(
-            e.type == EffectType.NEUT_DEEP_WOUNDS_STRIKE for e in unit_state.effects_on_strike
+            e.type == EffectType.NEUT_DEEP_WOUNDS_STRIKE
+            for e in unit_state.effects_on_strike
         )
 
         if has_deep_wounds and not neut:
@@ -288,11 +292,10 @@ class CombatEngine:
         new_hp = unit_state.current_hp + amount
         unit_state.current_hp = min(unit_state.unit.base_stats.hp, new_hp)
 
-
     def _deep_wounds_reduce_pct(self, unit_state: CombatantState, phase: str) -> int:
         """Returns the % of healing that survives Deep Wounds for this phase (0 = fully blocked).
 
-        rn, since only fae has the post combat stuff, ive decided to just make it a flag of whether 
+        rn, since only fae has the post combat stuff, ive decided to just make it a flag of whether
         deep wounds should be removed for post combat.
         """
         survive_fraction = 1.0
@@ -303,7 +306,7 @@ class CombatEngine:
             applies_post = e.params.get("post_combat", False)
             if phase == "post_combat" and not applies_post:
                 continue
-            pct = e.params.get("value", 50)   # % of healing this source lets survive
+            pct = e.params.get("value", 50)  # % of healing this source lets survive
             survive_fraction *= pct / 100
             found_any_sources = True
 
@@ -684,7 +687,9 @@ class CombatEngine:
             if e.type == EffectType.PRE_CBT_HEAL
         )
 
-        self._apply_healing(atk_state, atk_preheal)
+        self._apply_healing(
+            atk_state, atk_preheal
+        )  # the default is defined as pre-combat so thats why its not here
         self._apply_healing(def_state, def_preheal)
 
     def _process_strike(self, strike: Strike):
@@ -811,7 +816,7 @@ class CombatEngine:
                 hit_heal += self._resolve_formula(
                     effect.params, striker_state, target_state
                 )
-        self._apply_healing(striker_state, hit_heal)
+        self._apply_healing(striker_state, hit_heal, phase="in_combat")
 
         pulse_charge = 1
         for effect in striker_state.effects_on_strike:
@@ -894,7 +899,7 @@ class CombatEngine:
         if formula:
             cs = unit_state.combat_stats
             match formula:
-                case "bonus_count":  
+                case "bonus_count":
                     variable = unit_state.bonus_count
                 case "debuff_count":
                     variable = foe_state.penalty_count
@@ -1005,7 +1010,7 @@ class CombatEngine:
                 for e in state.effects_after_combat
                 if e.type == EffectType.HEAL_POST_CBT
             )
-            self._apply_healing(state, heal)
+            self._apply_healing(state, heal, phase="post_combat")
 
             dmg = sum(
                 self._resolve_formula(e.params, state, foe_state)
