@@ -8,7 +8,7 @@ real skill's authentic numbers.
 
 import pytest
 
-from backend.build import Unit, StatBlock
+from backend.build import Unit
 from backend.constants import MovementType, WeaponType, Color
 from backend.combatcalculator import CombatEngine, CombatantState
 
