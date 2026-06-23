@@ -45,15 +45,15 @@ EFFECT_LIST_MAP: dict[EffectType, str] = {
     EffectType.OFF_TEMPO: "effects_on_strike",
     EffectType.DEF_TEMPO: "effects_on_strike",
     EffectType.DR_FLOOR: "effects_on_strike",
-    EffectType.DEEP_WOUNDS_STRIKE: "effects_on_strike",
-    EffectType.NEUT_DEEP_WOUNDS_STRIKE: "effects_on_strike",
-    EffectType.REDUCE_DEEP_WOUNDS_STRIKE: "effects_on_strike",
+    EffectType.DEEP_WOUNDS_IN_CBT: "effects_on_strike",
+    EffectType.NEUT_DEEP_WOUNDS_IN_CBT: "effects_on_strike",
+    EffectType.REDUCE_DEEP_WOUNDS_IN_CBT: "effects_on_strike",
     # ── Post-combat ──────────────────────────────────────────────────────
     EffectType.HEAL_POST_CBT: "effects_after_combat",
     EffectType.DAMAGE_POST_CBT: "effects_after_combat",
     EffectType.DEEP_WOUNDS_POST_CBT: "effects_after_combat",
-    EffectType.REDUCE_DEEP_WOUNDS_POST_CBT: "effects_after_combat",
     EffectType.NEUT_DEEP_WOUNDS_POST_CBT: "effects_after_combat",
+    EffectType.REDUCE_DEEP_WOUNDS_POST_CBT: "effects_after_combat",
 }
 
 
