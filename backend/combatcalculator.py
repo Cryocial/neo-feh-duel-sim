@@ -254,7 +254,7 @@ class CombatEngine:
                 setattr(state, list_name, updated_conditions)
 
     def _apply_healing(
-        self, unit_state: CombatantState, amount: int, phase: str = "pre_combat"
+        self, unit_state: CombatantState, amount: int, phase: str = "in_combat"
     ):
         """Applies healing, with respect to the Deep Wounds effect.
 
@@ -272,20 +272,31 @@ class CombatEngine:
         if amount <= 0:
             return
 
-        has_deep_wounds = any(
-            e.type == EffectType.DEEP_WOUNDS_STRIKE
-            for e in unit_state.effects_on_strike
-        )
-        neut = any(
-            e.type == EffectType.NEUT_DEEP_WOUNDS_STRIKE
-            for e in unit_state.effects_on_strike
-        )
+        if phase == "post_combat":
+            effects = unit_state.effects_after_combat
+            dw_type = EffectType.DEEP_WOUNDS_POST_CBT
+            neut_type = EffectType.NEUT_DEEP_WOUNDS_POST_CBT
+            reduce_type = EffectType.REDUCE_DEEP_WOUNDS_POST_CBT
+        else:
+            effects = unit_state.effects_on_strike
+            dw_type = EffectType.DEEP_WOUNDS_IN_CBT
+            neut_type = EffectType.NEUT_DEEP_WOUNDS_IN_CBT
+            reduce_type = EffectType.REDUCE_DEEP_WOUNDS_IN_CBT
 
-        if has_deep_wounds and not neut:
-            reduce_pct = self._deep_wounds_reduce_pct(unit_state, phase)
-            if reduce_pct <= 0:
-                return  # fully blocked
-            amount = math.ceil(amount * reduce_pct / 100)
+        has_deep_wounds = any(e.type == dw_type for e in effects)
+        if has_deep_wounds:
+            neutralized = any(e.type == neut_type for e in effects)
+            if not neutralized:
+                survive = 1.0
+                found = False
+                for e in effects:
+                    if e.type == reduce_type:
+                        pct = self._resolve_formula(e.params, unit_state, unit_state)
+                        survive *= pct / 100
+                        found = True
+                if not found:
+                    return  # fully blocked, no reduce relief
+                amount = math.ceil(amount * survive)
 
         if amount <= 0:
             return
@@ -818,7 +829,7 @@ class CombatEngine:
                 hit_heal += self._resolve_formula(
                     effect.params, striker_state, target_state
                 )
-        self._apply_healing(striker_state, hit_heal, phase="in_combat")
+        self._apply_healing(striker_state, hit_heal) #phase is default in_combat 
 
         pulse_charge = 1
         for effect in striker_state.effects_on_strike:
