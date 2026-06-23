@@ -1,5 +1,5 @@
 import math
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from typing import Literal
 
 from .build import Unit, StatBlock
@@ -829,7 +829,7 @@ class CombatEngine:
                 hit_heal += self._resolve_formula(
                     effect.params, striker_state, target_state
                 )
-        self._apply_healing(striker_state, hit_heal) #phase is default in_combat 
+        self._apply_healing(striker_state, hit_heal)  # phase is default in_combat
 
         pulse_charge = 1
         for effect in striker_state.effects_on_strike:
@@ -887,16 +887,38 @@ class CombatEngine:
     def _get_wta_multiplier(
         self, striker_state: CombatantState, target_state: CombatantState
     ) -> float:
-        """Calculates the WTA multiplier (±20%, or ±40% with unanswered Triangle Adept).
+        """Calculates the WTA multiplier.
 
-        TODO: Triangle Adept / Cancel Affinity have no EffectType yet. Once
-        added, check effects_on_strike for both here — Triangle Adept doubles
-        `mult` unless either side has Cancel Affinity.
+        Base advantage is ±20%. Triangle Adept (on either combatant) amplifies
+        an EXISTING advantage to a larger value (default ±40%). Cancel Affinity
+        on either side neutralizes the Triangle Adept amplification, reverting
+        to the base ±20%.
         """
         advantage = self._check_color_advantage(striker_state, target_state)
         if advantage == 0:
             return 1.0
-        return 1.0 + (0.20 * advantage)
+
+        magnitude = 0.20
+
+        ta_effects = [
+            e
+            for e in striker_state.effects_on_strike + target_state.effects_on_strike
+            if e.type == EffectType.TRIANGLE_ADEPT
+        ]
+        cancel_affinity = any(
+            e.type == EffectType.CANCEL_AFFINITY
+            for e in striker_state.effects_on_strike + target_state.effects_on_strike
+        )
+
+        if ta_effects and not cancel_affinity:
+            magnitude = max(
+                self._resolve_formula(e.params, striker_state, target_state) / 100
+                if e.params
+                else 0.40
+                for e in ta_effects
+            )
+
+        return 1.0 + (magnitude * advantage)
 
     def _resolve_formula(
         self, params: dict, unit_state: CombatantState, foe_state: CombatantState

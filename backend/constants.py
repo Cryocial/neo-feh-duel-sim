@@ -90,7 +90,8 @@ class EffectType(str, Enum):
     DEEP_WOUNDS_IN_CBT = "DEEP_WOUNDS_IN_CBT"
     NEUT_DEEP_WOUNDS_IN_CBT = "NEUT_DEEP_WOUNDS_IN_CBT"
     REDUCE_DEEP_WOUNDS_IN_CBT = "REDUCE_DEEP_WOUNDS_IN_CBT"
-
+    TRIANGLE_ADEPT = "TRIANGLE_ADEPT"
+    CANCEL_AFFINITY = "CANCEL_AFFINITY"
     # ── Post-combat ───────────────────────────────────────────────────────────
     HEAL_POST_CBT = "HEAL_POST_CBT"
     DAMAGE_POST_CBT = "DAMAGE_POST_CBT"
