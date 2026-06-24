@@ -253,9 +253,7 @@ class CombatEngine:
                         updated_conditions.append(effect)
                 setattr(state, list_name, updated_conditions)
 
-    def _apply_healing(
-        self, unit_state: CombatantState, amount: int, phase: str = "in_combat"
-    ):
+    def _apply_healing(self, role: UnitRole, amount: int, phase: str = "in_combat"):
         """Applies healing, with respect to the Deep Wounds effect.
 
         phase: "pre_combat" | "in_combat" | "post_combat"
@@ -272,6 +270,10 @@ class CombatEngine:
         if amount <= 0:
             return
 
+        unit_state = self.combatant_states[role]
+        foe_role: UnitRole = "defender" if role == "attacker" else "attacker"
+        foe_state = self.combatant_states[foe_role]
+
         if phase == "post_combat":
             effects = unit_state.effects_after_combat
             dw_type = EffectType.DEEP_WOUNDS_POST_CBT
@@ -283,19 +285,25 @@ class CombatEngine:
             neut_type = EffectType.NEUT_DEEP_WOUNDS_IN_CBT
             reduce_type = EffectType.REDUCE_DEEP_WOUNDS_IN_CBT
 
-        has_deep_wounds = any(e.type == dw_type for e in effects)
-        if has_deep_wounds:
-            neutralized = any(e.type == neut_type for e in effects)
-            if not neutralized:
+        if any(e.type == dw_type for e in effects):
+            if not any(e.type == neut_type for e in effects):
                 survive = 1.0
                 found = False
                 for e in effects:
-                    if e.type == reduce_type:
-                        pct = self._resolve_formula(e.params, unit_state, unit_state)
-                        survive *= pct / 100
-                        found = True
+                    if e.type != reduce_type:
+                        continue
+                    # The effect sits in unit_state's list, but its formula may
+                    # scale off whoever OWNS it. applied_by == "foe" means the foe
+                    # inflicted it, so the foe's state is the formula's "unit".
+                    if e.applied_by == "foe":
+                        owner, opponent = foe_state, unit_state
+                    else:
+                        owner, opponent = unit_state, foe_state
+                    pct = self._resolve_formula(e.params, owner, opponent)
+                    survive *= pct / 100
+                    found = True
                 if not found:
-                    return  # fully blocked, no reduce relief
+                    return
                 amount = math.ceil(amount * survive)
 
         if amount <= 0:
@@ -700,10 +708,8 @@ class CombatEngine:
             if e.type == EffectType.PRE_CBT_HEAL
         )
 
-        self._apply_healing(
-            atk_state, atk_preheal
-        )  # the default is defined as pre-combat so thats why its not here
-        self._apply_healing(def_state, def_preheal)
+        self._apply_healing("attacker", atk_preheal, phase="in_combat")
+        self._apply_healing("defender", def_preheal, phase="in_combat")
 
     def _process_strike(self, strike: Strike):
         """Fully data-driven strike processing via effects_on_strike."""
@@ -829,8 +835,7 @@ class CombatEngine:
                 hit_heal += self._resolve_formula(
                     effect.params, striker_state, target_state
                 )
-        self._apply_healing(striker_state, hit_heal)  # phase is default in_combat
-
+        self._apply_healing(strike.striker, hit_heal, phase="in_combat")
         pulse_charge = 1
         for effect in striker_state.effects_on_strike:
             if effect.type == EffectType.PULSE_STRIKE and self._strike_matches(
@@ -1036,16 +1041,16 @@ class CombatEngine:
 
     def _phase_after_combat(self):
         """Processes effects_after_combat: post-combat healing/damage."""
-        atk_state = self.combatant_states["attacker"]
-        def_state = self.combatant_states["defender"]
+        for role, foe_role in (("attacker", "defender"), ("defender", "attacker")):
+            state = self.combatant_states[role]
+            foe_state = self.combatant_states[foe_role]
 
-        for state, foe_state in ((atk_state, def_state), (def_state, atk_state)):
             heal = sum(
                 self._resolve_formula(e.params, state, foe_state)
                 for e in state.effects_after_combat
                 if e.type == EffectType.HEAL_POST_CBT
             )
-            self._apply_healing(state, heal, phase="post_combat")
+            self._apply_healing(role, heal, phase="post_combat")
 
             dmg = sum(
                 self._resolve_formula(e.params, state, foe_state)
