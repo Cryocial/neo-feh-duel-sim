@@ -55,12 +55,13 @@ def _evaluate_ally_within_spaces(params: dict) -> Callable:
     target_str = params.get("target", "self")
 
     field = {
+        "1_space": "allies_within_1_space",
         "2_spaces": "allies_within_2_spaces",
         "3_spaces": "allies_within_3_spaces",
         "3_rows_cols": "allies_within_3_rows_cols",
-    }[check] #checks for typos
+    }[check]  # checks for typos
 
-    def evaluate(unit: 'CombatantState', foe: 'CombatantState') -> bool:
+    def evaluate(unit: "CombatantState", foe: "CombatantState") -> bool:
         target = unit if target_str == "self" else foe
         return getattr(target.unit, field) >= min_allies
 
