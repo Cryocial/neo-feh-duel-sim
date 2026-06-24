@@ -25,6 +25,7 @@ from backend.combatcalculator import CombatEngine, CombatantState
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
+
 def colored_unit(color: Color, name="U") -> Unit:
     """A minimal unit of a given color. Weapon type is arbitrary here since
     WTA is color-based; stats are round and irrelevant to the multiplier."""
@@ -33,7 +34,11 @@ def colored_unit(color: Color, name="U") -> Unit:
         movement_type=MovementType.INFANTRY,
         weapon_type=WeaponType.SWORD,
         color=color,
-        hp=40, atk=30, spd=30, defense=20, res=20,
+        hp=40,
+        atk=30,
+        spd=30,
+        defense=20,
+        res=20,
     )
 
 
@@ -45,18 +50,24 @@ def state_with(unit: Unit, on_strike_effects=None) -> CombatantState:
 
 
 def ta_effect(pct=40) -> Effect:
-    return Effect(type=EffectType.TRIANGLE_ADEPT, applied_by="self",
-                  params={"flat": pct}, conditions=[])
+    return Effect(
+        type=EffectType.TRIANGLE_ADEPT,
+        applied_by="self",
+        params={"flat": pct},
+        conditions=[],
+    )
 
 
 def ta_effect_no_params() -> Effect:
-    return Effect(type=EffectType.TRIANGLE_ADEPT, applied_by="self",
-                  params={}, conditions=[])
+    return Effect(
+        type=EffectType.TRIANGLE_ADEPT, applied_by="self", params={}, conditions=[]
+    )
 
 
 def cancel_affinity_effect() -> Effect:
-    return Effect(type=EffectType.CANCEL_AFFINITY, applied_by="self",
-                  params={}, conditions=[])
+    return Effect(
+        type=EffectType.CANCEL_AFFINITY, applied_by="self", params={}, conditions=[]
+    )
 
 
 @pytest.fixture
@@ -66,6 +77,7 @@ def engine():
 
 
 # ── base weapon triangle (no TA) ──────────────────────────────────────────────
+
 
 def test_neutral_matchup_is_one(engine):
     # RED striker vs RED target -> no advantage
@@ -95,6 +107,7 @@ def test_colorless_is_neutral(engine):
 
 
 # ── Triangle Adept amplification ──────────────────────────────────────────────
+
 
 def test_ta_on_striker_amplifies_advantage(engine):
     striker = state_with(colored_unit(Color.RED), [ta_effect(40)])
@@ -131,6 +144,7 @@ def test_ta_irrelevant_when_neutral(engine):
 
 # ── Cancel Affinity ───────────────────────────────────────────────────────────
 
+
 def test_cancel_affinity_neutralizes_ta(engine):
     # advantage + TA, but target has Cancel Affinity -> back to base 1.20
     striker = state_with(colored_unit(Color.RED), [ta_effect(40)])
@@ -139,7 +153,9 @@ def test_cancel_affinity_neutralizes_ta(engine):
 
 
 def test_cancel_affinity_on_striker_side_also_works(engine):
-    striker = state_with(colored_unit(Color.RED), [ta_effect(40), cancel_affinity_effect()])
+    striker = state_with(
+        colored_unit(Color.RED), [ta_effect(40), cancel_affinity_effect()]
+    )
     target = state_with(colored_unit(Color.GREEN))
     assert engine._get_wta_multiplier(striker, target) == pytest.approx(1.20)
 
