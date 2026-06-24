@@ -129,7 +129,9 @@ class Unit:
         self._initialize_stats()
         self.first_combat_of_turn = True
         self.is_engaged = False
-
+        self.allies_within_2_spaces = 0
+        self.allies_within_3_spaces = 0
+        self.allies_within_3_rows_cols = 0
         # APPLY PROGRESSION STATS
 
         temp_max_flower_cap = 30

@@ -41,7 +41,30 @@ def _evaluate_spaces_moved(params: dict) -> Callable:
     return evaluate
 
 
-def _evaluate_ally_within_spaces(params: dict) -> Callable: ...
+def _evaluate_ally_within_spaces(params: dict) -> Callable:
+    """Checks ally-proximity counts supplied on the unit (duel-sim scenario facts).
+
+    params:
+      check: which proximity field to read —
+             "2_spaces" | "3_spaces" | "3_rows_cols"
+      min_allies: how many allies must be within that range (default 1)
+      target: "self" | "foe" (default "self")
+    """
+    check = params.get("check", "2_spaces")
+    min_allies = params.get("min_allies", 1)
+    target_str = params.get("target", "self")
+
+    field = {
+        "2_spaces": "allies_within_2_spaces",
+        "3_spaces": "allies_within_3_spaces",
+        "3_rows_cols": "allies_within_3_rows_cols",
+    }[check] #checks for typos
+
+    def evaluate(unit: 'CombatantState', foe: 'CombatantState') -> bool:
+        target = unit if target_str == "self" else foe
+        return getattr(target.unit, field) >= min_allies
+
+    return evaluate
 
 
 def _evaluate_first_combat_of_turn(params: dict) -> Callable:
