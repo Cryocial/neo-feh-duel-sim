@@ -598,12 +598,16 @@ class CombatEngine:
                 Strike("defender", "attacker", StrikeType.POTENT, consecutive=True)
             )
 
-        attacker_flash_effective = any(
-            e.type == EffectType.FLASH for e in atk_state.effects_strike_sequence
+        defender_flash = any(
+            e.type == EffectType.FLASH for e in def_state.effects_strike_sequence
         )
-        if attacker_flash_effective:
-            defender_first = []
-            defender_followups = []
+        if defender_flash:
+            defender_flash_neut = any(
+                e.type == EffectType.FLASH_NEUT for e in def_state.effects_strike_sequence
+            )
+            if not defender_flash_neut:
+                defender_first = []
+                defender_followups = []
 
         attacker_package = attacker_first + attacker_followups
         defender_package = defender_first + defender_followups

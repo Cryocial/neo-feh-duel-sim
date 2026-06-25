@@ -706,7 +706,8 @@ At startup, three JSON files are parsed to build the in-memory databases.
 | `VANTAGE_NEUT` | Neutralizes that allow unit to counterattack before foe's first attack | `{}` |
 | `DESPERATION` | Unit can make a follow-up attack before foe can counterattack / Unit can make a follow-up attack before foe's next attack | `{}` |
 | `DESPERATION_NEUT` | Neutralizes effects that allow unit to make a follow-up attack before foe's next attack  | `{}` |
-| `FLASH` | Foe cannot counterattack | `{}` |
+| `FLASH` | Unit cannot counterattack | `{}` |
+| `FLASH_NEUT` | Neutralizes effects that prevent unit's counterattacks | `{}` |
 | `OFF_FROZEN` | Decreases Spd difference necessary for unit to make a follow-up attack by X | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
 | `DEF_FROZEN` | Increases Spd difference necessary for unit to make a follow-up attack by X | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
 
