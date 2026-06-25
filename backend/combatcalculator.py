@@ -654,6 +654,10 @@ class CombatEngine:
 
         if strike_sequence:
             strike_sequence[0].is_first_hit = True
+            for i in range(1, len(strike_sequence)):
+                strike_sequence[i].consecutive = (
+                    strike_sequence[i].striker == strike_sequence[i - 1].striker
+                )
 
         return strike_sequence
 
