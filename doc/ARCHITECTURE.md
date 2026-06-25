@@ -703,6 +703,7 @@ At startup, three JSON files are parsed to build the in-memory databases.
 | `BRAVE` | Unit attacks twice | `{}` |
 | `POTENT` | Triggers an additional follow-up attack immediately after unit's standard follow-up attack | `{}` |
 | `VANTAGE` | Unit can counterattack before foe's first attack | `{}` |
+| `VANTAGE_NEUT` | Neutralizes that allow unit to counterattack before foe's first attack | `{}` |
 | `DESPERATION` | Unit can make a follow-up attack before foe can counterattack / Unit can make a follow-up attack before foe's next attack | `{}` |
 | `DESPERATION_NEUT` | Neutralizes effects that allow unit to make a follow-up attack before foe's next attack  | `{}` |
 | `FLASH` | Foe cannot counterattack | `{}` |
