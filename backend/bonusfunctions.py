@@ -198,3 +198,57 @@ def pre_hit_special_charge(unit, enemy=None):
             charge += 1
 
     return charge
+
+def potent_follow(unit, target_enemy=None):
+    """Returns the % potent if any (not sure what condition for follow up is and what to do for rift effects)."""
+    potent = 0
+    unit_spd = unit.get_combat_stat("spd", target_enemy)
+    enemy_spd = target_enemy.get_combat_stat("spd", unit)
+    spd_diff = unit_spd - enemy_spd
+
+    """Diff 30"""
+    if spd_diff + 25 >= 0:
+        if unit.has_keyword("decisive"):
+            if not unit.has_keyword("brave") and not unit.has_keyword("follow_up"):
+                potent = 100
+            else:
+                if potent < 50:
+                    potent = 50
+
+    """Diff 25"""
+    if spd_diff + 20 >= 0:
+        if unit.has_keyword("potent_follow"):
+            if not unit.has_keyword("brave") and not unit.has_keyword("follow_up"):
+                if potent < 70:
+                    potent = 70
+            else:
+                if potent < 30:
+                    potent = 30
+        if unit.has_keyword("potent_4") or unit.has_keyword("axe_of_dusk") or unit.has_keyword("potent_assault"):
+            if not unit.has_keyword("brave") and not unit.has_keyword("follow_up"):
+                if potent < 80:
+                    potent = 80
+            else:
+                if potent < 40:
+                    potent = 40
+        if unit.has_keyword("ilian_greatlance"):
+            if not unit.has_keyword("brave") and not unit.has_keyword("follow_up"):
+                potent = 100
+            else:
+                if potent < 50:
+                    potent = 50
+
+    """Diff 10"""
+    if spd_diff + 5 >= 0:
+        if unit.has_keyword("ice_falchion") or unit.has_keyword("ilian_longsword"):
+            potent = 100
+    
+    """Patience (Not sure what spd to use here)"""
+    if unit.base_stats.spd >= 30:
+        if not unit.has_keyword("brave") and not unit.has_keyword("follow_up"):
+            potent = 100
+        else:
+            if potent < 50:
+                potent = 50
+
+    return potent
