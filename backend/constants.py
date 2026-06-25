@@ -57,7 +57,8 @@ class EffectType(str, Enum):
 
     # ── Strike sequence ───────────────────────────────────────────────────────
     FU_DENY = "FU_DENY"
-    NFU = "NFU"
+    OFF_NFU = "OFF_NFU"
+    DEF_NFU = "DEF_NFU"
     GFU = "GFU"
     BRAVE = "BRAVE"
     POTENT = "POTENT"
