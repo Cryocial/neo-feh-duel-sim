@@ -586,9 +586,18 @@ class CombatEngine:
         defender_vantage = any(
             e.type == EffectType.VANTAGE for e in def_state.effects_strike_sequence
         )
+        if defender_vantage:
+            defender_vantage = not any(
+                e.type == EffectType.VANTAGE_NEUT for e in atk_state.effects_strike_sequence
+            )
+
         attacker_desperation = any(
             e.type == EffectType.DESPERATION for e in atk_state.effects_strike_sequence
         )
+        if attacker_desperation:
+            attacker_desperation = not any(
+                e.type == EffectType.DESPERATION_NEUT for e in def_state.effects_strike_sequence
+            )
 
         if defender_vantage and attacker_desperation:
             strike_sequence = (

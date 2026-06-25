@@ -63,9 +63,11 @@ class EffectType(str, Enum):
     BRAVE = "BRAVE"
     POTENT = "POTENT"
     VANTAGE = "VANTAGE"
+    VANTAGE_NEUT = "VANTAGE_NEUT"
     DESPERATION = "DESPERATION"
     DESPERATION_NEUT = "DESPERATION_NEUT"
     FLASH = "FLASH"
+    FLASH_NEUT = "FLASH_NEUT"
 
     # ── Pre-combat ────────────────────────────────────────────────────────────
     PRE_CBT_DAMAGE = "PRE_CBT_DAMAGE"
