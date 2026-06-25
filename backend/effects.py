@@ -28,6 +28,8 @@ EFFECT_LIST_MAP: dict[EffectType, str] = {
     EffectType.DESPERATION_NEUT: "effects_strike_sequence",
     EffectType.FLASH: "effects_strike_sequence",
     EffectType.FLASH_NEUT: "effects_strike_sequence",
+    EffectType.OFF_FROZEN: "effects_strike_sequence",
+    EffectType.DEF_FROZEN: "effects_strike_sequence",
     # ── Pre-combat ───────────────────────────────────────────────────────
     EffectType.PRE_CBT_DAMAGE: "effects_pre_combat",
     EffectType.PRE_CBT_HEAL: "effects_pre_combat",

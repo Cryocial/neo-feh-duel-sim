@@ -430,8 +430,33 @@ class CombatEngine:
         def_state = self.combatant_states["defender"]
 
         spd_diff = atk_state.combat_stats.spd - def_state.combat_stats.spd
-        attacker_spd_check = 1 if spd_diff > 5 else 0
-        defender_spd_check = 1 if spd_diff < -5 else 0
+
+        atk_off_frozen = sum(
+            self._resolve_formula(e.params, atk_state, def_state)
+            for e in atk_state.effects_strike_sequence
+            if e.type == EffectType.OFF_FROZEN
+        ) # easier FU for attacker granted in attacker list
+
+        atk_def_frozen = sum(
+            self._resolve_formula(e.params, atk_state, def_state)
+            for e in atk_state.effects_strike_sequence
+            if e.type == EffectType.DEF_FROZEN
+        ) # harder FU for attacker inflicted in attacker list
+
+        def_off_frozen = sum(
+            self._resolve_formula(e.params, def_state, atk_state)
+            for e in def_state.effects_strike_sequence
+            if e.type == EffectType.OFF_FROZEN
+        ) # easier FU for defender granted in defender list
+
+        def_def_frozen = sum(
+            self._resolve_formula(e.params, def_state, atk_state)
+            for e in def_state.effects_strike_sequence
+            if e.type == EffectType.DEF_FROZEN
+        ) # harder FU for attacker inflicted in defender list
+
+        attacker_spd_check = 1 if spd_diff > 5 - atk_off_frozen + atk_def_frozen else 0
+        defender_spd_check = 1 if -spd_diff > 5 - def_off_frozen + def_def_frozen else 0
 
         nb_attacker_GFU = sum(
             1 for e in atk_state.effects_strike_sequence if e.type == EffectType.GFU

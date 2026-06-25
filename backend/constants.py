@@ -68,6 +68,8 @@ class EffectType(str, Enum):
     DESPERATION_NEUT = "DESPERATION_NEUT"
     FLASH = "FLASH"
     FLASH_NEUT = "FLASH_NEUT"
+    OFF_FROZEN = "OFF_FROZEN"
+    DEF_FROZEN = "DEF_FROZEN"
 
     # ── Pre-combat ────────────────────────────────────────────────────────────
     PRE_CBT_DAMAGE = "PRE_CBT_DAMAGE"
