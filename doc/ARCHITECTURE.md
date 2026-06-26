@@ -336,7 +336,7 @@ class Status:
     { "effect": "FLAT_DAMAGE_AOE",
       "target": "self",
       "params": {
-        "formula": "num_bonus_and_penalties",
+        "formula": "num_bonus_and_penalties_on_unit",
         "multiplier": 3,
         "flat": 0,
         "min": 0,
@@ -348,7 +348,7 @@ class Status:
     { "effect": "FLAT_DAMAGE_STRIKE",
       "target": "self",
       "params": {
-        "formula": "num_bonus_and_penalties",
+        "formula": "num_bonus_and_penalties_on_unit",
         "multiplier": 3,
         "flat": 0,
         "min": 0,
