@@ -57,14 +57,19 @@ class EffectType(str, Enum):
 
     # ── Strike sequence ───────────────────────────────────────────────────────
     FU_DENY = "FU_DENY"
-    NFU = "NFU"
+    OFF_NFU = "OFF_NFU"
+    DEF_NFU = "DEF_NFU"
     GFU = "GFU"
     BRAVE = "BRAVE"
     POTENT = "POTENT"
     VANTAGE = "VANTAGE"
+    VANTAGE_NEUT = "VANTAGE_NEUT"
     DESPERATION = "DESPERATION"
     DESPERATION_NEUT = "DESPERATION_NEUT"
     FLASH = "FLASH"
+    FLASH_NEUT = "FLASH_NEUT"
+    OFF_FROZEN = "OFF_FROZEN"
+    DEF_FROZEN = "DEF_FROZEN"
 
     # ── Pre-combat ────────────────────────────────────────────────────────────
     PRE_CBT_DAMAGE = "PRE_CBT_DAMAGE"
