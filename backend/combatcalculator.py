@@ -467,25 +467,25 @@ class CombatEngine:
             self._resolve_formula(e.params, atk_state, def_state)
             for e in atk_state.effects_strike_sequence
             if e.type == EffectType.OFF_FROZEN
-        ) # easier FU for attacker granted in attacker list
+        )  # easier FU for attacker granted in attacker list
 
         atk_def_frozen = sum(
             self._resolve_formula(e.params, atk_state, def_state)
             for e in atk_state.effects_strike_sequence
             if e.type == EffectType.DEF_FROZEN
-        ) # harder FU for attacker inflicted in attacker list
+        )  # harder FU for attacker inflicted in attacker list
 
         def_off_frozen = sum(
             self._resolve_formula(e.params, def_state, atk_state)
             for e in def_state.effects_strike_sequence
             if e.type == EffectType.OFF_FROZEN
-        ) # easier FU for defender granted in defender list
+        )  # easier FU for defender granted in defender list
 
         def_def_frozen = sum(
             self._resolve_formula(e.params, def_state, atk_state)
             for e in def_state.effects_strike_sequence
             if e.type == EffectType.DEF_FROZEN
-        ) # harder FU for attacker inflicted in defender list
+        )  # harder FU for attacker inflicted in defender list
 
         attacker_spd_check = 1 if spd_diff > 5 - atk_off_frozen + atk_def_frozen else 0
         defender_spd_check = 1 if -spd_diff > 5 - def_off_frozen + def_def_frozen else 0
@@ -635,7 +635,8 @@ class CombatEngine:
         )
         if defender_flash:
             defender_flash_neut = any(
-                e.type == EffectType.FLASH_NEUT for e in def_state.effects_strike_sequence
+                e.type == EffectType.FLASH_NEUT
+                for e in def_state.effects_strike_sequence
             )
             if not defender_flash_neut:
                 defender_first = []
@@ -649,7 +650,8 @@ class CombatEngine:
         )
         if defender_vantage:
             defender_vantage = not any(
-                e.type == EffectType.VANTAGE_NEUT for e in atk_state.effects_strike_sequence
+                e.type == EffectType.VANTAGE_NEUT
+                for e in atk_state.effects_strike_sequence
             )
 
         attacker_desperation = any(
@@ -657,7 +659,8 @@ class CombatEngine:
         )
         if attacker_desperation:
             attacker_desperation = not any(
-                e.type == EffectType.DESPERATION_NEUT for e in def_state.effects_strike_sequence
+                e.type == EffectType.DESPERATION_NEUT
+                for e in def_state.effects_strike_sequence
             )
 
         if defender_vantage and attacker_desperation:
