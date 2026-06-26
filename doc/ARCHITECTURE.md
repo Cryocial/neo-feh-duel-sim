@@ -290,7 +290,7 @@ class Skill:
         { 
           "type": "cbt_stat_check",
           "params": {
-            "unit": "self",
+            "stat": "spd",
             "margin": 0
           }
         }
@@ -336,7 +336,7 @@ class Status:
     { "effect": "FLAT_DAMAGE_AOE",
       "target": "self",
       "params": {
-        "formula": "num_bonus_and_penalties_on_unit",
+        "formula": "num_bonus_and_penalties",
         "multiplier": 3,
         "flat": 0,
         "min": 0,
@@ -348,7 +348,7 @@ class Status:
     { "effect": "FLAT_DAMAGE_STRIKE",
       "target": "self",
       "params": {
-        "formula": "num_bonus_and_penalties_on_unit",
+        "formula": "num_bonus_and_penalties",
         "multiplier": 3,
         "flat": 0,
         "min": 0,
@@ -742,8 +742,8 @@ At startup, three JSON files are parsed to build the in-memory databases.
 | `DEF_TEMPO` | Neutralizes effects that grant "Special cooldown charge +X" on unit | `{}` |
 | `DR_FLOOR` | Reduces damage from specific unit's attack to a maximum of X during combat (X resolved via the formula block; "floor to 1" is `flat: 1`) | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
 
-| `DEEP_WOUNDS_IN_CBT` | Unit cannot be healed during combat (pre-combat and per-strike heals) | `{}` |
-| `NEUT_DEEP_WOUNDS_IN_CBT` | Neutralizes \[Deep Wounds] for in-combat healing | `{}` |
+| `DEEP_WOUNDS_IN_CBT` | Unit cannot be healed during combat (pre-combat and per-strike heals). Stored in the **afflicted** unit's list and checked against that unit's own heals. So for a skill like fatal smoke 4, it would check the `target: "foe"` (routed into the foe's list), while a carried status uses `target: "self"`. | `{}` |
+| `NEUT_DEEP_WOUNDS_IN_CBT` | Neutralizes \[Deep Wounds] for in-combat healing. Self-protective: lives in the protected unit's own list (`target: "self"`), checked alongside any Deep Wounds afflicting that same unit. | `{}` |
 | `REDUCE_DEEP_WOUNDS_IN_CBT` | Reduces \[Deep Wounds] for in-combat healing — lets a % of healing through. Multiple sources stack multiplicatively and the surviving heal rounds UP | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
 | `TRIANGLE_ADEPT` | Amplifies an existing Weapon Triangle advantage (on either combatant) to a larger magnitude. Never creates advantage where none exists | `{ flat: int }` (the advantage %, e.g. 40) |
 | `CANCEL_AFFINITY` | Neutralizes Triangle Adept amplification (on either side), reverting to the base ±20% Weapon Triangle | `{}` |
@@ -785,8 +785,8 @@ Formula names resolve to raw game quantities; skill-specific offsets and caps li
 | Value | Resolves to | Extra params |
 |---|---|---|
 | `""` (empty) | `0` — only the `flat` component applies | — |
-| `bonus_count` | Unit's active bonus count (Liberates: pair with `flat` for the offset, `max` for the cap) | — |
-| `debuff_count` | Unit's active penalty count | — |
+| `bonus_count` | Unit's active bonus count | — |
+| `penalty_count` | Unit's active penalty count | — |
 | `all_bonus_penalty_both` | Sum of bonus + penalty counts on **both** unit and foe (Empathy) | — |
 | `spaces_moved` | Spaces the unit moved before combat (Incited / Truly Incited) | — |
 | `sum_visible_buffs` | Sum of unit's visible stat bonuses, each floored at 0 (Treachery) | — |
@@ -811,7 +811,7 @@ Formula names resolve to raw game quantities; skill-specific offsets and caps li
 | `foe_initiates` | `pre_aoe` | `{}` |
 | `spaces_moved` | `pre_aoe` | `{ "target": "self"\|"foe"\|"either"\|"initiator", "min_spaces": int }` |
 | `ally_within_spaces` | `pre_aoe` | `{ "min_allies": int, "spaces": int }` |
-| `ally_within_spaces` | `pre_aoe` | `{ "check": "1_space"\|"2_spaces"\|"3_spaces"\|"3_rows_cols", "min_allies": int, "target": "self"\|"foe" }` |
+| `ally_within_spaces123` | `pre_aoe` | `{ "check": "1_space"\|"2_spaces"\|"3_spaces"\|"3_rows_cols", "min_allies": int, "target": "self"\|"foe" }` |
 ### NOTE: CHECK WHICH ALLY COND METHOD WE WANT TO USE 
 | `foe_weapon_type` | `pre_aoe` | `{ "types": list[str] }` |
 | `bonus_penalty_total` | `pre_aoe` | `{ "min_count": int, "include_foe": bool }` |
