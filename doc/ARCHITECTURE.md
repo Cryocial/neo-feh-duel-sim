@@ -288,7 +288,7 @@ class Skill:
           }
         },
         { 
-          "type": "cbt_spd_check",
+          "type": "cbt_stat_check",
           "params": {
             "unit": "self",
             "margin": 0
@@ -414,9 +414,12 @@ class CombatantState:
     damage_mitigated_bucket: int = 0                   # cumulated mitigated damage (for reflex, etc.)
     bonus_count:             int = 0                   # number of active bonuses
     penalty_count:           int = 0                   # number of active penalties
-    special_use_count:       int = 0                   # number of times the Special was used this combat (for DR effects with a limited use)
-    strike_count:            int = 0                   # number of times the unit has struck this combat
-    has_entered_combat:      bool = False              # whether the unit has already entered combat this turn
+    special_use_count:       int = 0                   # times the Special was used this combat
+    strike_count:            int = 0                   # times the unit has struck this combat
+    has_entered_combat:      bool = False              # whether the unit already entered combat this turn
+    is_initiator:            bool = False              # whether this unit initiated combat
+    triggers_brave:          bool = False              # set during strike-sequence determination; read by triggers_brave condition
+    spaces_moved:            int = 0                   # spaces moved before combat (clash conditions)
     effects_AoE:             list[Effect] = field(default_factory=list)
     effects_start_of_combat: list[Effect] = field(default_factory=list)
     effects_strike_sequence: list[Effect] = field(default_factory=list)
@@ -739,9 +742,11 @@ At startup, three JSON files are parsed to build the in-memory databases.
 | `DEF_TEMPO` | Neutralizes effects that grant "Special cooldown charge +X" on unit | `{}` |
 | `DR_FLOOR` | Reduces damage from specific unit's attack to a maximum of X during combat (X resolved via the formula block; "floor to 1" is `flat: 1`) | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
 
-| `DEEP_WOUNDS_STRIKE` | Unit cannot be healed during combat | `{}` |
-| `NEUT_DEEP_WOUNDS_STRIKE` | Neutralizes the effect of \[Deep Wounds] | `{}` |
-| `REDUCE_DEEP_WOUNDS_STRIKE` | Reduces the effect of \[Deep Wounds by X%] | `{}` |
+| `DEEP_WOUNDS_IN_CBT` | Unit cannot be healed during combat (pre-combat and per-strike heals) | `{}` |
+| `NEUT_DEEP_WOUNDS_IN_CBT` | Neutralizes \[Deep Wounds] for in-combat healing | `{}` |
+| `REDUCE_DEEP_WOUNDS_IN_CBT` | Reduces \[Deep Wounds] for in-combat healing — lets a % of healing through. Multiple sources stack multiplicatively and the surviving heal rounds UP | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
+| `TRIANGLE_ADEPT` | Amplifies an existing Weapon Triangle advantage (on either combatant) to a larger magnitude. Never creates advantage where none exists | `{ flat: int }` (the advantage %, e.g. 40) |
+| `CANCEL_AFFINITY` | Neutralizes Triangle Adept amplification (on either side), reverting to the base ±20% Weapon Triangle | `{}` |
 
 #### `effects_after_combat`
 
@@ -750,8 +755,9 @@ At startup, three JSON files are parsed to build the in-memory databases.
 | `HEAL_POST_CBT` | Restores X HP to unit after combat | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
 | `DAMAGE_POST_CBT` | After combat, deals X damage to unit | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
 | `DEEP_WOUNDS_POST_CBT` | Unit cannot be healed after combat | `{}` |
-| `REDUCE_DEEP_WOUNDS_POST_CBT` | Reduce the effect of \[Deep Wounds] | `{}` |
-| `NEUT_DEEP_WOUNDS_POST_CBT` | Neutralizes the effect of \[Deep Wounds] | `{}` |
+| `NEUT_DEEP_WOUNDS_POST_CBT` | Neutralizes \[Deep Wounds] for post-combat healing | `{}` |
+| `REDUCE_DEEP_WOUNDS_POST_CBT` | Reduces \[Deep Wounds] for post-combat healing — lets a % through, stacks multiplicatively, rounds UP | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
+> **Deep Wounds is split by phase.** In-combat Deep Wounds (`*_IN_CBT`) lives in `effects_on_strike` and gates both pre-combat and per-strike healing; post-combat Deep Wounds (`*_POST_CBT`) lives in `effects_after_combat`. The block is checked per-phase by `_apply_healing(role, amount, phase)`, which selects the matching effect family from the matching list. Reduce effects let a fraction of healing through, stack multiplicatively across sources, and round the surviving heal up.
 
 ---
 
@@ -779,19 +785,21 @@ Formula names resolve to raw game quantities; skill-specific offsets and caps li
 | Value | Resolves to | Extra params |
 |---|---|---|
 | `""` (empty) | `0` — only the `flat` component applies | — |
-| `cbt_stat` | Unit or foe's in-combat stat | `"unit": "self"\|"foe", "stat": "atk"\|"spd"\|"def"\|"res"` |
-| `3R3C_foes` | Number of foes within 3 rows or 3 columns centered on unit or foe | `"unit": "self"\|"foe"` |
-| `max_cooldown` | Unit or foe's max Special cooldown count value | `"unit": "self"\|"foe"` |
-| `num_bonus_and_penalties_on_unit` | Sum of unit's active bonus count and penalty count | — |
+| `bonus_count` | Unit's active bonus count (Liberates: pair with `flat` for the offset, `max` for the cap) | — |
+| `debuff_count` | Unit's active penalty count | — |
 | `all_bonus_penalty_both` | Sum of bonus + penalty counts on **both** unit and foe (Empathy) | — |
-| `bonus_count` | Unit's active bonus count (Liberates: pair with `flat` for the offset) | — |
 | `spaces_moved` | Spaces the unit moved before combat (Incited / Truly Incited) | — |
-| `spd_diff` | `unit_spd - foe_spd`, in-combat (Dodge: pair with `multiplier`/`max` for the cap) | — |
 | `sum_visible_buffs` | Sum of unit's visible stat bonuses, each floored at 0 (Treachery) | — |
 | `sum_foe_visible_debuffs` | Sum of foe's visible stat penalties, each floored at 0 (Dominance) | — |
 | `mitigated_bucket` | Unit's accumulated mitigated-damage total (Reflex) | — |
 | `unit_max_hp` | Unit's max HP (percent heals: pair with `multiplier`) | — |
+| `spd_diff` | `unit_spd - foe_spd`, in-combat, floored at 0 (Dodge: pair with `multiplier`/`max` for the cap) | — |
 | `foe_penalty_count` | Foe's active penalty count (Creation Pulse: pair with `max` for the cap) | — |
+| `unit_cbt_atk` | Unit's in-combat Atk | — |
+| `unit_cbt_spd` | Unit's in-combat Spd | — |
+| `unit_cbt_def` | Unit's in-combat Def | — |
+| `unit_cbt_res` | Unit's in-combat Res | — |
+| `max_cooldown` | Unit's max Special cooldown count value | — |
 
 ---
 
@@ -803,13 +811,14 @@ Formula names resolve to raw game quantities; skill-specific offsets and caps li
 | `foe_initiates` | `pre_aoe` | `{}` |
 | `spaces_moved` | `pre_aoe` | `{ "target": "self"\|"foe"\|"either"\|"initiator", "min_spaces": int }` |
 | `ally_within_spaces` | `pre_aoe` | `{ "min_allies": int, "spaces": int }` |
+| `ally_within_spaces` | `pre_aoe` | `{ "check": "1_space"\|"2_spaces"\|"3_spaces"\|"3_rows_cols", "min_allies": int, "target": "self"\|"foe" }` |
+### NOTE: CHECK WHICH ALLY COND METHOD WE WANT TO USE 
 | `foe_weapon_type` | `pre_aoe` | `{ "types": list[str] }` |
 | `bonus_penalty_total` | `pre_aoe` | `{ "min_count": int, "include_foe": bool }` |
 | `is_engaged` | `pre_aoe` | `{}` |
 | `first_combat_of_turn` | `pre_aoe` | `{ "target": "self"\|"foe" }` |
 | `hp_above_pct` | `start_of_combat` | `{ "unit": "self"\|"foe", "threshold": int }` |
-| `hp_below_pct` | `start_of_combat` | `{ "unit": "self"\|"foe", "threshold": int }` |
-| `cbt_stat_check` | `start_of_combat` | `{ "stat": str, "unit": "self"\|"foe" "margin": int }` |
+| `hp_below_pct` | `start_of_combat` | `{ "unit": "self"\|"foe", "threshold": int }` — true when HP% is strictly below threshold (exact complement of `hp_above_pct`) |
 | `triggers_brave` | `post_sequence` | `{ "target": "self"\|"foe" }` |
 | `cbt_stat_check` | `start_of_combat` | `{ "stat": str, "unit": "self"\|"foe", "margin": int, "comparison": "greater_or_equal"\|"lesser_than" }` | *`cbt_stat_check`'s `comparison` is optional and defaults to `greater_or_equal` (`unit_stat >= foe_stat + margin`). `lesser_than` evaluates `unit_stat < foe_stat + margin`. The two are exact complements at the same `margin`, so a pair of effects with opposite comparisons partitions every case (e.g. Breath of Life 4's 40%/20% heal split on Def).*
 
