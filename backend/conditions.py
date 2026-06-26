@@ -190,7 +190,6 @@ CONDITION_REGISTRY: dict[str, tuple[Phase, Callable[[dict], Callable]]] = {
     "triggers_brave": ("post_sequence", _evaluate_triggers_brave),
     "bonus_penalty_total": ("pre_aoe", _evaluate_num_bonus_penalty_total),
     "is_engaged": ("pre_aoe", _evaluate_is_engaged),
-    "ally_within_spaces": ("pre_aoe", _evaluate_ally_within_spaces)
 }
 
 # ── classes ─────────────────────────────────────────────────────────────────

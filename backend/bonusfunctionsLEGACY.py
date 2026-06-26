@@ -199,6 +199,7 @@ def pre_hit_special_charge(unit, enemy=None):
 
     return charge
 
+
 def potent_follow(unit, target_enemy=None):
     """Returns the % potent if any (not sure what condition for follow up is and what to do for rift effects)."""
     potent = 0
@@ -224,7 +225,11 @@ def potent_follow(unit, target_enemy=None):
             else:
                 if potent < 30:
                     potent = 30
-        if unit.has_keyword("potent_4") or unit.has_keyword("axe_of_dusk") or unit.has_keyword("potent_assault"):
+        if (
+            unit.has_keyword("potent_4")
+            or unit.has_keyword("axe_of_dusk")
+            or unit.has_keyword("potent_assault")
+        ):
             if not unit.has_keyword("brave") and not unit.has_keyword("follow_up"):
                 if potent < 80:
                     potent = 80
@@ -242,7 +247,7 @@ def potent_follow(unit, target_enemy=None):
     if spd_diff + 5 >= 0:
         if unit.has_keyword("ice_falchion") or unit.has_keyword("ilian_longsword"):
             potent = 100
-    
+
     """Patience (Not sure what spd to use here)"""
     if unit.base_stats.spd >= 30:
         if not unit.has_keyword("brave") and not unit.has_keyword("follow_up"):
