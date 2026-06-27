@@ -735,8 +735,10 @@ At startup, three JSON files are parsed to build the in-memory databases.
 | `HEAL_STRIKE` | When unit deals damage to foe , restores X HP to unit| `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
 | `OFF_BREATH` | Grants Special cooldown charge +1 per unit's attack | `{}` |
 | `DEF_BREATH` | Grants Special cooldown charge +1 per foe's attack | `{}` |
-| `OFF_TEMPO` | Neutralizes effects that inflict "Special cooldown charge -X" on unit | `{}` |
-| `DEF_TEMPO` | Neutralizes effects that grant "Special cooldown charge +X" on unit | `{}` |
+| `BREATH_NEUT` | Neutralizes effects that grant "Special cooldown charge +X" on unit | `{}` |
+| `OFF_GUARD` | Inflicts Special cooldown charge -1 per foe's attack | `{}` |
+| `DEF_GUARD` | Inflicts Special cooldown charge -1 per unit's attack | `{}` |
+| `GUARD_NEUT` | Neutralizes effects that inflict "Special cooldown charge -X" on unit | `{}` |
 | `DR_FLOOR` | Reduces damage from specific unit's attack to a maximum of X during combat (X resolved via the formula block; "floor to 1" is `flat: 1`) | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
 
 | `DEEP_WOUNDS_STRIKE` | Unit cannot be healed during combat | `{}` |
