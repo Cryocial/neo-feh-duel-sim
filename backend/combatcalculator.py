@@ -854,24 +854,30 @@ class CombatEngine:
                     effect.params, striker_state, target_state
                 )
         self._apply_healing(strike.striker, hit_heal, phase="in_combat")
-        pulse_charge = 1
-        for effect in striker_state.effects_on_strike:
-            if effect.type == EffectType.PULSE_STRIKE and self._strike_matches(
-                strike,
-                effect.params,
-                unit_special=striker_special,
-                foe_special=target_special,
-            ):
-                pulse_charge += self._resolve_formula(
-                    effect.params, striker_state, target_state
-                )
 
         if striker_special:
             striker_state.special_use_count += 1
             striker_state.current_cooldown = striker_state.unit.max_cooldown
-        striker_state.current_cooldown -= max(0, pulse_charge)
+        else:
+            striker_breath = any(e.type == EffectType.OFF_BREATH for e in striker_state.effects_on_strike)
+            striker_guard = any(e.type == EffectType.DEF_GUARD for e in striker_state.effects_on_strike)
+            striker_breath_neut = any(e.type == EffectType.BREATH_NEUT for e in striker_state.effects_on_strike)
+            striker_guard_neut = any(e.type == EffectType.GUARD_NEUT for e in striker_state.effects_on_strike)
+            
+            striker_charge = 1 + int(striker_breath and not striker_breath_neut) - int(striker_guard and not striker_guard_neut)
+            striker_state.current_cooldown = max(0, striker_state.current_cooldown - striker_charge)
 
-        striker_state.strike_count += 1
+        if target_special:
+            target_state.special_use_count += 1
+            target_state.current_cooldown = target_state.unit.max_cooldown
+        else:            
+            target_breath = any(e.type == EffectType.DEF_BREATH for e in target_state.effects_on_strike)
+            target_guard = any(e.type == EffectType.OFF_GUARD for e in target_state.effects_on_strike)
+            target_breath_neut = any(e.type == EffectType.BREATH_NEUT for e in target_state.effects_on_strike)
+            target_guard_neut = any(e.type == EffectType.GUARD_NEUT for e in target_state.effects_on_strike)
+
+            target_charge = 1 + int(target_breath and not target_breath_neut) - int(target_guard and not target_guard_neut)
+            target_state.current_cooldown = max(0, target_state.current_cooldown - target_charge)
 
     def _check_color_advantage(
         self, striker_state: CombatantState, target_state: CombatantState
