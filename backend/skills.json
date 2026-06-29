@@ -77,5 +77,45 @@
             "params": { "stat": "defense", "margin": -5, "comparison": "lesser_than" } }
         ] }
     ]
+  },
+  "Chosen Sword": {
+    "type": "weapon",
+    "visible": { "might": 16, "range": 1, "slaying": 1, "cooldown": 0, "grants": {} },
+    "allowed_movement_types": [],
+    "allowed_weapon_types": ["SWORD"],
+    "is_arcane": false,
+    "is_prf": true,
+    "effects": [
+      {
+        "effect": "STAT_BOOST",
+        "target": "self",
+        "params": { "stats": ["atk", "spd", "defense", "res"], "formula": "", "multiplier": 0, "flat": 15, "min": 15, "max": 15 },
+        "conditions": []
+      },
+      {
+        "effect": "FLAT_DAMAGE_STRIKE",
+        "target": "self",
+        "params": { "formula": "", "multiplier": 0, "flat": 25, "min": 25, "max": 25, "strike": "every_strike" },
+        "conditions": []
+      },
+      {
+        "effect": "FLAT_DR_STRIKE",
+        "target": "self",
+        "params": { "formula": "", "multiplier": 0, "flat": 15, "min": 15, "max": 15, "strike": "every_strike" },
+        "conditions": []
+      },
+      {
+        "effect": "FLAT_DR_STRIKE",
+        "target": "self",
+        "params": { "formula": "", "multiplier": 0, "flat": 15, "min": 15, "max": 15, "strike": "on_foe_special" },
+        "conditions": []
+      },
+      {
+        "effect": "DR_PIERCE",
+        "target": "self",
+        "params": { "value": 50, "strike": "every_strike" },
+        "conditions": []
+      }
+    ]
   }
 }
