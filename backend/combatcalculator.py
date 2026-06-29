@@ -498,29 +498,6 @@ class CombatEngine:
             mult_pat = pct_pat / 100
         return mult_pat
 
-    """Legacy Function?"""
-    def _potent_active(self, effects, spd_diff, is_attacker, made_fu):
-        """Returns the Potent damage multiplier if active, else None.
-
-        made_natural_fu: whether this unit landed a natural follow-up,
-        which some Potent skills use to reduce their effectiveness.
-        """
-        relevant_diff = spd_diff if is_attacker else -spd_diff
-        best_mult = None
-        for e in effects:
-            if e.type == EffectType.POTENT:
-                threshold = e.params.get("spd_threshold", 25)
-                if relevant_diff >= threshold:
-                    if made_fu and "damage_pct_if_fu" in e.params:
-                        pct = e.params["damage_pct_if_fu"]
-                    else:
-                        pct = e.params.get("damage_pct", 100)
-                    mult = pct / 100.0
-                    if best_mult is None or mult > best_mult:
-                        best_mult = mult
-        return best_mult
-
-    # TODO CHECK POTENT LOGIC TMR
 
     def _determine_strike_sequence(self) -> list[Strike]:
         """Calculates the combat sequence using effects_strike_sequence instead of keywords."""
@@ -622,14 +599,12 @@ class CombatEngine:
         attacker_potent_mult = self._potent_active(
             atk_state.effects_strike_sequence,
             spd_diff,
-            is_attacker=True,
-            made_fu=attacker_FU > 0,
+            is_attacker=True
         )
         defender_potent_mult = self._potent_active(
             def_state.effects_strike_sequence,
             spd_diff,
-            is_attacker=False,
-            made_fu=defender_FU > 0,
+            is_attacker=False
         )
 
         attacker_potent = attacker_potent_mult is not None
