@@ -649,6 +649,25 @@ class CombatEngine:
                 mult_pat = pct_pat / 100
         return mult_pat
 
+    """Legacy Function?
+    def _potent_active(self, effects, spd_diff, is_attacker, made_fu):
+        relevant_diff = spd_diff if is_attacker else -spd_diff
+        best_mult = None
+        for e in effects:
+            if e.type == EffectType.POTENT:
+                threshold = e.params.get("spd_threshold", 25)
+                if relevant_diff >= threshold:
+                    if made_fu and "damage_pct_if_fu" in e.params:
+                        pct = e.params["damage_pct_if_fu"]
+                    else:
+                        pct = e.params.get("damage_pct", 100)
+                    mult = pct / 100.0
+                    if best_mult is None or mult > best_mult:
+                        best_mult = mult
+        return best_mult
+    """
+
+    # TODO CHECK POTENT LOGIC TMR
 
     def _determine_strike_sequence(self) -> list[Strike]:
         """Calculates the combat sequence using effects_strike_sequence instead of keywords."""
