@@ -25,7 +25,11 @@ def make_unit(name, color=Color.RED, hp=50, atk=40, spd=10, defense=20, res=20):
         movement_type=MovementType.INFANTRY,
         weapon_type=WeaponType.SWORD,  # physical -> targets Def
         color=color,
-        hp=hp, atk=atk, spd=spd, defense=defense, res=res,
+        hp=hp,
+        atk=atk,
+        spd=spd,
+        defense=defense,
+        res=res,
     )
 
 
@@ -47,6 +51,7 @@ def atk_boost_status(amount=10):
 
 # ── baseline: no skills, pure stat combat ─────────────────────────────────────
 
+
 def test_plain_combat_runs_and_deals_damage():
     """Two equal-speed units, attacker 40 atk vs 20 def -> 20 dmg per hit.
     No follow-ups (spd equal), so attacker hits once, defender retaliates once."""
@@ -61,6 +66,7 @@ def test_plain_combat_runs_and_deals_damage():
 
 
 # ── the regression guard ──────────────────────────────────────────────────────
+
 
 def test_stat_boost_increases_damage():
     """A +10 Atk STAT_BOOST must raise damage dealt by 10 per hit.
@@ -103,12 +109,14 @@ def test_stat_boost_multiple_stats():
         Status(
             name="Atk/Def Boost",
             type="bonus",
-            effects=[{
-                "effect": "STAT_BOOST",
-                "target": "self",
-                "params": {"stats": ["atk", "defense"], "flat": 6},
-                "conditions": [],
-            }],
+            effects=[
+                {
+                    "effect": "STAT_BOOST",
+                    "target": "self",
+                    "params": {"stats": ["atk", "defense"], "flat": 6},
+                    "conditions": [],
+                }
+            ],
         )
     )
     defender = make_unit("D", atk=10, defense=20, spd=10)
