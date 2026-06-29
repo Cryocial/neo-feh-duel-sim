@@ -433,6 +433,48 @@ class CombatEngine:
 
         return target_stat
 
+    def _potent_check_10(self, effects, spd_diff, is_attacker):
+        """Check the Potent damage multipler for potent effects that decrease the spd diff by 10"""
+        potent_100 = None
+        if spd_diff + 5 >= 0:
+            potent_100 = 1
+        return potent_100
+    
+    def _potent_check_25(self, effects, spd_diff, is_attacker, made_fu, triggers_brave):
+        """Check the Potent damage multipler for potent effects that decrease the spd diff by 25"""
+        mult_25 = None
+        if spd_diff + 20 >= 0:
+            if (triggers_brave or made_fu) and "damage_pct_if_fu" in e.params:
+                pct_25 = e.params["damage_pct_if_fu"]
+            else:
+                pct_25 = e.params.get("damage_pct", 100)
+            mult_25 = pct_25 / 100
+        return mult_25
+
+    def _potent_check_30(self, effects, spd_diff, is_attacker, made_fu, triggers_brave):
+        """Check the Potent damage multipler for potent effects that decrease the spd diff by 30"""
+        mult_30 = None
+        if spd_diff + 25 >= 0:
+            if (triggers_brave or made_fu) and "damage_pct_if_fu" in e.params:
+                pct_30 = e.params["damage_pct_if_fu"]
+            else:
+                pct_30 = e.params.get("damage_pct", 100)
+            mult_30 = pct_30 / 100
+        return mult_30
+
+    def _potent_check_patience(self, effects, spd_diff, is_attacker, made_fu, triggers_brave):
+        """Check the Potent damage multipler for potent effects that require a certain spd threshold"""
+        mult_pat = None
+        """Not sure what to use for this check"""
+        if self.spd >= 30:
+            if (triggers_brave or made_fu) and "damage_pct_if_fu" in e.params:
+                pct_pat = e.params["damage_pct_if_fu"]
+            else:
+                pct_pat = e.params.get("damage_pct", 100)
+            mult_pat = pct_pat / 100
+        return mult_pat
+
+    """Legacy Function?"""
     def _potent_active(self, effects, spd_diff, is_attacker, made_fu):
         """Returns the Potent damage multiplier if active, else None.
 
