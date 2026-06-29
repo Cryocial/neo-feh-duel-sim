@@ -1,5 +1,5 @@
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Literal
 
 from .build import Unit, StatBlock
@@ -397,6 +397,30 @@ class CombatEngine:
 
         atk_state.combat_stats = StatBlock(**atk_vals)
         def_state.combat_stats = StatBlock(**def_vals)
+
+        # Apply in-combat STAT_BOOST / STAT_DAUNT effects.
+        # These live in effects_start_of_combat and were previously never applied.
+        for state, foe in ((atk_state, def_state), (def_state, atk_state)):
+            for effect in state.effects_start_of_combat:
+                if effect.type not in (EffectType.STAT_BOOST, EffectType.STAT_DAUNT):
+                    continue
+
+                # applied_by == "foe" means the foe inflicted this effect, so the
+                # foe's state is the formula's "unit" (matches the healing/DW crossover).
+                if effect.applied_by == "foe":
+                    owner, opponent = foe, state
+                else:
+                    owner, opponent = state, foe
+
+                magnitude = self._resolve_formula(effect.params, owner, opponent)
+                if effect.type == EffectType.STAT_DAUNT:
+                    magnitude = -abs(magnitude)
+
+                stats = effect.params.get("stats", [])
+                updates = {
+                    s: getattr(state.combat_stats, s) + magnitude for s in stats
+                }
+                state.combat_stats = replace(state.combat_stats, **updates)
 
         self.attacker.combat_stats = self.combatant_states["attacker"].combat_stats
         self.defender.combat_stats = self.combatant_states["defender"].combat_stats
