@@ -6,6 +6,7 @@ from .build import Unit, StatBlock
 from .constants import Color, StrikeType, EffectType
 from .effects import Effect, build_effect, EFFECT_LIST_MAP
 from .conditions import Phase, Condition, AtomicCondition, AnyOf, AllOf
+from .jsonbootupstuff import BONUS_DATABASE, PENALTY_DATABASE
 
 UnitRole = Literal["attacker", "defender"]
 
@@ -26,12 +27,28 @@ class CombatantState:
     is_initiator: bool = False
     triggers_brave: bool = False
     spaces_moved: int = 0
+    granted_visible_buffs: StatBlock = field(default_factory=StatBlock)
+    granted_visible_debuffs: StatBlock = field(default_factory=StatBlock)
+    effects_start_of_turn: list[Effect] = field(default_factory=list)
     effects_AoE: list[Effect] = field(default_factory=list)
     effects_start_of_combat: list[Effect] = field(default_factory=list)
     effects_strike_sequence: list[Effect] = field(default_factory=list)
     effects_pre_combat: list[Effect] = field(default_factory=list)
     effects_on_strike: list[Effect] = field(default_factory=list)
     effects_after_combat: list[Effect] = field(default_factory=list)
+
+    def visible_stat(self, name: str) -> int:
+        """Visible stat INCLUDING per-combat start-of-turn grants.
+
+        Start-of-turn grants (Hone, Ploy, etc.) are stored per-combat on this
+        CombatantState rather than mutating the Unit, so anything reading visible
+        stats during/after start-of-turn must go through here, not
+        unit.get_visible_stat directly, or it won't see the grants.
+        """
+        base = self.unit.get_visible_stat(name)
+        base += getattr(self.granted_visible_buffs, name)
+        base -= getattr(self.granted_visible_debuffs, name)
+        return base
 
 
 @dataclass
@@ -198,6 +215,10 @@ class CombatEngine:
                 is_initiator=False,
             ),
         }
+        self._phase_start_of_turn()
+
+        self._compute_counts()
+
         _distribute_effects(
             self.combatant_states["attacker"], self.combatant_states["defender"]
         )
@@ -230,6 +251,102 @@ class CombatEngine:
             "attacker_final_hp": self.combatant_states["attacker"].current_hp,
             "defender_final_hp": self.combatant_states["defender"].current_hp,
         }
+
+    def _phase_start_of_turn(self):
+        """Grants visible stats and statuses at start of turn (Hone, Ploy, etc.).
+
+        Two passes so stat-dependent grants (Ploy reads visible Res) see the
+        results of unconditional grants applied first. Grants are written
+        per-combat onto CombatantState, never mutating the Unit, so repeated
+        simulate() calls stay isolated.
+        """
+        for role, foe_role in (("attacker", "defender"), ("defender", "attacker")):
+            state = self.combatant_states[role]
+            foe = self.combatant_states[foe_role]
+            for skill in state.unit.equipped_items:
+                for desc in skill.effects:
+                    if desc.get("effect") not in ("GRANT_VISIBLE_STAT", "GRANT_STATUS"):
+                        continue
+                    effect = build_effect(desc, applied_by="self")
+                    tgt = state if desc["target"] == "self" else foe
+                    tgt.effects_start_of_turn.append(effect)
+
+        for conditional in (False, True):
+            for role, foe_role in (("attacker", "defender"), ("defender", "attacker")):
+                state = self.combatant_states[role]
+                foe = self.combatant_states[foe_role]
+                for effect in state.effects_start_of_turn:
+                    if bool(effect.conditions) != conditional:
+                        continue
+                    owner = foe if effect.applied_by == "foe" else state
+                    opponent = state if effect.applied_by == "foe" else foe
+                    if not self._start_of_turn_conditions_pass(effect, owner, opponent):
+                        continue
+                    self._apply_grant(effect, state)
+
+    def _start_of_turn_conditions_pass(self, effect, owner, opponent) -> bool:
+        """Evaluates a start-of-turn effect's conditions (all must hold).
+        Handles only flat atomic conditions; AnyOf/AllOf on grants not yet supported."""
+        for cond in effect.conditions:
+            if not cond.func(owner, opponent):
+                return False
+        return True
+
+    def _apply_grant(self, effect, target_state):
+        """Applies a single GRANT_* effect to the target's per-combat layers."""
+        if effect.type == EffectType.GRANT_VISIBLE_STAT:
+            stats = effect.params.get("stats", {})
+            buff_updates, debuff_updates = {}, {}
+            for stat, amount in stats.items():
+                if amount >= 0:
+                    buff_updates[stat] = (
+                        getattr(target_state.granted_visible_buffs, stat) + amount
+                    )
+                else:
+                    debuff_updates[stat] = (
+                        getattr(target_state.granted_visible_debuffs, stat) + abs(amount)
+                    )
+            if buff_updates:
+                target_state.granted_visible_buffs = replace(
+                    target_state.granted_visible_buffs, **buff_updates
+                )
+            if debuff_updates:
+                target_state.granted_visible_debuffs = replace(
+                    target_state.granted_visible_debuffs, **debuff_updates
+                )
+        elif effect.type == EffectType.GRANT_STATUS:
+            name = effect.params.get("status")
+            status = BONUS_DATABASE.get(name) or PENALTY_DATABASE.get(name)
+            if status is not None:
+                target_state.unit.active_statuses = list(
+                    target_state.unit.active_statuses
+                ) + [status]
+
+    def _compute_counts(self):
+        """Tallies bonus_count / penalty_count from final visible buffs/debuffs and
+        active statuses. Previously never computed -> counting skills saw 0.
+
+        NOTE: counts one bonus per buffed stat + one per bonus status (and likewise
+        for penalties). Verify this matches how counting skills are meant to tally."""
+        for role in ("attacker", "defender"):
+            state = self.combatant_states[role]
+            bonuses = penalties = 0
+            for stat in ("atk", "spd", "defense", "res"):
+                if getattr(state.granted_visible_buffs, stat) > 0:
+                    bonuses += 1
+                if getattr(state.granted_visible_debuffs, stat) > 0:
+                    penalties += 1
+                if getattr(state.unit.visible_buffs, stat) > 0:
+                    bonuses += 1
+                if getattr(state.unit.visible_debuffs, stat) > 0:
+                    penalties += 1
+            for status in state.unit.active_statuses:
+                if status.type == "bonus":
+                    bonuses += 1
+                else:
+                    penalties += 1
+            state.bonus_count = bonuses
+            state.penalty_count = penalties
 
     def _evaluate_conditions(self, phase: Phase) -> None:
         for role, foe_role in (("attacker", "defender"), ("defender", "attacker")):
@@ -630,16 +747,12 @@ class CombatEngine:
         atk_state.triggers_brave = attacker_brave
         def_state.triggers_brave = defender_brave
 
-        attacker_potent_mult = self._potent_active(
-            atk_state.effects_strike_sequence,
-            spd_diff,
-            is_attacker=True
-        )
-        defender_potent_mult = self._potent_active(
-            def_state.effects_strike_sequence,
-            spd_diff,
-            is_attacker=False
-        )
+        # POTENT TEMPORARILY DISABLED — _potent_active removed; the new
+        # _potent_check_* system is being wired separately. Placeholder None
+        # keeps the downstream attacker_potent/defender_potent logic working
+        # (Potent simply never triggers until reconnected).
+        attacker_potent_mult = None
+        defender_potent_mult = None
 
         attacker_potent = attacker_potent_mult is not None
         defender_potent = defender_potent_mult is not None
