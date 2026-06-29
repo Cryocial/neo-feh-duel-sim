@@ -17,6 +17,7 @@ class CombatantState:
     current_cooldown: int
     combat_stats: StatBlock | None = None
     defensive_stat: Literal["defense", "res"] | None = None
+    cd_start_of_cbt: int = 0
     damage_mitigated_bucket: int = 0
     bonus_count: int = 0
     penalty_count: int = 0
@@ -215,6 +216,9 @@ class CombatEngine:
         self._evaluate_conditions("post_sequence")
 
         self._phase_pre_combat()
+
+        for state in self.combatant_states.values():
+            state.cd_start_of_cbt = state.current_cooldown
 
         while (
             len(strike_sequence) > 0
@@ -736,6 +740,23 @@ class CombatEngine:
 
         raw_atk = striker_state.combat_stats.atk
         defensive_stat = getattr(target_state.combat_stats, target_state.defensive_stat)
+
+        for unit_state, foe_state in ((striker_state, target_state), (target_state, striker_state)):
+            total_pulse = 0
+            for e in unit_state.effects_on_strike:
+                if e.type == EffectType.PULSE_STRIKE and self._strike_matches(strike, e.params):
+                    pulse = self._resolve_formula(e.params, unit_state, foe_state)
+                    if e.params.get("cap_cd_start_of_cbt", False):
+                        pulse = min(pulse, unit_state.cd_start_of_cbt)
+                    total_pulse += pulse
+
+            total_scowl = sum(
+                    self._resolve_formula(e.params, unit_state, foe_state)
+                    for e in unit_state.effects_on_strike
+                    if e.type == EffectType.SCOWL_STRIKE and self._strike_matches(strike, e.params)
+            )
+
+            unit_state.current_cooldown = max(0, unit_state.current_cooldown - total_pulse + total_scowl)
 
         # Does either side's Special trigger on this exact strike?
         # TODO: target-side cooldown charging from being attacked isn't
