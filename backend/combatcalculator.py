@@ -650,10 +650,16 @@ class CombatEngine:
         def_state.triggers_brave = defender_brave
 
         attacker_potent_mult = self._potent_active(
-            atk_state.effects_strike_sequence, spd_diff, is_attacker=True
+            atk_state.effects_strike_sequence,
+            spd_diff,
+            is_attacker=True,
+            made_fu=attacker_FU > 0,
         )
         defender_potent_mult = self._potent_active(
-            def_state.effects_strike_sequence, spd_diff, is_attacker=False
+            def_state.effects_strike_sequence,
+            spd_diff,
+            is_attacker=False,
+            made_fu=defender_FU > 0,
         )
 
         attacker_potent = attacker_potent_mult is not None
