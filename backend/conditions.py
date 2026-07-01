@@ -129,6 +129,16 @@ def _evaluate_cbt_stat_check(params: dict) -> Callable:
     return evaluate
 
 
+def _evaluate_start_stat_check(params: dict) -> Callable:
+    """Checks if a certain unit's stat meets a certain threshold at start of battle"""
+    def evaluate(unit: "CombatantState", foe: "CombatantState") -> bool:
+        stat = getattr(unit.starting_stats, stat)
+        stat_threshold = params.get("threshold", 0)
+        return stat >= stat_threshold
+
+    return evaluate
+
+
 def _evaluate_num_bonus_penalty_total(params: dict) -> Callable:
     """Checks total active effects."""
     min_count = params.get("min_count", 1)
@@ -186,7 +196,8 @@ CONDITION_REGISTRY: dict[str, tuple[Phase, Callable[[dict], Callable]]] = {
     "first_combat_of_turn": ("pre_aoe", _evaluate_first_combat_of_turn),
     "hp_above_pct": ("start_of_combat", _evaluate_hp_above_pct),
     "hp_below_pct": ("start_of_combat", _evaluate_hp_below_pct),
-    "cbt_stat_check": ("start_of_combat", _evaluate_cbt_stat_check),
+    "cbt_stat_check": ("pre_aoe", _evaluate_cbt_stat_check),
+    "start_stat_check":("", _evaluate_start_stat_check),
     "triggers_brave": ("post_sequence", _evaluate_triggers_brave),
     "bonus_penalty_total": ("pre_aoe", _evaluate_num_bonus_penalty_total),
     "is_engaged": ("pre_aoe", _evaluate_is_engaged),
