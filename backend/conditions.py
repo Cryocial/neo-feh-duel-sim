@@ -128,8 +128,10 @@ def _evaluate_cbt_stat_check(params: dict) -> Callable:
 
     return evaluate
 
+
 # Phase literal:
 Phase = Literal["start_of_turn", "pre_aoe", "start_of_combat", "post_sequence"]
+
 
 def _evaluate_visible_stat_check(params: dict) -> Callable:
     """Start-of-turn stat comparison using VISIBLE stats (Ploy reads visible Res)."""
@@ -147,6 +149,7 @@ def _evaluate_visible_stat_check(params: dict) -> Callable:
         return unit_stat >= threshold
 
     return evaluate
+
 
 def _evaluate_num_bonus_penalty_total(params: dict) -> Callable:
     """Checks total active effects."""
