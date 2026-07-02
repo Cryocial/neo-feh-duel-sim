@@ -303,9 +303,9 @@ class CombatEngine:
                         getattr(target_state.granted_visible_buffs, stat) + amount
                     )
                 else:
-                    debuff_updates[stat] = (
-                        getattr(target_state.granted_visible_debuffs, stat) + abs(amount)
-                    )
+                    debuff_updates[stat] = getattr(
+                        target_state.granted_visible_debuffs, stat
+                    ) + abs(amount)
             if buff_updates:
                 target_state.granted_visible_buffs = replace(
                     target_state.granted_visible_buffs, **buff_updates
@@ -534,9 +534,7 @@ class CombatEngine:
                     magnitude = -abs(magnitude)
 
                 stats = effect.params.get("stats", [])
-                updates = {
-                    s: getattr(state.combat_stats, s) + magnitude for s in stats
-                }
+                updates = {s: getattr(state.combat_stats, s) + magnitude for s in stats}
                 state.combat_stats = replace(state.combat_stats, **updates)
 
         self.attacker.combat_stats = self.combatant_states["attacker"].combat_stats
@@ -573,7 +571,7 @@ class CombatEngine:
                 target_stat = "defense"
 
         return target_stat
-    
+
     def _potent_active(self, effects, spd_diff, is_attacker, made_fu, triggers_brave):
         current_mult = 0
         final_mult = 0
@@ -609,7 +607,7 @@ class CombatEngine:
                 if spd_diff + 5 >= 0:
                     potent_100 = 1
         return potent_100
-    
+
     def _potent_check_25(self, effects, spd_diff, is_attacker, made_fu, triggers_brave):
         """Check the Potent damage multipler for potent effects that decrease the spd diff by 25"""
         mult_25 = 0
@@ -636,7 +634,9 @@ class CombatEngine:
                     mult_30 = pct_30 / 100
         return mult_30
 
-    def _potent_check_guarantee(self, effects, spd_diff, is_attacker, made_fu, triggers_brave):
+    def _potent_check_guarantee(
+        self, effects, spd_diff, is_attacker, made_fu, triggers_brave
+    ):
         """Check the Potent damage multipler for guaranteed potent effects (like patience)"""
         mult_pat = 0
         """Not sure what to use for this check"""
@@ -1070,7 +1070,7 @@ class CombatEngine:
                     effect.params, striker_state, target_state
                 )
         self._apply_healing(strike.striker, hit_heal, phase="in_combat")
-        
+
         pulse_charge = 1
         for effect in striker_state.effects_on_strike:
             if effect.type == EffectType.PULSE_STRIKE and self._strike_matches(
@@ -1086,13 +1086,17 @@ class CombatEngine:
         striker_charge = 1
         for effect in striker_state.effects_on_strike:
             if effect.type == EffectType.PULSE_STRIKE and self._strike_matches(
-                strike, effect.params,
-                unit_special=striker_special, foe_special=target_special,
+                strike,
+                effect.params,
+                unit_special=striker_special,
+                foe_special=target_special,
             ):
                 striker_charge += self._resolve_formula(
                     effect.params, striker_state, target_state
                 )
-        if any(e.type == EffectType.OFF_BREATH for e in striker_state.effects_on_strike):
+        if any(
+            e.type == EffectType.OFF_BREATH for e in striker_state.effects_on_strike
+        ):
             striker_charge += 1
 
         target_charge = 1

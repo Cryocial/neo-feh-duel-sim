@@ -2,17 +2,27 @@
   "Change of Fate": {
     "type": "bonus",
     "effects": [
-      { "effect": "STAT_BOOST", "target": "self",
+      {
+        "effect": "STAT_BOOST",
+        "target": "self",
         "params": {
-          "stats": ["atk", "spd", "defense", "res"],
+          "stats": [
+            "atk",
+            "spd",
+            "defense",
+            "res"
+          ],
           "formula": "",
           "multiplier": 0,
           "flat": 5,
           "min": 5,
           "max": 5
         },
-        "conditions": [] },
-      { "effect": "FLAT_DAMAGE_AOE", "target": "self",
+        "conditions": []
+      },
+      {
+        "effect": "FLAT_DAMAGE_AOE",
+        "target": "self",
         "params": {
           "formula": "num_bonus_and_penalties_on_unit",
           "multiplier": 3,
@@ -20,8 +30,11 @@
           "min": 0,
           "max": 15
         },
-        "conditions": [] },
-      { "effect": "FLAT_DAMAGE_STRIKE", "target": "self",
+        "conditions": []
+      },
+      {
+        "effect": "FLAT_DAMAGE_STRIKE",
+        "target": "self",
         "params": {
           "formula": "num_bonus_and_penalties_on_unit",
           "multiplier": 3,
@@ -30,15 +43,20 @@
           "max": 15,
           "strike": "every_strike"
         },
-        "conditions": [] }
+        "conditions": []
+      }
     ]
   },
   "Paranoia": {
     "type": "bonus",
     "effects": [
-      { "effect": "STAT_BOOST", "target": "self",
+      {
+        "effect": "STAT_BOOST",
+        "target": "self",
         "params": {
-          "stats": ["atk"],
+          "stats": [
+            "atk"
+          ],
           "formula": "",
           "multiplier": 0,
           "flat": 5,
@@ -46,152 +64,221 @@
           "max": 5
         },
         "conditions": [
-          { "type": "hp_below_pct",
-            "params": { "threshold": 100, "target": "self" } }
-        ] },
-      { "effect": "VANTAGE", "target": "self",
+          {
+            "type": "hp_below_pct",
+            "params": {
+              "threshold": 100,
+              "target": "self"
+            }
+          }
+        ]
+      },
+      {
+        "effect": "VANTAGE",
+        "target": "self",
         "params": {},
         "conditions": [
-          { "type": "hp_below_pct",
-            "params": { "threshold": 100, "target": "self" } }
-        ] }
+          {
+            "type": "hp_below_pct",
+            "params": {
+              "threshold": 100,
+              "target": "self"
+            }
+          }
+        ]
+      }
     ]
   },
   "Atk Liberate": {
     "type": "bonus",
     "effects": [
-      { "effect": "STAT_BOOST", "target": "self",
+      {
+        "effect": "STAT_BOOST",
+        "target": "self",
         "params": {
-          "stats": ["atk"],
+          "stats": [
+            "atk"
+          ],
           "formula": "bonus_count_plus_4",
           "multiplier": 1,
           "min": 4,
           "max": 8
         },
-        "conditions": [] }
+        "conditions": []
+      }
     ]
   },
   "Spd Liberate": {
     "type": "bonus",
     "effects": [
-      { "effect": "STAT_BOOST", "target": "self",
+      {
+        "effect": "STAT_BOOST",
+        "target": "self",
         "params": {
-          "stats": ["spd"],
+          "stats": [
+            "spd"
+          ],
           "formula": "bonus_count_plus_4",
           "multiplier": 1,
           "min": 4,
           "max": 8
         },
-        "conditions": [] }
+        "conditions": []
+      }
     ]
   },
   "Def Liberate": {
     "type": "bonus",
     "effects": [
-      { "effect": "STAT_BOOST", "target": "self",
+      {
+        "effect": "STAT_BOOST",
+        "target": "self",
         "params": {
-          "stats": ["defense"],
+          "stats": [
+            "defense"
+          ],
           "formula": "bonus_count_plus_4",
           "multiplier": 1,
           "min": 4,
           "max": 8
         },
-        "conditions": [] }
+        "conditions": []
+      }
     ]
   },
   "Res Liberate": {
     "type": "bonus",
     "effects": [
-      { "effect": "STAT_BOOST", "target": "self",
+      {
+        "effect": "STAT_BOOST",
+        "target": "self",
         "params": {
-          "stats": ["res"],
+          "stats": [
+            "res"
+          ],
           "formula": "bonus_count_plus_4",
           "multiplier": 1,
           "min": 4,
           "max": 8
         },
-        "conditions": [] }
+        "conditions": []
+      }
     ]
   },
   "Empathy": {
     "type": "bonus",
     "effects": [
-      { "effect": "STAT_BOOST", "target": "self",
+      {
+        "effect": "STAT_BOOST",
+        "target": "self",
         "params": {
-          "stats": ["atk", "spd", "defense", "res"],
+          "stats": [
+            "atk",
+            "spd",
+            "defense",
+            "res"
+          ],
           "formula": "all_bonus_penalty_both",
           "multiplier": 1,
           "max": 7
         },
-        "conditions": [] }
+        "conditions": []
+      }
     ]
   },
   "Incited": {
     "type": "bonus",
     "effects": [
-      { "effect": "STAT_BOOST", "target": "self",
+      {
+        "effect": "STAT_BOOST",
+        "target": "self",
         "params": {
-          "stats": ["atk", "spd", "defense", "res"],
+          "stats": [
+            "atk",
+            "spd",
+            "defense",
+            "res"
+          ],
           "formula": "spaces_moved",
           "multiplier": 1,
           "max": 3
         },
-        "conditions": [] }
+        "conditions": []
+      }
     ]
   },
   "Truly Incited": {
     "type": "bonus",
     "effects": [
-      { "effect": "STAT_BOOST", "target": "self",
+      {
+        "effect": "STAT_BOOST",
+        "target": "self",
         "params": {
-          "stats": ["atk", "spd", "defense", "res"],
+          "stats": [
+            "atk",
+            "spd",
+            "defense",
+            "res"
+          ],
           "formula": "spaces_moved",
           "multiplier": 2,
           "max": 8
         },
-        "conditions": [] }
+        "conditions": []
+      }
     ]
   },
   "Treachery": {
     "type": "bonus",
     "effects": [
-      { "effect": "FLAT_DAMAGE_STRIKE", "target": "self",
+      {
+        "effect": "FLAT_DAMAGE_STRIKE",
+        "target": "self",
         "params": {
           "formula": "sum_visible_buffs",
           "multiplier": 1,
           "strike": "every_strike"
         },
-        "conditions": [] }
+        "conditions": []
+      }
     ]
   },
   "Dominance": {
     "type": "bonus",
     "effects": [
-      { "effect": "FLAT_DAMAGE_STRIKE", "target": "self",
+      {
+        "effect": "FLAT_DAMAGE_STRIKE",
+        "target": "self",
         "params": {
           "formula": "sum_foe_visible_debuffs",
           "multiplier": 1,
           "strike": "every_strike"
         },
-        "conditions": [] }
+        "conditions": []
+      }
     ]
   },
   "Reflex": {
     "type": "bonus",
     "effects": [
-      { "effect": "FLAT_DAMAGE_STRIKE", "target": "self",
+      {
+        "effect": "FLAT_DAMAGE_STRIKE",
+        "target": "self",
         "params": {
           "formula": "mitigated_bucket",
           "multiplier": 1,
           "strike": "every_strike"
         },
-        "conditions": [] }
+        "conditions": []
+      }
     ]
   },
   "Dodge": {
     "type": "bonus",
     "effects": [
-      { "effect": "PERC_DR_STRIKE", "target": "self",
+      {
+        "effect": "PERC_DR_STRIKE",
+        "target": "self",
         "params": {
           "formula": "spd_diff",
           "multiplier": 4,
@@ -199,64 +286,99 @@
           "strike": "every_strike",
           "piercable": true
         },
-        "conditions": [] }
+        "conditions": []
+      }
     ]
   },
   "Divine Nectar": {
     "type": "bonus",
     "effects": [
-      { "effect": "PRE_CBT_HEAL", "target": "self",
+      {
+        "effect": "PRE_CBT_HEAL",
+        "target": "self",
         "params": {
           "formula": "",
           "flat": 20
         },
-        "conditions": [] },
-      { "effect": "FLAT_DR_STRIKE", "target": "self",
+        "conditions": []
+      },
+      {
+        "effect": "FLAT_DR_STRIKE",
+        "target": "self",
         "params": {
           "formula": "",
           "flat": 10,
           "strike": "first_sequence"
         },
         "conditions": [
-          { "type": "first_combat_of_turn",
-            "params": { "target": "self" } }
-        ] },
-      { "effect": "NEUT_DEEP_WOUNDS_STRIKE", "target": "self",
+          {
+            "type": "first_combat_of_turn",
+            "params": {
+              "target": "self"
+            }
+          }
+        ]
+      },
+      {
+        "effect": "NEUT_DEEP_WOUNDS_STRIKE",
+        "target": "self",
         "params": {},
-        "conditions": [] }
+        "conditions": []
+      }
     ]
   },
   "Imbue": {
     "type": "bonus",
     "effects": [
-      { "effect": "PRE_CBT_HEAL", "target": "self",
+      {
+        "effect": "PRE_CBT_HEAL",
+        "target": "self",
         "params": {
           "formula": "unit_max_hp",
           "multiplier": 0.4
         },
-        "conditions": [] }
+        "conditions": []
+      }
     ]
   },
   "Dark Emblem": {
     "type": "bonus",
     "effects": [
-      { "effect": "STAT_BOOST", "target": "self",
+      {
+        "effect": "STAT_BOOST",
+        "target": "self",
         "params": {
-          "stats": ["atk", "spd", "defense", "res"],
+          "stats": [
+            "atk",
+            "spd",
+            "defense",
+            "res"
+          ],
           "formula": "",
           "multiplier": 0,
           "flat": 5,
           "min": 5,
           "max": 5
         },
-        "conditions": [] }
+        "conditions": []
+      }
     ]
   },
   "Breath": {
-  "type": "bonus",
-  "effects": [
-    { "effect": "OFF_BREATH", "target": "self", "params": {}, "conditions": [] },
-    { "effect": "DEF_BREATH", "target": "self", "params": {}, "conditions": [] }
-  ]
-}
+    "type": "bonus",
+    "effects": [
+      {
+        "effect": "OFF_BREATH",
+        "target": "self",
+        "params": {},
+        "conditions": []
+      },
+      {
+        "effect": "DEF_BREATH",
+        "target": "self",
+        "params": {},
+        "conditions": []
+      }
+    ]
+  }
 }
