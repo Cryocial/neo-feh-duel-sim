@@ -251,5 +251,12 @@
         },
         "conditions": [] }
     ]
-  }
+  },
+  "Breath": {
+  "type": "bonus",
+  "effects": [
+    { "effect": "OFF_BREATH", "target": "self", "params": {}, "conditions": [] },
+    { "effect": "DEF_BREATH", "target": "self", "params": {}, "conditions": [] }
+  ]
+}
 }

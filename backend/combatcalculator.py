@@ -1070,6 +1070,7 @@ class CombatEngine:
                     effect.params, striker_state, target_state
                 )
         self._apply_healing(strike.striker, hit_heal, phase="in_combat")
+        
         pulse_charge = 1
         for effect in striker_state.effects_on_strike:
             if effect.type == EffectType.PULSE_STRIKE and self._strike_matches(
@@ -1082,10 +1083,28 @@ class CombatEngine:
                     effect.params, striker_state, target_state
                 )
 
+        striker_charge = 1
+        for effect in striker_state.effects_on_strike:
+            if effect.type == EffectType.PULSE_STRIKE and self._strike_matches(
+                strike, effect.params,
+                unit_special=striker_special, foe_special=target_special,
+            ):
+                striker_charge += self._resolve_formula(
+                    effect.params, striker_state, target_state
+                )
+        if any(e.type == EffectType.OFF_BREATH for e in striker_state.effects_on_strike):
+            striker_charge += 1
+
+        target_charge = 1
+        if any(e.type == EffectType.DEF_BREATH for e in target_state.effects_on_strike):
+            target_charge += 1
+
         if striker_special:
             striker_state.special_use_count += 1
             striker_state.current_cooldown = striker_state.unit.max_cooldown
-        striker_state.current_cooldown -= max(0, pulse_charge)
+        striker_state.current_cooldown -= max(0, striker_charge)
+
+        target_state.current_cooldown -= max(0, target_charge)
 
         striker_state.strike_count += 1
 
