@@ -71,6 +71,10 @@ class EffectType(str, Enum):
     OFF_FROZEN = "OFF_FROZEN"
     DEF_FROZEN = "DEF_FROZEN"
 
+    # ── Start of turn ─────────────────────────────────────────────────────────
+    GRANT_VISIBLE_STAT = "GRANT_VISIBLE_STAT"
+    GRANT_STATUS = "GRANT_STATUS"
+
     # ── Pre-combat ────────────────────────────────────────────────────────────
     PRE_CBT_DAMAGE = "PRE_CBT_DAMAGE"
     PRE_CBT_HEAL = "PRE_CBT_HEAL"
