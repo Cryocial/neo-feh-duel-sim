@@ -381,7 +381,7 @@ class CombatEngine:
         - Reduce Deep Wounds applies to pre_combat and in_combat by default;
             post_combat is still fully blocked UNLESS a post-combat-relief
             reduce effect is present (rn only L!Fae, but im adding this for a
-            "just in case".
+            "just in case", check out _deep_wound_reduce_pct).
         - Reduce rounds the surviving heal UP (ceil).
         """
         if amount <= 0:
@@ -417,7 +417,7 @@ class CombatEngine:
                     else:
                         owner, opponent = unit_state, foe_state
                     pct = self._resolve_formula(e.params, owner, opponent)
-                    survive *= (100 - pct) / 100
+                    survive *= pct / 100
                     found = True
                 if not found:
                     return
@@ -427,6 +427,30 @@ class CombatEngine:
             return
         new_hp = unit_state.current_hp + amount
         unit_state.current_hp = min(unit_state.unit.base_stats.hp, new_hp)
+
+    def _deep_wounds_reduce_pct(self, unit_state: CombatantState, phase: str) -> int:
+        """Returns the % of healing that survives Deep Wounds for this phase (0 = fully blocked).
+
+        rn, since only fae has the post combat stuff, ive decided to just make it a flag of whether
+        deep wounds should be removed for post combat.
+        """
+        survive_fraction = 1.0
+        found_any_sources = False
+        for e in unit_state.effects_on_strike:
+            if e.type != EffectType.REDUCE_DEEP_WOUNDS_STRIKE:
+                continue
+            applies_post = e.params.get(
+                "post_combat", False
+            )  # the flag for if we should check post combat healing
+            if phase == "post_combat" and not applies_post:
+                continue
+            pct = e.params.get("value", 50)  # % of healing this source lets survive
+            survive_fraction *= pct / 100
+            found_any_sources = True
+
+        if not found_any_sources:
+            return 0
+        return round(survive_fraction * 100)
 
     def _phase_AoE(self):
         """Processes effects_AoE. Only the initiator can trigger an AoE special."""
