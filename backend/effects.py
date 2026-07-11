@@ -30,9 +30,6 @@ EFFECT_LIST_MAP: dict[EffectType, str] = {
     EffectType.FLASH_NEUT: "effects_strike_sequence",
     EffectType.OFF_FROZEN: "effects_strike_sequence",
     EffectType.DEF_FROZEN: "effects_strike_sequence",
-    # ── Start of turn ────────────────────────────────────────────────────
-    EffectType.GRANT_VISIBLE_STAT: "effects_start_of_turn",
-    EffectType.GRANT_STATUS: "effects_start_of_turn",
     # ── Pre-combat ───────────────────────────────────────────────────────
     EffectType.PRE_CBT_DAMAGE: "effects_pre_combat",
     EffectType.PRE_CBT_HEAL: "effects_pre_combat",
