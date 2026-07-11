@@ -3,13 +3,7 @@
     "movement_type": "INFANTRY",
     "weapon_type": "SWORD",
     "color": "RED",
-    "base_stats": {
-      "hp": 45,
-      "atk": 32,
-      "spd": 26,
-      "defense": 32,
-      "res": 22
-    },
+    "base_stats": { "hp": 45, "atk": 32, "spd": 26, "defense": 32, "res": 22 },
     "prf_skills": []
   }
 }
