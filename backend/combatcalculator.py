@@ -318,16 +318,18 @@ class CombatEngine:
             name = effect.params.get("status")
             status = BONUS_DATABASE.get(name) or PENALTY_DATABASE.get(name)
             if status is not None:
-                target_state.unit.active_statuses = list(
-                    target_state.unit.active_statuses
-                ) + [status]
+                already_have = any(
+                    s.name == status.name
+                    for s in target_state.unit.active_statuses + target_state.granted_statuses
+                )
+                if not already_have:
+                    target_state.granted_statuses.append(status)
 
     def _compute_counts(self):
         """Tallies bonus_count / penalty_count from final visible buffs/debuffs and
         active statuses. Previously never computed -> counting skills saw 0.
 
-        NOTE: counts one bonus per buffed stat + one per bonus status (and likewise
-        for penalties). Verify this matches how counting skills are meant to tally."""
+        """
         for role in ("attacker", "defender"):
             state = self.combatant_states[role]
             bonuses = penalties = 0
