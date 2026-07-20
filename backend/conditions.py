@@ -132,25 +132,6 @@ def _evaluate_cbt_stat_check(params: dict) -> Callable:
 # Phase literal:
 Phase = Literal["start_of_turn", "pre_aoe", "start_of_combat", "post_sequence"]
 
-
-def _evaluate_visible_stat_check(params: dict) -> Callable:
-    """Start-of-turn stat comparison using VISIBLE stats (Ploy reads visible Res)."""
-    stat = params.get("stat", "res")
-    margin = params.get("margin", 0)
-    comparison = params.get("comparison", "greater_or_equal")
-
-    def evaluate(unit, foe) -> bool:
-        # uses CombatantState.visible_stat so it sees per-combat grants
-        unit_stat = unit.visible_stat(stat)
-        foe_stat = foe.visible_stat(stat)
-        threshold = foe_stat + margin
-        if comparison == "lesser_than":
-            return unit_stat < threshold
-        return unit_stat >= threshold
-
-    return evaluate
-
-
 def _evaluate_num_bonus_penalty_total(params: dict) -> Callable:
     """Checks total active effects."""
     min_count = params.get("min_count", 1)
@@ -209,7 +190,6 @@ CONDITION_REGISTRY: dict[str, tuple[Phase, Callable[[dict], Callable]]] = {
     "hp_above_pct": ("start_of_combat", _evaluate_hp_above_pct),
     "hp_below_pct": ("start_of_combat", _evaluate_hp_below_pct),
     "cbt_stat_check": ("start_of_combat", _evaluate_cbt_stat_check),
-    "visible_stat_check": ("start_of_turn", _evaluate_visible_stat_check),
     "triggers_brave": ("post_sequence", _evaluate_triggers_brave),
     "bonus_penalty_total": ("pre_aoe", _evaluate_num_bonus_penalty_total),
     "is_engaged": ("pre_aoe", _evaluate_is_engaged),
