@@ -584,81 +584,34 @@ class CombatEngine:
         return target_stat
 
     def _potent_active(self, effects, spd_diff, is_attacker, made_fu, triggers_brave):
-        current_mult = 0
-        final_mult = 0
-        potent_check = 0
+        """Takes the highest value of potent effects that trigger, or None if none trigger."""
+        best = None
+        for e in effects:
+            if e.type != EffectType.POTENT:
+                continue
+            mult = self._potent_multiplier(e, spd_diff, made_fu, triggers_brave)
+            if mult is not None and (best is None or mult > best):
+                best = mult
+        return best
 
-        """Determine the highest multiplier for the potent hit. We need to add a condition to make sure the unit is allowed to meet each one in the first place."""
-        current_mult = self._potent_check_10
-        if final_mult < current_mult:
-            final_mult = current_mult
+    def _potent_multiplier(self, effect, spd_diff, made_fu, triggers_brave):
+        """One POTENT effect's multiplier if it triggers, else None. Reads params.
+        spd_threshold is REQUIRED — a POTENT effect without it is an authoring error."""
+        p = effect.params
 
-        current_mult = self._potent_check_25
-        if final_mult < current_mult:
-            final_mult = current_mult
+        if "spd_threshold" not in p and not p.get("guaranteed", False):
+            raise KeyError(
+                f"POTENT effect missing required 'spd_threshold' (params: {p})"
+            )
 
-        current_mult = self._potent_check_30
-        if final_mult < current_mult:
-            final_mult = current_mult
-
-        current_mult = self._potent_check_guarantee
-        if final_mult < current_mult:
-            final_mult = current_mult
-
-        if final_mult > 0:
-            return final_mult
-        else:
+        if not p.get("guaranteed", False) and spd_diff < -p["spd_threshold"]:
             return None
 
-    def _potent_check_10(self, effects, spd_diff, is_attacker):
-        """Check the Potent damage multipler for potent effects that decrease the spd diff by 10"""
-        potent_100 = 0
-        for e in effects:
-            if e.type == EffectType.POTENT:
-                if spd_diff + 5 >= 0:
-                    potent_100 = 1
-        return potent_100
-
-    def _potent_check_25(self, effects, spd_diff, is_attacker, made_fu, triggers_brave):
-        """Check the Potent damage multipler for potent effects that decrease the spd diff by 25"""
-        mult_25 = 0
-        for e in effects:
-            if e.type == EffectType.POTENT:
-                if spd_diff + 20 >= 0:
-                    if (triggers_brave or made_fu) and "damage_pct_if_fu" in e.params:
-                        pct_25 = e.params["damage_pct_if_fu"]
-                    else:
-                        pct_25 = e.params.get("damage_pct", 100)
-                    mult_25 = pct_25 / 100
-        return mult_25
-
-    def _potent_check_30(self, effects, spd_diff, is_attacker, made_fu, triggers_brave):
-        """Check the Potent damage multipler for potent effects that decrease the spd diff by 30"""
-        mult_30 = 0
-        for e in effects:
-            if e.type == EffectType.POTENT:
-                if spd_diff + 25 >= 0:
-                    if (triggers_brave or made_fu) and "damage_pct_if_fu" in e.params:
-                        pct_30 = e.params["damage_pct_if_fu"]
-                    else:
-                        pct_30 = e.params.get("damage_pct", 100)
-                    mult_30 = pct_30 / 100
-        return mult_30
-
-    def _potent_check_guarantee(
-        self, effects, spd_diff, is_attacker, made_fu, triggers_brave
-    ):
-        """Check the Potent damage multipler for guaranteed potent effects (like patience)"""
-        mult_pat = 0
-        """Not sure what to use for this check"""
-        for e in effects:
-            if e.type == EffectType.POTENT:
-                if (triggers_brave or made_fu) and "damage_pct_if_fu" in e.params:
-                    pct_pat = e.params["damage_pct_if_fu"]
-                else:
-                    pct_pat = e.params.get("damage_pct", 100)
-                mult_pat = pct_pat / 100
-        return mult_pat
+        if (triggers_brave or made_fu) and "damage_pct_if_fu" in p:
+            pct = p["damage_pct_if_fu"]
+        else:
+            pct = p.get("damage_pct", 100)
+        return pct / 100
 
     """Legacy Function?
     def _potent_active(self, effects, spd_diff, is_attacker, made_fu):
