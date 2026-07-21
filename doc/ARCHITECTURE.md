@@ -745,13 +745,15 @@ Processed by `_phase_start_of_turn` before combat begins. These grant visible st
 | `FLAT_DR_STRIKE` | Reduce damage from specific foe's attacks by X during combat | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
 | `PERC_DR_STRIKE` | Reduce damage from specific foe's attacks during combat by X% | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str, piercable: bool }` |
 | `FLAT_DAMAGE_STRIKE` | Unit deals +X damage | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
-| `PULSE_STRIKE` | Grants Special count -X to unit before specific strikes | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
+| `PULSE_STRIKE` | Grants Special count -X to unit before specific strikes | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str, cap_cd_start_of_cbt: bool }` |
 | `SCOWL_STRIKE` | Inflicts Special cooldown count + X on unit before unit's specific attacks | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
 | `HEAL_STRIKE` | When unit deals damage to foe , restores X HP to unit| `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
 | `OFF_BREATH` | Grants Special cooldown charge +1 per unit's attack | `{}` |
 | `DEF_BREATH` | Grants Special cooldown charge +1 per foe's attack | `{}` |
-| `OFF_TEMPO` | Neutralizes effects that inflict "Special cooldown charge -X" on unit | `{}` |
-| `DEF_TEMPO` | Neutralizes effects that grant "Special cooldown charge +X" on unit | `{}` |
+| `BREATH_NEUT` | Neutralizes effects that grant "Special cooldown charge +X" on unit | `{}` |
+| `OFF_GUARD` | Inflicts Special cooldown charge -1 per foe's attack | `{}` |
+| `DEF_GUARD` | Inflicts Special cooldown charge -1 per unit's attack | `{}` |
+| `GUARD_NEUT` | Neutralizes effects that inflict "Special cooldown charge -X" on unit | `{}` |
 | `DR_FLOOR` | Reduces damage from specific unit's attack to a maximum of X during combat (X resolved via the formula block; "floor to 1" is `flat: 1`) | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
 
 | `DEEP_WOUNDS_IN_CBT` | Unit cannot be healed during combat (pre-combat and per-strike heals). Stored in the **afflicted** unit's list and checked against that unit's own heals. So for a skill like fatal smoke 4, it would check the `target: "foe"` (routed into the foe's list), while a carried status uses `target: "self"`. | `{}` |
