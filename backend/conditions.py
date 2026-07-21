@@ -129,6 +129,9 @@ def _evaluate_cbt_stat_check(params: dict) -> Callable:
     return evaluate
 
 
+# Phase literal:
+Phase = Literal["start_of_turn", "pre_aoe", "start_of_combat", "post_sequence"]
+
 def _evaluate_num_bonus_penalty_total(params: dict) -> Callable:
     """Checks total active effects."""
     min_count = params.get("min_count", 1)

@@ -1,47 +1,97 @@
 {
   "Arcane Cake": {
     "type": "weapon",
-    "visible": { "might": 16, "range": 1, "slaying": 1, "cooldown": 0, "grants": {} },
+    "visible": {
+      "might": 16,
+      "range": 1,
+      "slaying": 1,
+      "cooldown": 0,
+      "grants": {}
+    },
     "allowed_movement_types": [],
-    "allowed_weapon_types": ["AXE"],
+    "allowed_weapon_types": [
+      "AXE"
+    ],
     "is_arcane": true,
     "is_prf": false,
     "effects": [
       {
         "effect": "STAT_BOOST",
         "target": "self",
-        "params": { "stats": ["atk", "spd", "defense", "res"], "formula": "", "multiplier": 0, "flat": 15, "min": 15, "max": 15 },
+        "params": {
+          "stats": [
+            "atk",
+            "spd",
+            "defense",
+            "res"
+          ],
+          "formula": "",
+          "multiplier": 0,
+          "flat": 15,
+          "min": 15,
+          "max": 15
+        },
         "conditions": []
       },
       {
         "effect": "FLAT_DAMAGE_STRIKE",
         "target": "self",
-        "params": { "formula": "", "multiplier": 0, "flat": 25, "min": 25, "max": 25, "strike": "every_strike" },
+        "params": {
+          "formula": "",
+          "multiplier": 0,
+          "flat": 25,
+          "min": 25,
+          "max": 25,
+          "strike": "every_strike"
+        },
         "conditions": []
       },
       {
         "effect": "FLAT_DR_STRIKE",
         "target": "self",
-        "params": { "formula": "", "multiplier": 0, "flat": 15, "min": 15, "max": 15, "strike": "every_strike" },
+        "params": {
+          "formula": "",
+          "multiplier": 0,
+          "flat": 15,
+          "min": 15,
+          "max": 15,
+          "strike": "every_strike"
+        },
         "conditions": []
       },
       {
         "effect": "FLAT_DR_STRIKE",
         "target": "self",
-        "params": { "formula": "", "multiplier": 0, "flat": 15, "min": 15, "max": 15, "strike": "on_foe_special" },
+        "params": {
+          "formula": "",
+          "multiplier": 0,
+          "flat": 15,
+          "min": 15,
+          "max": 15,
+          "strike": "on_foe_special"
+        },
         "conditions": []
       },
       {
         "effect": "DR_PIERCE",
         "target": "self",
-        "params": { "value": 50, "strike": "every_strike" },
+        "params": {
+          "value": 50,
+          "strike": "every_strike"
+        },
         "conditions": []
       }
     ]
   },
   "Dragon Fang": {
     "type": "special",
-    "visible": { "might": 0, "range": 0, "slaying": 0, "cooldown": 4, "grants": {} },
+    "visible": {
+      "might": 0,
+      "range": 0,
+      "slaying": 0,
+      "cooldown": 4,
+      "grants": {}
+    },
     "allowed_movement_types": [],
     "allowed_weapon_types": [],
     "is_arcane": false,
@@ -50,7 +100,14 @@
       {
         "effect": "FLAT_DAMAGE_STRIKE",
         "target": "self",
-        "params": { "formula": "unit_cbt_atk", "multiplier": 0.5, "flat": 0, "min": 0, "max": -1, "strike": "on_unit_special" },
+        "params": {
+          "formula": "unit_cbt_atk",
+          "multiplier": 0.5,
+          "flat": 0,
+          "min": 0,
+          "max": -1,
+          "strike": "on_unit_special"
+        },
         "conditions": []
       }
     ]
@@ -58,24 +115,193 @@
   "Breath of Life 4": {
     "type": "bonus",
     "effects": [
-      { "effect": "PRE_CBT_HEAL", "target": "self",
+      {
+        "effect": "PRE_CBT_HEAL",
+        "target": "self",
         "params": {
           "formula": "unit_max_hp",
           "multiplier": 0.4
         },
         "conditions": [
-          { "type": "cbt_stat_check",
-            "params": { "stat": "defense", "margin": -5, "comparison": "greater_or_equal" } }
-        ] },
-      { "effect": "PRE_CBT_HEAL", "target": "self",
+          {
+            "type": "cbt_stat_check",
+            "params": {
+              "stat": "defense",
+              "margin": -5,
+              "comparison": "greater_or_equal"
+            }
+          }
+        ]
+      },
+      {
+        "effect": "PRE_CBT_HEAL",
+        "target": "self",
         "params": {
           "formula": "unit_max_hp",
           "multiplier": 0.2
         },
         "conditions": [
-          { "type": "cbt_stat_check",
-            "params": { "stat": "defense", "margin": -5, "comparison": "lesser_than" } }
-        ] }
+          {
+            "type": "cbt_stat_check",
+            "params": {
+              "stat": "defense",
+              "margin": -5,
+              "comparison": "lesser_than"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "Chosen Sword": {
+    "type": "weapon",
+    "visible": {
+      "might": 16,
+      "range": 1,
+      "slaying": 1,
+      "cooldown": 0,
+      "grants": {}
+    },
+    "allowed_movement_types": [],
+    "allowed_weapon_types": [
+      "SWORD"
+    ],
+    "is_arcane": false,
+    "is_prf": true,
+    "effects": [
+      {
+        "effect": "STAT_BOOST",
+        "target": "self",
+        "params": {
+          "stats": [
+            "atk",
+            "defense",
+            "res"
+          ],
+          "formula": "",
+          "multiplier": 0,
+          "flat": 16,
+          "min": 16,
+          "max": 16
+        },
+        "conditions": []
+      },
+      {
+        "effects": [
+          {
+            "effect": "GRANT_VISIBLE_STAT",
+            "target": "self",
+            "params": {
+              "stats": {
+                "atk": 6,
+                "spd": 6
+              }
+            },
+            "conditions": []
+          }
+        ]
+      },
+      {
+        "effects": [
+          {
+            "effect": "GRANT_VISIBLE_STAT",
+            "target": "self",
+            "params": {
+              "stats": {
+                "atk": 6,
+                "def": 6
+              }
+            },
+            "conditions": []
+          }
+        ]
+      },
+      {
+        "effects": [
+          {
+            "effect": "GRANT_STATUS",
+            "target": "self",
+            "params": {
+              "status": "Breath"
+            },
+            "conditions": []
+          }
+        ]
+      },
+      {
+        "effect": "FLAT_DAMAGE_STRIKE",
+        "target": "self",
+        "params": {
+          "formula": "",
+          "multiplier": 0,
+          "flat": 25,
+          "min": 25,
+          "max": 25,
+          "strike": "every_strike"
+        },
+        "conditions": []
+      },
+      {
+        "effect": "FLAT_DR_STRIKE",
+        "target": "self",
+        "params": {
+          "formula": "",
+          "multiplier": 0,
+          "flat": 15,
+          "min": 15,
+          "max": 15,
+          "strike": "every_strike"
+        },
+        "conditions": []
+      },
+      {
+        "effect": "FLAT_DR_STRIKE",
+        "target": "self",
+        "params": {
+          "formula": "",
+          "multiplier": 0,
+          "flat": 15,
+          "min": 15,
+          "max": 15,
+          "strike": "on_foe_special"
+        },
+        "conditions": []
+      },
+      {
+        "effect": "DR_PIERCE",
+        "target": "self",
+        "params": {
+          "value": 50,
+          "strike": "every_strike"
+        },
+        "conditions": []
+      },
+      {
+        "effect": "BRAVE",
+        "target": "self",
+        "params": {},
+        "conditions": [
+          {
+            "any_of": [
+              {
+                "type": "cbt_stat_check",
+                "params": {
+                  "stat": "defense",
+                  "margin": 1,
+                  "comparison": "greater_or_equal"
+                }
+              },
+              {
+                "type": "ally_within_spaces",
+                "params": {
+                  "check": "3_rows_cols",
+                  "min_allies": 2
+                }
+              }
+            ]
+          }
+        ]
+      }
     ]
   }
 }
