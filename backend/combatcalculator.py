@@ -77,14 +77,16 @@ def _distribute_effects(attacker: CombatantState, defender: CombatantState) -> N
     )
     for skill in attacker_skills:
         for desc in skill.effects:
-            effect = build_effect(desc, applied_by="self")
-            target = attacker if desc["target"] == "self" else defender
+            is_self = desc["target"] == "self"
+            effect = build_effect(desc, applied_by="self" if is_self else "foe")
+            target = attacker if is_self else defender
             _add_to_bucket(target, effect)
 
     for status in attacker.unit.active_statuses:
         for desc in status.effects:
-            effect = build_effect(desc, applied_by=status.type)
-            target = attacker if desc["target"] == "self" else defender
+            is_self = desc["target"] == "self"
+            effect = build_effect(desc, applied_by="self" if is_self else "foe")
+            target = attacker if is_self else defender
             _add_to_bucket(target, effect)
 
     defender_skills = filter(
@@ -101,16 +103,17 @@ def _distribute_effects(attacker: CombatantState, defender: CombatantState) -> N
     )
     for skill in defender_skills:
         for desc in skill.effects:
-            effect = build_effect(desc, applied_by="self")
-            target = defender if desc["target"] == "self" else attacker
+            is_self = desc["target"] == "self"
+            effect = build_effect(desc, applied_by="self" if is_self else "foe")
+            target = defender if is_self else attacker
             _add_to_bucket(target, effect)
 
     for status in defender.unit.active_statuses:
         for desc in status.effects:
-            effect = build_effect(desc, applied_by=status.type)
-            target = defender if desc["target"] == "self" else attacker
+            is_self = desc["target"] == "self"
+            effect = build_effect(desc, applied_by="self" if is_self else "foe")
+            target = defender if is_self else attacker
             _add_to_bucket(target, effect)
-
 
 def _add_to_bucket(state: CombatantState, effect: Effect) -> None:
     list_name = EFFECT_LIST_MAP.get(effect.type)
@@ -267,8 +270,10 @@ class CombatEngine:
                 for desc in skill.effects:
                     if desc.get("effect") not in ("GRANT_VISIBLE_STAT", "GRANT_STATUS"):
                         continue
-                    effect = build_effect(desc, applied_by="self")
-                    tgt = state if desc["target"] == "self" else foe
+                    target = desc["target"]
+                    applied_by = "self" if target == "self" else "foe"
+                    effect = build_effect(desc, applied_by=applied_by)
+                    tgt = state if target == "self" else foe
                     tgt.effects_start_of_turn.append(effect)
 
         for conditional in (False, True):
