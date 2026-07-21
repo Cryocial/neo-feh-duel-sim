@@ -1,6 +1,7 @@
 import math
 from dataclasses import dataclass, field, replace
 from typing import Literal
+from unittest import case
 
 from .build import Unit, StatBlock
 from .constants import Color, StrikeType, EffectType
@@ -118,8 +119,9 @@ def _distribute_effects(attacker: CombatantState, defender: CombatantState) -> N
 
 def _add_to_bucket(state: CombatantState, effect: Effect) -> None:
     list_name = EFFECT_LIST_MAP.get(effect.type)
-    if list_name is not None:
-        getattr(state, list_name).append(effect)
+    if list_name is None:
+        raise KeyError(f"EffectType {effect.type} has no EFFECT_LIST_MAP entry — effect would be silently dropped")
+    getattr(state, list_name).append(effect)
 
 
 def _evaluate_conditions_for_effect(
@@ -327,12 +329,13 @@ class CombatEngine:
             name = effect.params.get("status")
             status = BONUS_DATABASE.get(name) or PENALTY_DATABASE.get(name)
             if status is not None:
-                already_have = any(
-                    s.name == status.name
-                    for s in target_state.unit.active_statuses + target_state.granted_statuses
-                )
-                if not already_have:
-                    target_state.granted_statuses.append(status)
+                raise KeyError(f"GRANT_STATUS references unknown status '{name}' — not in BONUS/PENALTY_DATABASE")
+            already_have = any(
+                s.name == status.name
+                for s in target_state.unit.active_statuses + target_state.granted_statuses
+            )
+            if not already_have:
+                target_state.granted_statuses.append(status)
 
     def _compute_counts(self):
         """Tallies bonus_count / penalty_count from final visible buffs/debuffs and
@@ -1216,7 +1219,7 @@ class CombatEngine:
                 case "num_bonus_and_penalties_on_unit":
                     variable = unit_state.bonus_count + unit_state.penalty_count
                 case _:
-                    variable = 0.0
+                    raise ValueError(f"Unknown formula '{formula}' in _resolve_formula")
 
         value = math.floor(variable * multiplier) + flat
         if min_val >= 0:
