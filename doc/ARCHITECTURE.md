@@ -426,8 +426,11 @@ class CombatantState:
     effects_pre_combat:      list[Effect] = field(default_factory=list)
     effects_on_strike:       list[Effect] = field(default_factory=list)
     effects_after_combat:    list[Effect] = field(default_factory=list)
+    effects_start_of_turn: list[Effect] = field(default_factory=list)
+    effects_AoE: list[Effect] = field(default_factory=list)
+    effects_start_of_combat: list[Effect] = field(default_factory=list)
 ```
-
+`effects_start_of_turn` : for effects that grant visible stats or statuses at the start of the turn, i.e. of type `EffectType.GRANT_VISIBLE_STAT` and `EffectType.GRANT_STATUS`.
 `effects_AoE` : for effects related to AoE, for example effects of type `EffectType.TRIGGER_AOE`, `EffectType.HEXBLADE_AOE`, `EffectType.PULSE_AOE`, `EffectType.FLAT_DR_AOE`, etc.
 
 `effects_start_of_combat` : for effects that impact in-combat stats, i.e. of type `EffectType.STAT_BOOST` and `EffectType.STAT_DAUNT`.
@@ -647,26 +650,27 @@ At startup, three JSON files are parsed to build the in-memory databases.
 ## Simulation Timeline
 
 *Note: Start-of-Turn is ignored for now.*
+1. Call `_phase_start_of_turn`: processes `effects_start_of_turn`, granting visible stats and statuses (two passes: unconditional, then conditional). Then `_compute_counts` tallies `bonus_count` / `penalty_count` from the resulting buffs, debuffs, and statuses.
 
-1. Initialize `self.combatant_states`: parse both units' skills and statuses to create `Effect` objects and distribute them into the 6 lists. Load the map context.
+2. Initialize `self.combatant_states`: parse both units' skills and statuses to create `Effect` objects and distribute them into the 6 lists. Load the map context.
 
-2. Call `_evaluate_conditions("pre_aoe")`: evaluates phase `pre_aoe` conditions (visible stats, initiation, etc.).
+3. Call `_evaluate_conditions("pre_aoe")`: evaluates phase `pre_aoe` conditions (visible stats, initiation, etc.).
 
-3. Call `_phase_AoE`: processes `effects_AoE`.
+4. Call `_phase_AoE`: processes `effects_AoE`.
 
-4. Call `_combat_stat_calculations`: processes `effects_start_of_combat` and computes the in-combat stats for both units.
+5. Call `_combat_stat_calculations`: processes `effects_start_of_combat` and computes the in-combat stats for both units.
 
-5. Call `_evaluate_conditions("start_of_combat")`: evaluates phase `start_of_combat` conditions (HP% and in-combat stats).
+6. Call `_evaluate_conditions("start_of_combat")`: evaluates phase `start_of_combat` conditions (HP% and in-combat stats).
 
-6. Call `_determine_strike_sequence`: processes `effects_strike_sequence` to determine the strike sequence.
+7. Call `_determine_strike_sequence`: processes `effects_strike_sequence` to determine the strike sequence.
 
-7. Call `_evaluate_conditions("post_sequence")`: evaluates phase `post_sequence` conditions (e.g. the foe triggers the "attacks twice" effect).
+8. Call `_evaluate_conditions("post_sequence")`: evaluates phase `post_sequence` conditions (e.g. the foe triggers the "attacks twice" effect).
 
-8. Call `_phase_pre_combat`: processes `effects_pre_combat` (Flared Sparrow, BoL, etc.).
+9. Call `_phase_pre_combat`: processes `effects_pre_combat` (Flared Sparrow, BoL, etc.).
 
-9. Loop over the strike sequence consulting `effects_on_strike`.
+10. Loop over the strike sequence consulting `effects_on_strike`.
 
-10. Call `_phase_after_combat`: processes `effects_after_combat`.
+11. Call `_phase_after_combat`: processes `effects_after_combat`.
 
 ---
 
@@ -675,6 +679,14 @@ At startup, three JSON files are parsed to build the in-memory databases.
 ### A - Effect Type Reference
 
 ---
+#### `effects_start_of_turn`
+
+Processed by `_phase_start_of_turn` before combat begins. These grant visible stats and statuses to a unit (or foe) at the start of the turn. Grants are written per-combat onto the `CombatantState` (`granted_visible_buffs` / `granted_visible_debuffs` / `granted_statuses`), never mutating the `Unit`, so repeated simulations stay isolated. Evaluated in two passes: unconditional grants first, then conditional grants (e.g. Ploy) so their conditions see the results of the earlier grants.
+
+| Effect | Description | `params` |
+|---|---|---|
+| `GRANT_VISIBLE_STAT` | Grants visible (stat-screen) stat changes to the target at start of turn. Positive values become visible buffs, negative values become visible debuffs. Feeds `CombatantState.visible_stat()` and the bonus/penalty counts. | `{ stats: { atk: int, spd: int, defense: int, res: int } }` (only the stats being changed need be listed) |
+| `GRANT_STATUS` | Grants a named status to the target at start of turn, looked up by name in `BONUS_DATABASE` / `PENALTY_DATABASE` and appended to `granted_statuses`. Skipped if the target already has a status of that name (in `active_statuses` or `granted_statuses`), so non-stacking statuses aren't duplicated. | `{ status: str }` (the status name, must exist in a database) |
 
 #### `effects_AoE`
 
