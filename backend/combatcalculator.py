@@ -117,10 +117,13 @@ def _distribute_effects(attacker: CombatantState, defender: CombatantState) -> N
             target = defender if is_self else attacker
             _add_to_bucket(target, effect)
 
+
 def _add_to_bucket(state: CombatantState, effect: Effect) -> None:
     list_name = EFFECT_LIST_MAP.get(effect.type)
     if list_name is None:
-        raise KeyError(f"EffectType {effect.type} has no EFFECT_LIST_MAP entry — effect would be silently dropped")
+        raise KeyError(
+            f"EffectType {effect.type} has no EFFECT_LIST_MAP entry — effect would be silently dropped"
+        )
     getattr(state, list_name).append(effect)
 
 
@@ -329,10 +332,13 @@ class CombatEngine:
             name = effect.params.get("status")
             status = BONUS_DATABASE.get(name) or PENALTY_DATABASE.get(name)
             if status is not None:
-                raise KeyError(f"GRANT_STATUS references unknown status '{name}' — not in BONUS/PENALTY_DATABASE")
+                raise KeyError(
+                    f"GRANT_STATUS references unknown status '{name}' — not in BONUS/PENALTY_DATABASE"
+                )
             already_have = any(
                 s.name == status.name
-                for s in target_state.unit.active_statuses + target_state.granted_statuses
+                for s in target_state.unit.active_statuses
+                + target_state.granted_statuses
             )
             if not already_have:
                 target_state.granted_statuses.append(status)
@@ -586,15 +592,19 @@ class CombatEngine:
 
         return target_stat
 
-    def _potent_active(self, effects, spd_diff, is_attacker, made_fu, triggers_brave):
-        """Takes the highest value of potent effects that trigger, or None if none trigger."""
+    def _potent_active(self, effects, made_fu, triggers_brave):
+        """Any POTENT effect still in effects_strike_sequence has already passed
+        its spd condition. Return the highest percentage, or None."""
         best = None
         for e in effects:
             if e.type != EffectType.POTENT:
                 continue
-            mult = self._potent_multiplier(e, spd_diff, made_fu, triggers_brave)
-            if mult is not None and (best is None or mult > best):
-                best = mult
+            if (triggers_brave or made_fu) and "damage_pct_if_fu" in e.params:
+                pct = e.params["damage_pct_if_fu"]
+            else:
+                pct = e.params["damage_pct"]
+            mult = pct / 100
+            best = mult if best is None else max(best, mult)
         return best
 
     def _potent_multiplier(self, effect, spd_diff, made_fu, triggers_brave):
@@ -920,22 +930,30 @@ class CombatEngine:
         raw_atk = striker_state.combat_stats.atk
         defensive_stat = getattr(target_state.combat_stats, target_state.defensive_stat)
 
-        for unit_state, foe_state in ((striker_state, target_state), (target_state, striker_state)):
+        for unit_state, foe_state in (
+            (striker_state, target_state),
+            (target_state, striker_state),
+        ):
             total_pulse = 0
             for e in unit_state.effects_on_strike:
-                if e.type == EffectType.PULSE_STRIKE and self._strike_matches(strike, e.params):
+                if e.type == EffectType.PULSE_STRIKE and self._strike_matches(
+                    strike, e.params
+                ):
                     pulse = self._resolve_formula(e.params, unit_state, foe_state)
                     if e.params.get("cap_cd_start_of_cbt", False):
                         pulse = min(pulse, unit_state.cd_start_of_cbt)
                     total_pulse += pulse
 
             total_scowl = sum(
-                    self._resolve_formula(e.params, unit_state, foe_state)
-                    for e in unit_state.effects_on_strike
-                    if e.type == EffectType.SCOWL_STRIKE and self._strike_matches(strike, e.params)
+                self._resolve_formula(e.params, unit_state, foe_state)
+                for e in unit_state.effects_on_strike
+                if e.type == EffectType.SCOWL_STRIKE
+                and self._strike_matches(strike, e.params)
             )
 
-            unit_state.current_cooldown = max(0, unit_state.current_cooldown - total_pulse + total_scowl)
+            unit_state.current_cooldown = max(
+                0, unit_state.current_cooldown - total_pulse + total_scowl
+            )
 
         # Does either side's Special trigger on this exact strike?
         # TODO: target-side cooldown charging from being attacked isn't
@@ -1059,25 +1077,54 @@ class CombatEngine:
             striker_state.special_use_count += 1
             striker_state.current_cooldown = striker_state.unit.max_cooldown
         else:
-            striker_breath = any(e.type == EffectType.OFF_BREATH for e in striker_state.effects_on_strike)
-            striker_guard = any(e.type == EffectType.DEF_GUARD for e in striker_state.effects_on_strike)
-            striker_breath_neut = any(e.type == EffectType.BREATH_NEUT for e in striker_state.effects_on_strike)
-            striker_guard_neut = any(e.type == EffectType.GUARD_NEUT for e in striker_state.effects_on_strike)
-            
-            striker_charge = 1 + int(striker_breath and not striker_breath_neut) - int(striker_guard and not striker_guard_neut)
-            striker_state.current_cooldown = max(0, striker_state.current_cooldown - striker_charge)
+            striker_breath = any(
+                e.type == EffectType.OFF_BREATH for e in striker_state.effects_on_strike
+            )
+            striker_guard = any(
+                e.type == EffectType.DEF_GUARD for e in striker_state.effects_on_strike
+            )
+            striker_breath_neut = any(
+                e.type == EffectType.BREATH_NEUT
+                for e in striker_state.effects_on_strike
+            )
+            striker_guard_neut = any(
+                e.type == EffectType.GUARD_NEUT for e in striker_state.effects_on_strike
+            )
+
+            striker_charge = (
+                1
+                + int(striker_breath and not striker_breath_neut)
+                - int(striker_guard and not striker_guard_neut)
+            )
+            striker_state.current_cooldown = max(
+                0, striker_state.current_cooldown - striker_charge
+            )
 
         if target_special:
             target_state.special_use_count += 1
             target_state.current_cooldown = target_state.unit.max_cooldown
-        else:            
-            target_breath = any(e.type == EffectType.DEF_BREATH for e in target_state.effects_on_strike)
-            target_guard = any(e.type == EffectType.OFF_GUARD for e in target_state.effects_on_strike)
-            target_breath_neut = any(e.type == EffectType.BREATH_NEUT for e in target_state.effects_on_strike)
-            target_guard_neut = any(e.type == EffectType.GUARD_NEUT for e in target_state.effects_on_strike)
+        else:
+            target_breath = any(
+                e.type == EffectType.DEF_BREATH for e in target_state.effects_on_strike
+            )
+            target_guard = any(
+                e.type == EffectType.OFF_GUARD for e in target_state.effects_on_strike
+            )
+            target_breath_neut = any(
+                e.type == EffectType.BREATH_NEUT for e in target_state.effects_on_strike
+            )
+            target_guard_neut = any(
+                e.type == EffectType.GUARD_NEUT for e in target_state.effects_on_strike
+            )
 
-            target_charge = 1 + int(target_breath and not target_breath_neut) - int(target_guard and not target_guard_neut)
-            target_state.current_cooldown = max(0, target_state.current_cooldown - target_charge)
+            target_charge = (
+                1
+                + int(target_breath and not target_breath_neut)
+                - int(target_guard and not target_guard_neut)
+            )
+            target_state.current_cooldown = max(
+                0, target_state.current_cooldown - target_charge
+            )
 
     def _check_color_advantage(
         self, striker_state: CombatantState, target_state: CombatantState
