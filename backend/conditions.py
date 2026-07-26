@@ -132,6 +132,7 @@ def _evaluate_cbt_stat_check(params: dict) -> Callable:
 # Phase literal:
 Phase = Literal["start_of_turn", "pre_aoe", "start_of_combat", "post_sequence"]
 
+
 def _evaluate_num_bonus_penalty_total(params: dict) -> Callable:
     """Checks total active effects."""
     min_count = params.get("min_count", 1)
@@ -176,6 +177,49 @@ def _evaluate_triggers_brave(params: dict) -> Callable:
 
     return evaluate
 
+def _evaluate_potent_spd_check(params: dict) -> Callable:
+    """Standard Potent trigger. A normal follow-up needs spd_diff >= 5; Potent
+    lowers that requirement by `spd_lower`, so it triggers when
+        (unit_spd - foe_spd) >= 5 - spd_lower.
+
+    Example: Potent 10 (spd_lower=10) triggers at spd_diff >= -5, so a unit 5
+    slower than its foe still gets Potent.
+
+    Reads combat Spd (start_of_combat phase). Excludes Phantom (once modeled),
+    includes frozen effects (they're part of combat Spd).
+    """
+    spd_lower = params["spd_lower"]
+    base = 5  # the standard natural-follow-up Spd requirement
+
+    def evaluate(unit, foe) -> bool:
+        spd_diff = unit.combat_stats.spd - foe.combat_stats.spd
+        return spd_diff >= base - spd_lower
+
+    return evaluate
+
+def _evaluate_cbt_stat_sum_check(params: dict) -> Callable:
+    """Compares a SUM of the unit's in-combat stats vs the foe's, with a margin.
+    Used by the Spd+Def Potent: Spd+Def >= foe's Spd+Def + margin."""
+    stats = params["stats"]           # e.g. ["spd", "defense"]
+    margin = params.get("margin", 0)
+    comparison = params.get("comparison", "greater_or_equal")
+
+    def evaluate(unit, foe) -> bool:
+        u = sum(getattr(unit.combat_stats, s) for s in stats)
+        f = sum(getattr(foe.combat_stats, s) for s in stats)
+        threshold = f + margin
+        return u < threshold if comparison == "lesser_than" else u >= threshold
+
+    return evaluate
+
+def _evaluate_potent_patience(params: dict) -> Callable:
+    """Patience-type (guaranteed) Potent: triggers regardless of Spd.
+    """
+    def evaluate(unit, foe) -> bool:
+        return True
+
+    return evaluate
+
 
 # ── registry ─────────────────────────────────────────────────────────────────
 
@@ -187,12 +231,15 @@ CONDITION_REGISTRY: dict[str, tuple[Phase, Callable[[dict], Callable]]] = {
     "ally_within_spaces": ("pre_aoe", _evaluate_ally_within_spaces),
     "foe_weapon_type": ("pre_aoe", _evaluate_foe_weapon_type),
     "first_combat_of_turn": ("pre_aoe", _evaluate_first_combat_of_turn),
+    "potent_spd_check": ("start_of_combat", _evaluate_potent_spd_check),
     "hp_above_pct": ("start_of_combat", _evaluate_hp_above_pct),
     "hp_below_pct": ("start_of_combat", _evaluate_hp_below_pct),
     "cbt_stat_check": ("start_of_combat", _evaluate_cbt_stat_check),
+    "cbt_stat_sum_check": ("start_of_combat", _evaluate_cbt_stat_sum_check),
     "triggers_brave": ("post_sequence", _evaluate_triggers_brave),
     "bonus_penalty_total": ("pre_aoe", _evaluate_num_bonus_penalty_total),
     "is_engaged": ("pre_aoe", _evaluate_is_engaged),
+    "potent_patience": ("start_of_combat", _evaluate_potent_patience),
 }
 
 # ── classes ─────────────────────────────────────────────────────────────────
