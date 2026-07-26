@@ -593,8 +593,10 @@ class CombatEngine:
         return target_stat
 
     def _potent_active(self, effects, made_fu, triggers_brave):
-        """Any POTENT effect still in effects_strike_sequence has already passed
-        its spd condition. Return the highest percentage, or None."""
+        """Highest Potent multiplier among POTENT effects still in the strike
+        sequence (their spd/patience condition already passed in the condition
+        phase, so no spd check here). Returns None if none present.
+        'Highest value applied; does not stack.'"""
         best = None
         for e in effects:
             if e.type != EffectType.POTENT:
@@ -606,45 +608,6 @@ class CombatEngine:
             mult = pct / 100
             best = mult if best is None else max(best, mult)
         return best
-
-    def _potent_multiplier(self, effect, spd_diff, made_fu, triggers_brave):
-        """One POTENT effect's multiplier if it triggers, else None. Reads params.
-        spd_threshold is REQUIRED — a POTENT effect without it is an authoring error."""
-        p = effect.params
-
-        if "spd_threshold" not in p and not p.get("guaranteed", False):
-            raise KeyError(
-                f"POTENT effect missing required 'spd_threshold' (params: {p})"
-            )
-
-        if not p.get("guaranteed", False) and spd_diff < -p["spd_threshold"]:
-            return None
-
-        if (triggers_brave or made_fu) and "damage_pct_if_fu" in p:
-            pct = p["damage_pct_if_fu"]
-        else:
-            pct = p.get("damage_pct", 100)
-        return pct / 100
-
-    """Legacy Function?
-    def _potent_active(self, effects, spd_diff, is_attacker, made_fu):
-        relevant_diff = spd_diff if is_attacker else -spd_diff
-        best_mult = None
-        for e in effects:
-            if e.type == EffectType.POTENT:
-                threshold = e.params.get("spd_threshold", 25)
-                if relevant_diff >= threshold:
-                    if made_fu and "damage_pct_if_fu" in e.params:
-                        pct = e.params["damage_pct_if_fu"]
-                    else:
-                        pct = e.params.get("damage_pct", 100)
-                    mult = pct / 100.0
-                    if best_mult is None or mult > best_mult:
-                        best_mult = mult
-        return best_mult
-    """
-
-    # TODO CHECK POTENT LOGIC TMR
 
     def _determine_strike_sequence(self) -> list[Strike]:
         """Calculates the combat sequence using effects_strike_sequence instead of keywords."""
@@ -743,15 +706,22 @@ class CombatEngine:
         atk_state.triggers_brave = attacker_brave
         def_state.triggers_brave = defender_brave
 
-        # POTENT TEMPORARILY DISABLED — _potent_active removed; the new
-        # _potent_check_* system is being wired separately. Placeholder None
-        # keeps the downstream attacker_potent/defender_potent logic working
-        # (Potent simply never triggers until reconnected).
-        attacker_potent_mult = None
-        defender_potent_mult = None
+        attacker_potent_mult = self._potent_active(
+            atk_state.effects_strike_sequence,
+            made_fu=attacker_FU > 0,
+            triggers_brave=attacker_brave,
+        )
+        defender_potent_mult = self._potent_active(
+            def_state.effects_strike_sequence,
+            made_fu=defender_FU > 0,
+            triggers_brave=defender_brave,
+        )
 
         attacker_potent = attacker_potent_mult is not None
         defender_potent = defender_potent_mult is not None
+
+        attacker_brave_fu = attacker_brave and not attacker_potent
+        defender_brave_fu = defender_brave and not defender_potent
 
         attacker_brave_fu = attacker_brave and not attacker_potent
         defender_brave_fu = defender_brave and not defender_potent
@@ -785,19 +755,13 @@ class CombatEngine:
                 )
         if attacker_potent:
             attacker_followups.append(
-                Strike("attacker", "defender", StrikeType.POTENT, consecutive=True)
+                Strike("attacker", "defender", StrikeType.POTENT,
+                       consecutive=True, potent_mult=attacker_potent_mult)
             )
-
-        defender_first = [Strike("defender", "attacker", StrikeType.FIRST)]
-        if defender_brave:
-            defender_first.append(
-                Strike(
-                    "defender",
-                    "attacker",
-                    StrikeType.FIRST,
-                    brave_second_hit=True,
-                    consecutive=True,
-                )
+        if defender_potent:
+            defender_followups.append(
+                Strike("defender", "attacker", StrikeType.POTENT,
+                       consecutive=True, potent_mult=defender_potent_mult)
             )
 
         defender_followups = []
