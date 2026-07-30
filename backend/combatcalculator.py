@@ -779,11 +779,7 @@ class CombatEngine:
                         consecutive=True,
                     )
                 )
-        if defender_potent:
-            defender_followups.append(
-                Strike("defender", "attacker", StrikeType.POTENT, consecutive=True)
-            )
-
+                
         defender_flash = any(
             e.type == EffectType.FLASH for e in def_state.effects_strike_sequence
         )
@@ -989,7 +985,8 @@ class CombatEngine:
         effective_dr = perc_dr * pierce_mult
         damage_multiplier = 1.0 - effective_dr
         final_damage = math.trunc(final_damage * damage_multiplier)
-
+        if strike.strike_type is StrikeType.POTENT:
+            final_damage = math.trunc(final_damage * strike.potent_mult)
         flat_dr = 0
         for effect in target_state.effects_on_strike:
             if effect.type == EffectType.FLAT_DR_STRIKE and self._strike_matches(
