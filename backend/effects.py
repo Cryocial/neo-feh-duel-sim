@@ -61,6 +61,7 @@ EFFECT_LIST_MAP: dict[EffectType, str] = {
     EffectType.REDUCE_DEEP_WOUNDS_IN_CBT: "effects_on_strike",
     EffectType.TRIANGLE_ADEPT: "effects_on_strike",
     EffectType.CANCEL_AFFINITY: "effects_on_strike",
+    EffectType.STAFF_FULL_DAMAGE: "effects_on_strike",
     # ── Post-combat ──────────────────────────────────────────────────────
     EffectType.HEAL_POST_CBT: "effects_after_combat",
     EffectType.DAMAGE_POST_CBT: "effects_after_combat",
