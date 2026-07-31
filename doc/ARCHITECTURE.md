@@ -646,6 +646,33 @@ At startup, three JSON files are parsed to build the in-memory databases.
 3. **Simulation launch**: the `Skill` and `Status` objects of both units are read to instantiate `Effect` objects (with condition compilation) and distribute them into the 6 lists of each `CombatantState`.
 
 ---
+## Damage Calculation Pipeline
+
+1. **Base damage** — `max(0, trunc(Atk × effectiveness × WTA) − defensive_stat)`.
+   Effectiveness (×1.5, unless `NEUT_EFFECTIVE`) and the weapon-triangle
+   multiplier (`_get_wta_multiplier`, incl. Triangle Adept / Cancel Affinity)
+   apply to Atk here.
+2. **Fixed / true damage** — `FLAT_DAMAGE_STRIKE` effects added on
+   (Change of Fate, Treachery, etc.).
+3. ⚠ **Offensive Special damage** — special-trigger damage boosts. *(Not
+   implemented — awaits the Special system.)*
+4. ⚠ **StaffMod** — staff users deal ×0.5 unless Wrathful. *(Not implemented.)*
+5. **Percent damage reduction** — all percent DR combines into a single
+   multiplicative product `∏(1 − reduction)`:
+   - `PERC_DR_STRIKE` (non-Special): pierceable — reduced by `DR_PIERCE`
+     (`pierce_mult`), and (⚠ future) halvable by "reduce foe's DR%" effects.
+   - `PERC_DR_UNPIERCEABLE_STRIKE` (Special, Pavise/Aegis): NOT pierceable,
+     NOT halvable. Kept in its own product; `pierce_mult` never applies.
+   Both stack multiplicatively with each other and never reach 100% from
+   percentages alone (e.g. Dodge 40% + Archrival 40% → 64% total, not 80%).
+6. **Flat damage reduction** — `FLAT_DR_STRIKE` subtracted, floored at 0.
+7. **Damage floor** — `DR_FLOOR` caps the damage at a maximum (Collapsed Star
+   "reduce to 1"): if `final_damage > floor`, set to `floor`. Lowest floor wins.
+8. **Survival effects** — Miracle / survive-at-1-HP.
+
+Percent DR (step 5) is applied AFTER fixed/true damage (step 2) and offensive
+Specials (step 3), matching the wiki. Flat DR (step 6) and the floor (step 7)
+come after percent DR.
 
 ## Simulation Timeline
 
@@ -738,6 +765,7 @@ Processed by `_phase_start_of_turn` before combat begins. These grant visible st
 | Effect | Description | `params` |
 |---|---|---|
 | `DR_PIERCE` | Reduces the percentage of unit's non-Special "reduces damage by X%" | `{ value: int, strike }` |
+| `PERC_DR_UNPIERCEABLE_STRIKE` | Special-style percent damage reduction (Pavise/Aegis). Stacks multiplicatively with all other percent DR, but is NOT reduced by `DR_PIERCE` and (once implemented) cannot be halved/neutralized by "reduce foe's DR%" effects. | `{ formula, multiplier, flat, min, max, strike }` (percentage via the formula pipeline) |
 | `HEXBLADE_STRIKE` | Calculates damage using the lower of foe's Def or Res | `{}` |
 | `EFFECTIVE` | Effective against specific unit type | `{ movement_types: list[str], weapon_types: list[str] }` |
 | `NEUT_EFFECTIVE` | Neutralizes 'effective against specific unit type' | `{ movement_types: list[str], weapon_types: list[str] }` |
