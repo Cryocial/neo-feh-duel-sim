@@ -4,7 +4,7 @@ from typing import Literal
 from unittest import case
 
 from .build import Unit, StatBlock
-from .constants import Color, StrikeType, EffectType
+from .constants import Color, StrikeType, EffectType, WeaponType
 from .effects import Effect, build_effect, EFFECT_LIST_MAP
 from .conditions import Phase, Condition, AtomicCondition, AnyOf, AllOf
 from .jsonbootupstuff import BONUS_DATABASE, PENALTY_DATABASE
@@ -608,7 +608,42 @@ class CombatEngine:
             mult = pct / 100
             best = mult if best is None else max(best, mult)
         return best
+    def _staff_full_damage(self, striker_state) -> bool:
+        """True if a Wrathful-type effect makes this staff deal full (non-halved)
+        damage. Checks for a STAFF_FULL_DAMAGE effect in the striker's on-strike
+        list. Returns False by default, so staves halve damage unless a Wrathful
+        effect is present."""
+        return any(
+            e.type == EffectType.STAFF_FULL_DAMAGE
+            for e in striker_state.effects_on_strike
+        )
+    def _miracle_survives(self, target_state, striker_state) -> bool:
+        """True if the target has a Miracle that survives THIS lethal hit.
 
+        Special Miracle (MIRACLE_SPECIAL): cannot be bypassed by Fatal Smoke.
+        (Special-cooldown gating isn't modeled yet — awaits the Special system.)
+
+        Skill Miracle (MIRACLE_SKILL): once per combat (tracked by
+        target_state.miracle_used), and bypassed if the attacker has FATAL_SMOKE.
+
+        Does NOT set the used-flag — the caller sets it only when a SKILL miracle
+        is what actually saved the unit."""
+        if any(e.type == EffectType.MIRACLE_SPECIAL
+               for e in target_state.effects_on_strike):
+            return True
+
+        if target_state.miracle_used:
+            return False
+
+        has_skill_miracle = any(
+            e.type == EffectType.MIRACLE_SKILL
+            for e in target_state.effects_on_strike
+        )
+        fatal_smoke = any(
+            e.type == EffectType.FATAL_SMOKE
+            for e in striker_state.effects_on_strike
+        )
+        return has_skill_miracle and not fatal_smoke
     def _determine_strike_sequence(self) -> list[Strike]:
         """Calculates the combat sequence using effects_strike_sequence instead of keywords."""
         atk_state = self.combatant_states["attacker"]
@@ -956,6 +991,9 @@ class CombatEngine:
 
         final_damage = base_damage + true_damage
         pre_mitigation_damage = final_damage
+        if striker_state.unit.weapon_type is WeaponType.STAFF:
+            if not self._staff_full_damage(striker_state):
+                final_damage = math.trunc(final_damage * 0.5)
 
         pierce_mult = 1.0
         for effect in striker_state.effects_on_strike:
@@ -1034,6 +1072,11 @@ class CombatEngine:
 
         mitigated_amount = pre_mitigation_damage - final_damage
         target_state.damage_mitigated_bucket += mitigated_amount
+        lethal = final_damage >= target_state.current_hp
+        if lethal and target_state.current_hp > 1 and self._miracle_active(target_state, striker_state):
+            # survive at 1 HP: deal only enough to leave 1
+            final_damage = target_state.current_hp - 1
+
         target_state.current_hp -= final_damage
 
         hit_heal = 0

@@ -654,9 +654,8 @@ At startup, three JSON files are parsed to build the in-memory databases.
    apply to Atk here.
 2. **Fixed / true damage** — `FLAT_DAMAGE_STRIKE` effects added on
    (Change of Fate, Treachery, etc.).
-3. ⚠ **Offensive Special damage** — special-trigger damage boosts. *(Not
-   implemented — awaits the Special system.)*
-4. ⚠ **StaffMod** — staff users deal ×0.5 unless Wrathful. *(Not implemented.)*
+3. **Offensive Special damage** — special-trigger damage boosts.
+4. **StaffMod** — staff users deal ×0.5 unless Wrathful.
 5. **Percent damage reduction** — all percent DR combines into a single
    multiplicative product `∏(1 − reduction)`:
    - `PERC_DR_STRIKE` (non-Special): pierceable — reduced by `DR_PIERCE`
