@@ -22,6 +22,7 @@ class CombatantState:
     cd_start_of_cbt: int = 0
     damage_mitigated_bucket: int = 0
     bonus_count: int = 0
+    miracle_used: bool = False
     penalty_count: int = 0
     special_use_count: int = 0
     strike_count: int = 0
@@ -1073,9 +1074,17 @@ class CombatEngine:
         mitigated_amount = pre_mitigation_damage - final_damage
         target_state.damage_mitigated_bucket += mitigated_amount
         lethal = final_damage >= target_state.current_hp
-        if lethal and target_state.current_hp > 1 and self._miracle_active(target_state, striker_state):
-            # survive at 1 HP: deal only enough to leave 1
+        if lethal and target_state.current_hp > 1 and self._miracle_survives(
+            target_state, striker_state
+        ):
             final_damage = target_state.current_hp - 1
+            #TODO: this does not account for roy ring, but we can do that another day. this atm just checks of miracle has been procced in combat already
+            has_special_miracle = any(
+                e.type == EffectType.MIRACLE_SPECIAL
+                for e in target_state.effects_on_strike
+            )
+            if not has_special_miracle:
+                target_state.miracle_used = True
 
         target_state.current_hp -= final_damage
 
