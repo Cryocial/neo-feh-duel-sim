@@ -38,6 +38,7 @@ EFFECT_LIST_MAP: dict[EffectType, str] = {
     EffectType.PRE_CBT_HEAL: "effects_pre_combat",
     # ── On-strike ────────────────────────────────────────────────────────
     EffectType.DR_PIERCE: "effects_on_strike",
+    EffectType.PERC_DR_UNPIERCEABLE_STRIKE: "effects_on_strike",
     EffectType.HEXBLADE_STRIKE: "effects_on_strike",
     EffectType.EFFECTIVE: "effects_on_strike",
     EffectType.NEUT_EFFECTIVE: "effects_on_strike",

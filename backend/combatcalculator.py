@@ -980,9 +980,24 @@ class CombatEngine:
                     self._resolve_formula(effect.params, target_state, striker_state)
                     / 100.0
                 )
+                dr_val *= pierce_mult          # pierce THIS source
                 perc_dr = 1.0 - ((1.0 - perc_dr) * (1.0 - dr_val))
 
-        effective_dr = perc_dr * pierce_mult
+        unpierceable_dr = 0.0
+        for effect in target_state.effects_on_strike:
+            if effect.type == EffectType.PERC_DR_UNPIERCEABLE_STRIKE and self._strike_matches(
+                strike,
+                effect.params,
+                unit_special=target_special,
+                foe_special=striker_special,
+            ):
+                dr_val = (
+                    self._resolve_formula(effect.params, target_state, striker_state)
+                    / 100.0
+                )
+                unpierceable_dr = 1.0 - ((1.0 - unpierceable_dr) * (1.0 - dr_val))
+
+        effective_dr = 1.0 - ((1.0 - perc_dr) * (1.0 - unpierceable_dr))
         damage_multiplier = 1.0 - effective_dr
         final_damage = math.trunc(final_damage * damage_multiplier)
         if strike.strike_type is StrikeType.POTENT:
