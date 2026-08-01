@@ -617,6 +617,16 @@ class CombatEngine:
             e.type == EffectType.STAFF_FULL_DAMAGE
             for e in striker_state.effects_on_strike
         )
+    def _special_trigger_neutralized(self, state, strike) -> bool:
+        """True if a SPECIAL_TRIGGER_NEUT effect on `state` blocks its Special
+        from triggering on this strike, even though its cooldown has reached 0.
+        The cooldown is simply held at 0 (via the normal breath/guard charge
+        path in _process_strike) until the effect is no longer active."""
+        return any(
+            e.type == EffectType.SPECIAL_TRIGGER_NEUT and self._strike_matches(strike, e.params)
+            for e in state.effects_on_strike
+        )
+
     def _miracle_survives(self, strike, target_state, striker_state, target_special) -> bool:
         """True if a Miracle lets the target survive this lethal hit at 1 HP.
 
@@ -756,15 +766,24 @@ class CombatEngine:
         attacker_brave_fu = attacker_brave and not attacker_potent
         defender_brave_fu = defender_brave and not defender_potent
 
-        attacker_brave_fu = attacker_brave and not attacker_potent
-        defender_brave_fu = defender_brave and not defender_potent
-
         attacker_first = [Strike("attacker", "defender", StrikeType.FIRST)]
         if attacker_brave:
             attacker_first.append(
                 Strike(
                     "attacker",
                     "defender",
+                    StrikeType.FIRST,
+                    brave_second_hit=True,
+                    consecutive=True,
+                )
+            )
+
+        defender_first = [Strike("defender", "attacker", StrikeType.FIRST)]
+        if defender_brave:
+            defender_first.append(
+                Strike(
+                    "defender",
+                    "attacker",
                     StrikeType.FIRST,
                     brave_second_hit=True,
                     consecutive=True,
@@ -791,11 +810,6 @@ class CombatEngine:
                 Strike("attacker", "defender", StrikeType.POTENT,
                        consecutive=True, potent_mult=attacker_potent_mult)
             )
-        if defender_potent:
-            defender_followups.append(
-                Strike("defender", "attacker", StrikeType.POTENT,
-                       consecutive=True, potent_mult=defender_potent_mult)
-            )
 
         defender_followups = []
         if defender_FU > 0:
@@ -812,7 +826,12 @@ class CombatEngine:
                         consecutive=True,
                     )
                 )
-                
+        if defender_potent:
+            defender_followups.append(
+                Strike("defender", "attacker", StrikeType.POTENT,
+                       consecutive=True, potent_mult=defender_potent_mult)
+            )
+
         defender_flash = any(
             e.type == EffectType.FLASH for e in def_state.effects_strike_sequence
         )
@@ -951,8 +970,12 @@ class CombatEngine:
         # Does either side's Special trigger on this exact strike?
         # TODO: target-side cooldown charging from being attacked isn't
         # implemented yet, so target_special only reflects its starting value.
-        striker_special = striker_state.current_cooldown <= 0
-        target_special = target_state.current_cooldown <= 0
+        striker_special = striker_state.current_cooldown <= 0 and not self._special_trigger_neutralized(
+            striker_state, strike
+        )
+        target_special = target_state.current_cooldown <= 0 and not self._special_trigger_neutralized(
+            target_state, strike
+        )
 
         wta = self._get_wta_multiplier(striker_state, target_state)
         is_effective = any(

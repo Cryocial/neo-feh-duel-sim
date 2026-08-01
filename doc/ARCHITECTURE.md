@@ -656,14 +656,17 @@ At startup, three JSON files are parsed to build the in-memory databases.
    (Change of Fate, Treachery, etc.).
 3. **Offensive Special damage** — special-trigger damage boosts.
 4. **StaffMod** — staff users deal ×0.5 unless Wrathful.
-5. **Percent damage reduction** — all percent DR combines into a single
-   multiplicative product `∏(1 − reduction)`:
-   - `PERC_DR_STRIKE` (non-Special): pierceable — reduced by `DR_PIERCE`
-     (`pierce_mult`), and (⚠ future) halvable by "reduce foe's DR%" effects.
-   - `PERC_DR_UNPIERCEABLE_STRIKE` (Special, Pavise/Aegis): NOT pierceable,
-     NOT halvable. Kept in its own product; `pierce_mult` never applies.
-   Both stack multiplicatively with each other and never reach 100% from
-   percentages alone (e.g. Dodge 40% + Archrival 40% → 64% total, not 80%).
+5. **Percent damage reduction** — all percent DR is expressed as a single
+   `PERC_DR_STRIKE` effect type with a `piercable: bool` param:
+   - `piercable: true` (default; non-Special sources): reduced by `DR_PIERCE`
+     (`pierce_mult`) before stacking, and (⚠ future) halvable by "reduce foe's
+     DR%" effects. Multiple pierceable sources stack multiplicatively into
+     one product.
+   - `piercable: false` (Special-grade, Pavise/Aegis): NOT reduced by
+     `DR_PIERCE`, NOT halvable. Kept in its own product, immune to piercing.
+   The two products combine multiplicatively (`1 − (1−perc)(1−unpierceable)`)
+   and never reach 100% from percentages alone (e.g. Dodge 40% + Archrival
+   40% → 64% total, not 80%).
 6. **Flat damage reduction** — `FLAT_DR_STRIKE` subtracted, floored at 0.
 7. **Damage floor** — `DR_FLOOR` caps the damage at a maximum (Collapsed Star
    "reduce to 1"): if `final_damage > floor`, set to `floor`. Lowest floor wins.
@@ -764,13 +767,12 @@ Processed by `_phase_start_of_turn` before combat begins. These grant visible st
 | Effect | Description | `params` |
 |---|---|---|
 | `DR_PIERCE` | Reduces the percentage of unit's non-Special "reduces damage by X%" | `{ value: int, strike }` |
-| `PERC_DR_UNPIERCEABLE_STRIKE` | Special-style percent damage reduction (Pavise/Aegis). Stacks multiplicatively with all other percent DR, but is NOT reduced by `DR_PIERCE` and (once implemented) cannot be halved/neutralized by "reduce foe's DR%" effects. | `{ formula, multiplier, flat, min, max, strike }` (percentage via the formula pipeline) |
 | `HEXBLADE_STRIKE` | Calculates damage using the lower of foe's Def or Res | `{}` |
 | `EFFECTIVE` | Effective against specific unit type | `{ movement_types: list[str], weapon_types: list[str] }` |
 | `NEUT_EFFECTIVE` | Neutralizes 'effective against specific unit type' | `{ movement_types: list[str], weapon_types: list[str] }` |
 | `SPECIAL_TRIGGER_NEUT` | Unit cannot trigger Specials | `{}` |
 | `FLAT_DR_STRIKE` | Reduce damage from specific foe's attacks by X during combat | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
-| `PERC_DR_STRIKE` | Reduce damage from specific foe's attacks during combat by X% | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str, piercable: bool }` |
+| `PERC_DR_STRIKE` | Reduce damage from specific foe's attacks during combat by X%. `piercable` (default `true`) sources stack in one product and are reduced by `DR_PIERCE`; `piercable: false` (Special-grade, e.g. Pavise/Aegis) sources stack in a separate, pierce-immune product | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str, piercable: bool }` |
 | `FLAT_DAMAGE_STRIKE` | Unit deals +X damage | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
 | `PULSE_STRIKE` | Grants Special count -X to unit before specific strikes | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str, cap_cd_start_of_cbt: bool }` |
 | `SCOWL_STRIKE` | Inflicts Special cooldown count + X on unit before unit's specific attacks | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
