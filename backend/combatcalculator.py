@@ -22,7 +22,6 @@ class CombatantState:
     cd_start_of_cbt: int = 0
     damage_mitigated_bucket: int = 0
     bonus_count: int = 0
-    miracle_used: bool = False
     penalty_count: int = 0
     special_use_count: int = 0
     strike_count: int = 0
@@ -618,33 +617,31 @@ class CombatEngine:
             e.type == EffectType.STAFF_FULL_DAMAGE
             for e in striker_state.effects_on_strike
         )
-    def _miracle_survives(self, target_state, striker_state) -> bool:
-        """True if the target has a Miracle that survives THIS lethal hit.
+    def _miracle_survives(self, strike, target_state, striker_state, target_special) -> bool:
+        """True if a Miracle lets the target survive this lethal hit at 1 HP.
 
-        Special Miracle (MIRACLE_SPECIAL): cannot be bypassed by Fatal Smoke.
-        (Special-cooldown gating isn't modeled yet — awaits the Special system.)
+        Distinguished by the MIRACLE effect's params:
+          - Special miracle: strike == "on_unit_special" (requires the target's
+            special charged/ready) and cannot be bypassed by Fatal Smoke.
+          - Skill miracle: otherwise. Once per combat (target_state.miracle_used),
+            and bypassed by FATAL_SMOKE on the attacker.
 
-        Skill Miracle (MIRACLE_SKILL): once per combat (tracked by
-        target_state.miracle_used), and bypassed if the attacker has FATAL_SMOKE.
-
-        Does NOT set the used-flag — the caller sets it only when a SKILL miracle
-        is what actually saved the unit."""
-        if any(e.type == EffectType.MIRACLE_SPECIAL
-               for e in target_state.effects_on_strike):
-            return True
-
-        if target_state.miracle_used:
-            return False
-
-        has_skill_miracle = any(
-            e.type == EffectType.MIRACLE_SKILL
-            for e in target_state.effects_on_strike
-        )
+        Only checks; caller sets miracle_used for the skill-miracle case.
+        """
         fatal_smoke = any(
-            e.type == EffectType.FATAL_SMOKE
-            for e in striker_state.effects_on_strike
+            e.type == EffectType.FATAL_SMOKE for e in striker_state.effects_on_strike
         )
-        return has_skill_miracle and not fatal_smoke
+        for e in target_state.effects_on_strike:
+            if e.type != EffectType.MIRACLE:
+                continue
+            is_special = e.params.get("strike") == "on_unit_special"
+            if is_special:
+                if target_special:          # needs special ready; not bypassable
+                    return True
+            else:
+                if not target_state.miracle_used and not fatal_smoke:
+                    return True
+        return False
     def _determine_strike_sequence(self) -> list[Strike]:
         """Calculates the combat sequence using effects_strike_sequence instead of keywords."""
         atk_state = self.combatant_states["attacker"]
@@ -1008,6 +1005,7 @@ class CombatEngine:
                 pierce_mult *= 1.0 - pierce_value
 
         perc_dr = 0.0
+        unpierceable_dr = 0.0
         for effect in target_state.effects_on_strike:
             if effect.type == EffectType.PERC_DR_STRIKE and self._strike_matches(
                 strike,
@@ -1019,22 +1017,11 @@ class CombatEngine:
                     self._resolve_formula(effect.params, target_state, striker_state)
                     / 100.0
                 )
-                dr_val *= pierce_mult          # pierce THIS source
-                perc_dr = 1.0 - ((1.0 - perc_dr) * (1.0 - dr_val))
-
-        unpierceable_dr = 0.0
-        for effect in target_state.effects_on_strike:
-            if effect.type == EffectType.PERC_DR_UNPIERCEABLE_STRIKE and self._strike_matches(
-                strike,
-                effect.params,
-                unit_special=target_special,
-                foe_special=striker_special,
-            ):
-                dr_val = (
-                    self._resolve_formula(effect.params, target_state, striker_state)
-                    / 100.0
-                )
-                unpierceable_dr = 1.0 - ((1.0 - unpierceable_dr) * (1.0 - dr_val))
+                if effect.params.get("piercable", True):
+                    dr_val *= pierce_mult
+                    perc_dr = 1.0 - ((1.0 - perc_dr) * (1.0 - dr_val))
+                else:
+                    unpierceable_dr = 1.0 - ((1.0 - unpierceable_dr) * (1.0 - dr_val))
 
         effective_dr = 1.0 - ((1.0 - perc_dr) * (1.0 - unpierceable_dr))
         damage_multiplier = 1.0 - effective_dr
@@ -1071,21 +1058,23 @@ class CombatEngine:
         if dmg_floor is not None and final_damage > dmg_floor:
             final_damage = dmg_floor
 
-        mitigated_amount = pre_mitigation_damage - final_damage
-        target_state.damage_mitigated_bucket += mitigated_amount
         lethal = final_damage >= target_state.current_hp
         if lethal and target_state.current_hp > 1 and self._miracle_survives(
-            target_state, striker_state
+            strike, target_state, striker_state, target_special
         ):
-            final_damage = target_state.current_hp - 1
-            #TODO: this does not account for roy ring, but we can do that another day. this atm just checks of miracle has been procced in combat already
-            has_special_miracle = any(
-                e.type == EffectType.MIRACLE_SPECIAL
+            final_damage = target_state.current_hp - 1   # survive at exactly 1 HP
+            # Skill miracle is once-per-combat; special miracle is gated by
+            # cooldown instead, so only burn the flag for skill miracle.
+            special_miracle = any(
+                e.type == EffectType.MIRACLE
+                and e.params.get("strike") == "on_unit_special"
                 for e in target_state.effects_on_strike
             )
-            if not has_special_miracle:
+            if not special_miracle:
                 target_state.miracle_used = True
 
+        mitigated_amount = pre_mitigation_damage - final_damage
+        target_state.damage_mitigated_bucket += mitigated_amount
         target_state.current_hp -= final_damage
 
         hit_heal = 0
