@@ -112,6 +112,31 @@ _evaluate_hp_above_pct = _make_hp_pct_evaluator(lambda pct, threshold: pct >= th
 _evaluate_hp_below_pct = _make_hp_pct_evaluator(lambda pct, threshold: pct < threshold)
 
 
+def _evaluate_visible_stat_check(params: dict) -> Callable:
+    """Generic visible-stat comparison (Ploy, Eldhrimnir, etc.).
+
+    Used by start-of-turn grants, which are evaluated eagerly outside the
+    pre_aoe/start_of_combat/post_sequence phase system (see
+    CombatEngine._start_of_turn_conditions_pass, which calls cond.func
+    directly). Reads through CombatantState.visible_stat so a conditional
+    grant sees the results of unconditional grants applied earlier in the
+    same start-of-turn pass.
+    """
+    stat = params.get("stat", "res")
+    margin = params.get("margin", 0)
+    comparison = params.get("comparison", "greater_or_equal")
+
+    def evaluate(unit: "CombatantState", foe: "CombatantState") -> bool:
+        unit_stat = unit.visible_stat(stat)
+        foe_stat = foe.visible_stat(stat)
+        threshold = foe_stat + margin
+        if comparison == "lesser_than":
+            return unit_stat < threshold
+        return unit_stat >= threshold
+
+    return evaluate
+
+
 def _evaluate_cbt_stat_check(params: dict) -> Callable:
     """Generic in-combat stat comparison (handles Spd, Def, Res, etc)."""
     stat = params.get("stat", "spd")
@@ -177,6 +202,7 @@ def _evaluate_triggers_brave(params: dict) -> Callable:
 
     return evaluate
 
+
 def _evaluate_potent_spd_check(params: dict) -> Callable:
     """Standard Potent trigger. A normal follow-up needs spd_diff >= 5; Potent
     lowers that requirement by `spd_lower`, so it triggers when
@@ -197,10 +223,11 @@ def _evaluate_potent_spd_check(params: dict) -> Callable:
 
     return evaluate
 
+
 def _evaluate_cbt_stat_sum_check(params: dict) -> Callable:
     """Compares a SUM of the unit's in-combat stats vs the foe's, with a margin.
     Used by the Spd+Def Potent: Spd+Def >= foe's Spd+Def + margin."""
-    stats = params["stats"]           # e.g. ["spd", "defense"]
+    stats = params["stats"]  # e.g. ["spd", "defense"]
     margin = params.get("margin", 0)
     comparison = params.get("comparison", "greater_or_equal")
 
@@ -212,9 +239,10 @@ def _evaluate_cbt_stat_sum_check(params: dict) -> Callable:
 
     return evaluate
 
+
 def _evaluate_potent_patience(params: dict) -> Callable:
-    """Patience-type (guaranteed) Potent: triggers regardless of Spd.
-    """
+    """Patience-type (guaranteed) Potent: triggers regardless of Spd."""
+
     def evaluate(unit, foe) -> bool:
         return True
 
@@ -240,6 +268,7 @@ CONDITION_REGISTRY: dict[str, tuple[Phase, Callable[[dict], Callable]]] = {
     "bonus_penalty_total": ("pre_aoe", _evaluate_num_bonus_penalty_total),
     "is_engaged": ("pre_aoe", _evaluate_is_engaged),
     "potent_patience": ("start_of_combat", _evaluate_potent_patience),
+    "visible_stat_check": ("start_of_turn", _evaluate_visible_stat_check),
 }
 
 # ── classes ─────────────────────────────────────────────────────────────────

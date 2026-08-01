@@ -864,6 +864,7 @@ Formula names resolve to raw game quantities; skill-specific offsets and caps li
 | `hp_below_pct` | `start_of_combat` | `{ "unit": "self"\|"foe", "threshold": int }` — true when HP% is strictly below threshold (exact complement of `hp_above_pct`) |
 | `triggers_brave` | `post_sequence` | `{ "target": "self"\|"foe" }` |
 | `cbt_stat_check` | `start_of_combat` | `{ "stat": str, "unit": "self"\|"foe", "margin": int, "comparison": "greater_or_equal"\|"lesser_than" }` | *`cbt_stat_check`'s `comparison` is optional and defaults to `greater_or_equal` (`unit_stat >= foe_stat + margin`). `lesser_than` evaluates `unit_stat < foe_stat + margin`. The two are exact complements at the same `margin`, so a pair of effects with opposite comparisons partitions every case (e.g. Breath of Life 4's 40%/20% heal split on Def).*
+| `visible_stat_check` | `start_of_turn` | `{ "stat": str, "margin": int, "comparison": "greater_or_equal"\|"lesser_than" }` | Same semantics as `cbt_stat_check` but compares visible stats via `CombatantState.visible_stat()` (Ploy, Eldhrímnir). The `start_of_turn` phase is NOT part of the three-phase `_evaluate_conditions` system — it's evaluated eagerly by `_start_of_turn_conditions_pass`, which calls `cond.func` directly, so a conditional grant sees unconditional grants applied earlier in the same pass. |
 
 
 
