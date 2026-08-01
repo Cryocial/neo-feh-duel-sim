@@ -42,7 +42,9 @@ def neut_effect(strike="every_strike") -> Effect:
 
 
 def state_with(unit, on_strike_effects=None, cooldown=0) -> CombatantState:
-    s = CombatantState(unit=unit, current_hp=unit.base_stats.hp, current_cooldown=cooldown)
+    s = CombatantState(
+        unit=unit, current_hp=unit.base_stats.hp, current_cooldown=cooldown
+    )
     if on_strike_effects:
         s.effects_on_strike = list(on_strike_effects)
     return s
