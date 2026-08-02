@@ -280,7 +280,7 @@
         "effect": "PERC_DR_STRIKE",
         "target": "self",
         "params": {
-          "formula": "spd_diff",
+          "formula": "phantom_spd_diff",
           "multiplier": 4,
           "max": 40,
           "strike": "every_strike",

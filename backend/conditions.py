@@ -138,14 +138,29 @@ def _evaluate_visible_stat_check(params: dict) -> Callable:
 
 
 def _evaluate_cbt_stat_check(params: dict) -> Callable:
-    """Generic in-combat stat comparison (handles Spd, Def, Res, etc)."""
+    """Generic in-combat stat comparison (handles Spd, Def, Res, etc).
+
+    include_phantom defaults to True: most stat checks (Breath of Life's Def
+    threshold, the Brave-trigger conditional, etc.) are ordinary stat
+    comparisons and should see Phantom Spd/Res/Def like any other bonus.
+    Follow-up eligibility and Potent are the deliberate exceptions, and they
+    have their own dedicated evaluators (_evaluate_potent_spd_check,
+    _evaluate_cbt_stat_sum_check) that never touch Phantom at all — they
+    don't go through this function. Pass "include_phantom": false here only
+    if a future generic check genuinely needs to ignore Phantom.
+    """
     stat = params.get("stat", "spd")
     margin = params.get("margin", 0)
     comparison = params.get("comparison", "greater_or_equal")
+    include_phantom = params.get("include_phantom", True)
 
     def evaluate(unit: "CombatantState", foe: "CombatantState") -> bool:
-        unit_stat = getattr(unit.combat_stats, stat, unit.unit.get_visible_stat(stat))
-        foe_stat = getattr(foe.combat_stats, stat, foe.unit.get_visible_stat(stat))
+        if include_phantom:
+            unit_stat = unit.cbt_stat_with_phantom(stat)
+            foe_stat = foe.cbt_stat_with_phantom(stat)
+        else:
+            unit_stat = getattr(unit.combat_stats, stat, unit.unit.get_visible_stat(stat))
+            foe_stat = getattr(foe.combat_stats, stat, foe.unit.get_visible_stat(stat))
         threshold = foe_stat + margin
         if comparison == "lesser_than":
             return unit_stat < threshold
@@ -211,8 +226,9 @@ def _evaluate_potent_spd_check(params: dict) -> Callable:
     Example: Potent 10 (spd_lower=10) triggers at spd_diff >= -5, so a unit 5
     slower than its foe still gets Potent.
 
-    Reads combat Spd (start_of_combat phase). Excludes Phantom (once modeled),
-    includes frozen effects (they're part of combat Spd).
+    Reads combat_stats.spd directly (not cbt_stat_with_phantom), so Phantom
+    Spd is excluded, per its design (see CombatantState.cbt_stat_with_phantom).
+    Includes frozen effects (they're part of combat Spd).
     """
     spd_lower = params["spd_lower"]
     base = 5  # the standard natural-follow-up Spd requirement
@@ -226,7 +242,13 @@ def _evaluate_potent_spd_check(params: dict) -> Callable:
 
 def _evaluate_cbt_stat_sum_check(params: dict) -> Callable:
     """Compares a SUM of the unit's in-combat stats vs the foe's, with a margin.
-    Used by the Spd+Def Potent: Spd+Def >= foe's Spd+Def + margin."""
+    Used by the Spd+Def Potent: Spd+Def >= foe's Spd+Def + margin.
+
+    This is a Potent-only evaluator (its one documented use is the Spd+Def
+    Potent variant), so unlike _evaluate_cbt_stat_check it has no
+    include_phantom toggle at all — it must always exclude Phantom, the same
+    as _evaluate_potent_spd_check, so there's nothing to accidentally flip.
+    """
     stats = params["stats"]  # e.g. ["spd", "defense"]
     margin = params.get("margin", 0)
     comparison = params.get("comparison", "greater_or_equal")

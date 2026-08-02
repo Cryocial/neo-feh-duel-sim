@@ -54,6 +54,7 @@ class EffectType(str, Enum):
     STAT_DAUNT = "STAT_DAUNT"
     BONUS_NEUT = "BONUS_NEUT"
     PENALTY_NEUT = "PENALTY_NEUT"
+    PHANTOM_STAT = "PHANTOM_STAT"
 
     # ── Strike sequence ───────────────────────────────────────────────────────
     FU_DENY = "FU_DENY"

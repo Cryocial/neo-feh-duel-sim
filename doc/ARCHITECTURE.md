@@ -822,7 +822,7 @@ Used in the `params` of `effects_on_strike` effects to specify which strikes the
 
 ### C - `formula` Value Reference
 
-Formula names resolve to raw game quantities; skill-specific offsets and caps live in the params (`flat` for offsets, `min`/`max` for clamps), not baked into the formula. For example, the Liberate "+4, max 8" is `"formula": "bonus_count", "multiplier": 1, "flat": 4, "max": 8`, and Dodge's "Spd diff ×4, max 40%" is `"formula": "spd_diff", "multiplier": 4, "min": 0, "max": 40`.
+Formula names resolve to raw game quantities; skill-specific offsets and caps live in the params (`flat` for offsets, `min`/`max` for clamps), not baked into the formula. For example, the Liberate "+4, max 8" is `"formula": "bonus_count", "multiplier": 1, "flat": 4, "max": 8`, and Dodge's "Spd diff ×4, max 40%" is `"formula": "phantom_spd_diff", "multiplier": 4, "min": 0, "max": 40`.
 .
 
 | Value | Resolves to | Extra params |
@@ -836,7 +836,7 @@ Formula names resolve to raw game quantities; skill-specific offsets and caps li
 | `sum_foe_visible_debuffs` | Sum of foe's visible stat penalties, each floored at 0 (Dominance) | — |
 | `mitigated_bucket` | Unit's accumulated mitigated-damage total (Reflex) | — |
 | `unit_max_hp` | Unit's max HP (percent heals: pair with `multiplier`) | — |
-| `spd_diff` | `unit_spd - foe_spd`, in-combat, floored at 0 (Dodge: pair with `multiplier`/`max` for the cap) | — |
+| `phantom_spd_diff` | `unit_spd - foe_spd`, in-combat, **including Phantom Spd**, floored at 0 (Dodge: pair with `multiplier`/`max` for the cap). Distinct from the plain `spd_diff` locals used by the follow-up check and `potent_spd_check`, which deliberately exclude Phantom. | — |
 | `foe_penalty_count` | Foe's active penalty count (Creation Pulse: pair with `max` for the cap) | — |
 | `unit_cbt_atk` | Unit's in-combat Atk | — |
 | `unit_cbt_spd` | Unit's in-combat Spd | — |

@@ -163,7 +163,7 @@ def test_spd_diff_positive(engine, plain_unit, plain_foe):
     foe = make_state(
         plain_foe, combat_stats=StatBlock(hp=50, atk=25, spd=20, defense=25, res=25)
     )
-    params = {"formula": "spd_diff", "multiplier": 1}
+    params = {"formula": "phantom_spd_diff", "multiplier": 1}
     assert engine._resolve_formula(params, unit, foe) == 15
 
 
@@ -175,7 +175,7 @@ def test_spd_diff_floored_at_zero_when_slower(engine, plain_unit, plain_foe):
     foe = make_state(
         plain_foe, combat_stats=StatBlock(hp=50, atk=25, spd=30, defense=25, res=25)
     )
-    params = {"formula": "spd_diff", "multiplier": 4, "max": 40}
+    params = {"formula": "phantom_spd_diff", "multiplier": 4, "max": 40}
     assert engine._resolve_formula(params, unit, foe) == 0
 
 

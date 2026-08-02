@@ -15,6 +15,7 @@ EFFECT_LIST_MAP: dict[EffectType, str] = {
     EffectType.STAT_DAUNT: "effects_start_of_combat",
     EffectType.BONUS_NEUT: "effects_start_of_combat",
     EffectType.PENALTY_NEUT: "effects_start_of_combat",
+    EffectType.PHANTOM_STAT: "effects_start_of_combat",
     # ── Strike sequence ─────────────────────────────────────────────────
     EffectType.FU_DENY: "effects_strike_sequence",
     EffectType.OFF_NFU: "effects_strike_sequence",
