@@ -18,6 +18,7 @@ class CombatantState:
     current_hp: int
     current_cooldown: int
     combat_stats: StatBlock | None = None
+    phantom_bonus: StatBlock = field(default_factory=StatBlock)
     defensive_stat: Literal["defense", "res"] | None = None
     cd_start_of_cbt: int = 0
     damage_mitigated_bucket: int = 0
@@ -51,6 +52,19 @@ class CombatantState:
         base += getattr(self.granted_visible_buffs, name)
         base -= getattr(self.granted_visible_debuffs, name)
         return base
+
+    def cbt_stat_with_phantom(self, name: str) -> int:
+        """Combat stat plus Phantom (Spd/Res/Def) bonuses, for checks that are
+        explicitly allowed to see Phantom — e.g. Dodge's Spd-diff DR.
+
+        Follow-up eligibility and Potent triggers must NOT use this: they read
+        combat_stats directly, since Phantom is defined to boost Spd checks
+        without affecting whether a follow-up attack happens.
+        """
+        base = getattr(self.combat_stats, name, None)
+        if base is None:
+            base = self.unit.get_visible_stat(name)
+        return base + getattr(self.phantom_bonus, name)
 
 
 @dataclass
@@ -556,9 +570,29 @@ class CombatEngine:
                 stats = effect.params.get("stats", [])
                 updates = {s: getattr(state.combat_stats, s) + magnitude for s in stats}
                 state.combat_stats = replace(state.combat_stats, **updates)
+        # Apply PHANTOM_STAT effects. These accumulate into phantom_bonus
+        # instead of combat_stats, so it wont apply to normal follow ups and etc.
+        for state, foe in ((atk_state, def_state), (def_state, atk_state)):
+            for effect in state.effects_start_of_combat:
+                if effect.type != EffectType.PHANTOM_STAT:
+                    continue
+
+                if effect.applied_by == "foe":
+                    owner, opponent = foe, state
+                else:
+                    owner, opponent = state, foe
+
+                magnitude = self._resolve_formula(effect.params, owner, opponent)
+                stats = effect.params.get("stats", [])
+                updates = {
+                    s: getattr(state.phantom_bonus, s) + magnitude for s in stats
+                }
+                state.phantom_bonus = replace(state.phantom_bonus, **updates)
 
         self.attacker.combat_stats = self.combatant_states["attacker"].combat_stats
         self.defender.combat_stats = self.combatant_states["defender"].combat_stats
+        self.attacker.phantom_bonus = self.combatant_states["attacker"].phantom_bonus
+        self.defender.phantom_bonus = self.combatant_states["defender"].phantom_bonus
 
         # Adaptive damage targeting
         self.combatant_states[
@@ -1305,9 +1339,14 @@ class CombatEngine:
                     variable = unit_state.damage_mitigated_bucket
                 case "unit_max_hp":
                     variable = unit_state.unit.base_stats.hp
-                case "spd_diff":
+                case "phantom_spd_diff":
+                    # Distinct from the follow-up/Potent spd_diff locals in
+                    # _determine_strike_sequence and _evaluate_potent_spd_check —
+                    # this one is phantom-inclusive by name and by design.
                     variable = max(
-                        0, unit_state.combat_stats.spd - foe_state.combat_stats.spd
+                        0,
+                        unit_state.cbt_stat_with_phantom("spd")
+                        - foe_state.cbt_stat_with_phantom("spd"),
                     )
                 case "foe_penalty_count":
                     variable = foe_state.penalty_count
