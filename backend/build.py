@@ -132,6 +132,7 @@ class Unit:
         self.first_combat_of_turn = True
         self.is_engaged = False
         self.style_enabled = False
+        self.chosen_range: int | None = None
         self.allies_within_2_spaces = 0
         self.allies_within_3_spaces = 0
         self.allies_within_3_rows_cols = 0

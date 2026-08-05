@@ -10,11 +10,12 @@ EFFECT_LIST_MAP: dict[EffectType, str] = {
     EffectType.FLAT_DR_AOE: "effects_AoE",
     EffectType.HEXBLADE_AOE: "effects_AoE",
     EffectType.PULSE_AOE: "effects_AoE",
-    # ── Stat modifications ──────────────────────────────────────────────
+    # ── Start-of-combat effects ──────────────────────────────────────────
     EffectType.STAT_BOOST: "effects_start_of_combat",
     EffectType.STAT_DAUNT: "effects_start_of_combat",
     EffectType.BONUS_NEUT: "effects_start_of_combat",
     EffectType.PENALTY_NEUT: "effects_start_of_combat",
+    EffectType.RANGE_EXTENSION: "effects_start_of_combat",
     # ── Strike sequence ─────────────────────────────────────────────────
     EffectType.FU_DENY: "effects_strike_sequence",
     EffectType.OFF_NFU: "effects_strike_sequence",

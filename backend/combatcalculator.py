@@ -3,7 +3,7 @@ from dataclasses import dataclass, field, replace
 from typing import Literal
 
 from .build import Unit, StatBlock
-from .constants import Color, StrikeType, EffectType
+from .constants import Color, StrikeType, EffectType, WeaponType
 from .effects import Effect, build_effect, EFFECT_LIST_MAP
 from .conditions import Phase, Condition, AtomicCondition, AnyOf, AllOf
 from .jsonbootupstuff import BONUS_DATABASE, PENALTY_DATABASE
@@ -63,6 +63,11 @@ class Strike:
     consecutive: bool = False
     is_first_hit: bool = False
     potent_mult: float = 1.0
+
+
+
+def _base_combat_range(weapon_type: WeaponType) -> int:
+    return 2 if weapon_type in {WeaponType.BOW, WeaponType.DAGGER, WeaponType.TOME, WeaponType.STAFF} else 1
 
 
 def _distribute_effects(attacker: CombatantState, defender: CombatantState) -> None:
@@ -208,6 +213,7 @@ class CombatEngine:
     attacker: Unit
     defender: Unit
     combatant_states: dict[UnitRole, CombatantState] = field(init=False)
+    combat_range: int = field(init=False, default=0)
 
     def simulate(self) -> dict[str, int]:
         """Runs the full combat simulation following a 10-step timeline."""
@@ -240,6 +246,8 @@ class CombatEngine:
         self._phase_AoE()
 
         self._combat_stat_calculations()
+
+        self._range_calculation()
 
         self._evaluate_conditions("start_of_combat")
 
@@ -572,6 +580,24 @@ class CombatEngine:
             striker_state=self.combatant_states["defender"],
             target_state=self.combatant_states["attacker"],
         )
+
+    def _range_calculation(self):
+        """Determines the distance this combat happens at: the attacker's base
+        weapon range, overridden by a RANGE_EXTENSION from the attacker's own
+        style, if any (only the initiator's engagement range matters here).
+        """
+        self.combat_range = _base_combat_range(self.attacker.weapon_type)
+
+        atk_state = self.combatant_states["attacker"]
+        for effect in atk_state.effects_start_of_combat:
+            if effect.type != EffectType.RANGE_EXTENSION:
+                continue
+            min_range = effect.params["min"]
+            max_range = effect.params["max"]
+            self.combat_range = (
+                min_range if min_range == max_range else self.attacker.chosen_range
+            )
+            break
 
     def _determine_defensive_stat(
         self, striker_state: CombatantState, target_state: CombatantState
