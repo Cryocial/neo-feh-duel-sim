@@ -177,6 +177,14 @@ def _evaluate_triggers_brave(params: dict) -> Callable:
     return evaluate
 
 
+def _evaluate_style_enabled(params: dict) -> Callable:
+    """Checks if unit should use style if possible"""
+    def evaluate(unit: "CombatantState", foe: "CombatantState") -> bool:
+        return unit.nb_styles == 1 and unit.style_enabled
+
+    return evaluate
+
+
 # ── registry ─────────────────────────────────────────────────────────────────
 
 
@@ -193,6 +201,7 @@ CONDITION_REGISTRY: dict[str, tuple[Phase, Callable[[dict], Callable]]] = {
     "triggers_brave": ("post_sequence", _evaluate_triggers_brave),
     "bonus_penalty_total": ("pre_aoe", _evaluate_num_bonus_penalty_total),
     "is_engaged": ("pre_aoe", _evaluate_is_engaged),
+    "style_enabled": ("pre_aoe", _evaluate_style_enabled),
 }
 
 # ── classes ─────────────────────────────────────────────────────────────────
