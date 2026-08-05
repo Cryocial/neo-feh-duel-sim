@@ -888,17 +888,22 @@ class CombatEngine:
                 Strike("defender", "attacker", StrikeType.POTENT, consecutive=True)
             )
 
+        defender_counterattack = (
+            self.combat_range == _base_combat_range(def_state.unit.weapon_type)
+            or any(e.type == EffectType.COUNTERATTACK for e in def_state.effects_strike_sequence)
+        )
+                 
         defender_flash = any(
             e.type == EffectType.FLASH for e in def_state.effects_strike_sequence
         )
-        if defender_flash:
-            defender_flash_neut = any(
-                e.type == EffectType.FLASH_NEUT
-                for e in def_state.effects_strike_sequence
-            )
-            if not defender_flash_neut:
-                defender_first = []
-                defender_followups = []
+        defender_flash_neut = any(
+            e.type == EffectType.FLASH_NEUT
+            for e in def_state.effects_strike_sequence
+        )
+
+        if not defender_counterattack or (defender_flash and not defender_flash_neut):
+            defender_first = []
+            defender_followups = []
 
         attacker_package = attacker_first + attacker_followups
         defender_package = defender_first + defender_followups

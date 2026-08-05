@@ -27,6 +27,7 @@ EFFECT_LIST_MAP: dict[EffectType, str] = {
     EffectType.VANTAGE_NEUT: "effects_strike_sequence",
     EffectType.DESPERATION: "effects_strike_sequence",
     EffectType.DESPERATION_NEUT: "effects_strike_sequence",
+    EffectType.COUNTERATTACK: "effects_strike_sequence",
     EffectType.FLASH: "effects_strike_sequence",
     EffectType.FLASH_NEUT: "effects_strike_sequence",
     EffectType.OFF_FROZEN: "effects_strike_sequence",
