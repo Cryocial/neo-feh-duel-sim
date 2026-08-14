@@ -1,11 +1,12 @@
 import json
 import os
-from .build import StatBlock, Skill, Status
+from .build import StatBlock, Skill, Status, DivineVein
 from .constants import MovementType, WeaponType
 
 SKILL_DATABASE: dict[str, Skill] = {}
 BONUS_DATABASE: dict[str, Status] = {}
 PENALTY_DATABASE: dict[str, Status] = {}
+DIVINE_VEINS_DATABASE: dict[str, Status] = {}
 UNIT_DATABASE: dict[str, dict] = {}
 
 
@@ -50,6 +51,15 @@ def _load_skills(path: str) -> None:
         )
 
 
+def _load_divine_veins(path: str) -> None:
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    for name, entry in data.items():
+        DIVINE_VEINS_DATABASE[name] = DivineVein(
+            name=name,
+            effects=entry.get("effects", [])
+        )
+
 def _load_units(path: str) -> None:
     with open(path, encoding="utf-8") as f:
         data = json.load(f)
@@ -63,6 +73,7 @@ def _initialize_databases() -> None:
         (_load_statuses, "statuses.json"),
         (_load_skills, "skills.json"),
         (_load_units, "units.json"),
+        (_load_divine_veins, "divine_veins.json")
     ]
     for loader, filename in loaders:
         path = os.path.join(base, filename)

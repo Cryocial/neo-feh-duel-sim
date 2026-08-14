@@ -71,6 +71,10 @@ class Status:
     effects: list[dict]  # raw effect definitions from the JSON
     grants_style: bool = False
 
+@dataclass(frozen=True)
+class DivineVein:
+    name: str
+    effects: list[dict]
 
 class Unit:
     """
