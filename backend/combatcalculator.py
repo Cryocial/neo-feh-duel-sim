@@ -975,10 +975,10 @@ class CombatEngine:
             if e.type == EffectType.PRE_CBT_DAMAGE
         )
 
-        if atk_predmg > 0:
-            def_state.current_hp = max(1, def_state.current_hp - atk_predmg)
         if def_predmg > 0:
-            atk_state.current_hp = max(1, atk_state.current_hp - def_predmg)
+            def_state.current_hp = max(1, def_state.current_hp - def_predmg)
+        if atk_predmg > 0:
+            atk_state.current_hp = max(1, atk_state.current_hp - atk_predmg)
 
         # Process Pre-Combat Heal
         atk_preheal = sum(
