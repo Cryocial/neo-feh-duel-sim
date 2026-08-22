@@ -2,7 +2,7 @@ import math
 from dataclasses import dataclass, field, replace
 from typing import Literal
 
-from .build import Unit, StatBlock
+from .build import Unit, StatBlock, DivineVein
 from .constants import Color, StrikeType, EffectType, WeaponType
 from .effects import Effect, build_effect, EFFECT_LIST_MAP
 from .conditions import Phase, Condition, AtomicCondition, AnyOf, AllOf
@@ -30,6 +30,7 @@ class CombatantState:
     spaces_moved: int = 0
     style_enabled: bool = False
     nb_styles: int = 0
+    active_ally_divine_vein: DivineVein | None = None
     granted_visible_buffs: StatBlock = field(default_factory=StatBlock)
     granted_visible_debuffs: StatBlock = field(default_factory=StatBlock)
     effects_start_of_turn: list[Effect] = field(default_factory=list)
@@ -99,6 +100,13 @@ def _distribute_effects(attacker: CombatantState, defender: CombatantState) -> N
             _add_to_bucket(target, effect)
         attacker.nb_styles += status.grants_style
 
+    if attacker.active_ally_divine_vein:
+        for desc in attacker.active_ally_divine_vein.effects:
+            is_self = desc["target"] == "self"
+            effect = build_effect(desc, applied_by="self" if is_self else "foe")
+            target = attacker if is_self else defender
+            _add_to_bucket(target, effect)
+
     defender_skills = filter(
         None,
         [
@@ -120,6 +128,13 @@ def _distribute_effects(attacker: CombatantState, defender: CombatantState) -> N
 
     for status in defender.unit.active_statuses:
         for desc in status.effects:
+            is_self = desc["target"] == "self"
+            effect = build_effect(desc, applied_by="self" if is_self else "foe")
+            target = defender if is_self else attacker
+            _add_to_bucket(target, effect)
+
+    if defender.active_ally_divine_vein:
+        for desc in defender.active_ally_divine_vein.effects:
             is_self = desc["target"] == "self"
             effect = build_effect(desc, applied_by="self" if is_self else "foe")
             target = defender if is_self else attacker
@@ -210,6 +225,8 @@ class CombatEngine:
 
     attacker: Unit
     defender: Unit
+    attacker_divine_vein: DivineVein | None = None
+    defender_divine_vein: DivineVein | None = None
     combatant_states: dict[UnitRole, CombatantState] = field(init=False)
     combat_range: int = field(init=False, default=0)
 
@@ -221,14 +238,16 @@ class CombatEngine:
                 current_hp=self.attacker.current_hp,
                 current_cooldown=self.attacker.max_cooldown - self.attacker.pre_charge,
                 is_initiator=True,
-                style_enabled=self.attacker.style_enabled
+                style_enabled=self.attacker.style_enabled,
+                active_ally_divine_vein=self.attacker_divine_vein
             ),
             "defender": CombatantState(
                 unit=self.defender,
                 current_hp=self.defender.current_hp,
                 current_cooldown=self.defender.max_cooldown - self.defender.pre_charge,
                 is_initiator=False,
-                style_enabled=self.defender.style_enabled
+                style_enabled=self.defender.style_enabled,
+                active_ally_divine_vein=self.defender_divine_vein
             ),
         }
         self._phase_start_of_turn()
@@ -973,10 +992,10 @@ class CombatEngine:
             if e.type == EffectType.PRE_CBT_DAMAGE
         )
 
-        if atk_predmg > 0:
-            def_state.current_hp = max(1, def_state.current_hp - atk_predmg)
         if def_predmg > 0:
-            atk_state.current_hp = max(1, atk_state.current_hp - def_predmg)
+            def_state.current_hp = max(1, def_state.current_hp - def_predmg)
+        if atk_predmg > 0:
+            atk_state.current_hp = max(1, atk_state.current_hp - atk_predmg)
 
         # Process Pre-Combat Heal
         atk_preheal = sum(

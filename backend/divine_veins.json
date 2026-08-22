@@ -1,0 +1,182 @@
+{
+  "Flame": {
+    "effects": [
+      {
+        "effect": "PRE_CBT_DAMAGE",
+        "target": "foe",
+        "params": {
+          "formula": "",
+          "multiplier": 0,
+          "flat": 7,
+          "min": 7,
+          "max": 7
+        },
+        "conditions": []
+      }
+    ]
+  },
+  "Stone": {
+    "effects": [
+      {
+        "effect": "PERC_DR_AOE",
+        "target": "self",
+        "params": {
+            "formula": "",
+            "multiplier": 0,
+            "flat": 50,
+            "min": 50,
+            "max": 50
+        },
+        "conditions": []
+      },
+      {
+        "effect": "STAT_BOOST",
+        "target": "self",
+        "params": {
+          "stats": [
+            "defense", "res"
+          ],
+          "formula": "",
+          "multiplier": 0,
+          "flat": 6,
+          "min": 6,
+          "max": 6
+        },
+        "conditions": []
+      },
+      {
+        "effect": "FLAT_DR_STRIKE",
+        "target": "self",
+        "params": {
+            "formula": "",
+            "multiplier": 0,
+            "flat": 10,
+            "min": 10,
+            "max": 10,
+            "strike": "on_foe_special"
+        },
+        "conditions": []
+      }
+    ]
+  },"Green": {
+    "effects": [
+      {
+        "effect": "OFF_GUARD",
+        "target": "foe",
+        "params": {},
+        "conditions": []
+      },
+      {
+        "effect": "DEF_GUARD",
+        "target": "foe",
+        "params": {},
+        "conditions": []
+      }
+    ]
+  },
+  "Vert": {
+    "effects": [
+      {
+        "effect": "STAT_DAUNT",
+        "target": "foe",
+        "params": {
+            "stats": [
+            "atk", "spd"
+          ],
+          "formula": "",
+          "multiplier": 0,
+          "flat": 5,
+          "min": 5,
+          "max": 5
+        },
+        "conditions": []
+      },
+      {
+        "effect": "OFF_GUARD",
+        "target": "foe",
+        "params": {},
+        "conditions": []
+      },
+      {
+        "effect": "DEF_GUARD",
+        "target": "foe",
+        "params": {},
+        "conditions": []
+      },
+      {
+        "effect": "SCOWL_STRIKE",
+        "target": "foe",
+        "params": {
+            "formula": "",
+            "multiplier": 0,
+            "flat": 1,
+            "min": 1,
+            "max": 1,
+            "strike": "first_strike"
+        },
+        "conditions": []
+      }
+    ]
+  },
+  "Haze": {
+    "effects": [
+      {
+        "effect": "STAT_DAUNT",
+        "target": "foe",
+        "params": {
+            "stats": [
+            "atk", "spd", "defense", "res"
+          ],
+          "formula": "",
+          "multiplier": 0,
+          "flat": 5,
+          "min": 5,
+          "max": 5
+        },
+        "conditions": []
+      },
+      {
+        "effect": "BONUS_NEUT",
+        "target": "foe",
+        "params": {
+            "stats": [
+            "atk", "spd", "defense", "res"
+          ]
+        },
+        "conditions": []
+      }
+    ]
+  },
+  "Water": {
+    "effects": [
+      {
+        "effect": "STAT_DAUNT",
+        "target": "foe",
+        "params": {
+            "stats": [
+            "spd"
+          ],
+          "formula": "",
+          "multiplier": 0,
+          "flat": 5,
+          "min": 5,
+          "max": 5
+        },
+        "conditions": []
+      },
+      {
+        "effect": "DR_PIERCE",
+        "target": "self",
+        "params": {
+            "formula": "",
+            "multiplier": 0,
+            "flat": 50,
+            "min": 50,
+            "max": 50,
+            "strike": "every_strike"
+        },
+        "conditions": []
+      }
+    ]
+  }
+}
