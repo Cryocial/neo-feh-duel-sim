@@ -706,6 +706,7 @@ Processed by `_phase_start_of_turn` before combat begins. These grant visible st
 | `STAT_DAUNT` | Inflicts -X to specific stats to unit | `{ stats: list[str] } + { formula: str, multiplier: float, flat: int, min: int, max: int }` |
 | `BONUS_NEUT` | Neutralizes bonuses to specific stats | `{}` |
 | `PENALTY_NEUT` | Neutralizes penalties to specific stats | `{}` |
+| `RANGE_EXTENSION` | Unit can attack foes within specific range | `{ min: int, max: int }` |
 
 #### `effects_strike_sequence`
 

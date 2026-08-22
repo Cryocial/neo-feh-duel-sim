@@ -17,6 +17,7 @@ def _load_statuses(path: str) -> None:
             name=name,
             type=entry["type"],
             effects=entry.get("effects", []),
+            grants_style=entry.get("grants_style", False)
         )
         if status.type == "bonus":
             BONUS_DATABASE[name] = status
@@ -45,6 +46,7 @@ def _load_skills(path: str) -> None:
             ],
             is_arcane=entry.get("is_arcane", False),
             is_prf=entry.get("is_prf", False),
+            grants_style=entry.get("grants_style", False)
         )
 
 

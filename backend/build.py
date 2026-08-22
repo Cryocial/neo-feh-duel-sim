@@ -61,6 +61,7 @@ class Skill:
     allowed_weapon_types: list[WeaponType]
     is_arcane: bool = False
     is_prf: bool = False
+    grants_style: bool = False
 
 
 @dataclass(frozen=True)
@@ -68,6 +69,7 @@ class Status:
     name: str
     type: Literal["bonus", "penalty"]
     effects: list[dict]  # raw effect definitions from the JSON
+    grants_style: bool = False
 
 
 class Unit:
@@ -129,6 +131,8 @@ class Unit:
         self._initialize_stats()
         self.first_combat_of_turn = True
         self.is_engaged = False
+        self.style_enabled = False
+        self.chosen_range: int | None = None
         self.allies_within_2_spaces = 0
         self.allies_within_3_spaces = 0
         self.allies_within_3_rows_cols = 0
