@@ -3,7 +3,7 @@ from dataclasses import dataclass, field, replace
 from typing import Literal
 
 from .build import Unit, StatBlock
-from .constants import Color, StrikeType, EffectType
+from .constants import Color, StrikeType, EffectType, WeaponType
 from .effects import Effect, build_effect, EFFECT_LIST_MAP
 from .conditions import Phase, Condition, AtomicCondition, AnyOf, AllOf
 from .jsonbootupstuff import BONUS_DATABASE, PENALTY_DATABASE
@@ -28,6 +28,8 @@ class CombatantState:
     is_initiator: bool = False
     triggers_brave: bool = False
     spaces_moved: int = 0
+    style_enabled: bool = False
+    nb_styles: int = 0
     granted_visible_buffs: StatBlock = field(default_factory=StatBlock)
     granted_visible_debuffs: StatBlock = field(default_factory=StatBlock)
     effects_start_of_turn: list[Effect] = field(default_factory=list)
@@ -63,6 +65,11 @@ class Strike:
     potent_mult: float = 1.0
 
 
+
+def _base_combat_range(weapon_type: WeaponType) -> int:
+    return 2 if weapon_type in {WeaponType.BOW, WeaponType.DAGGER, WeaponType.TOME, WeaponType.STAFF} else 1
+
+
 def _distribute_effects(attacker: CombatantState, defender: CombatantState) -> None:
     attacker_skills = filter(
         None,
@@ -82,6 +89,7 @@ def _distribute_effects(attacker: CombatantState, defender: CombatantState) -> N
             effect = build_effect(desc, applied_by="self" if is_self else "foe")
             target = attacker if is_self else defender
             _add_to_bucket(target, effect)
+        attacker.nb_styles += skill.grants_style
 
     for status in attacker.unit.active_statuses:
         for desc in status.effects:
@@ -89,6 +97,7 @@ def _distribute_effects(attacker: CombatantState, defender: CombatantState) -> N
             effect = build_effect(desc, applied_by="self" if is_self else "foe")
             target = attacker if is_self else defender
             _add_to_bucket(target, effect)
+        attacker.nb_styles += status.grants_style
 
     defender_skills = filter(
         None,
@@ -202,6 +211,7 @@ class CombatEngine:
     attacker: Unit
     defender: Unit
     combatant_states: dict[UnitRole, CombatantState] = field(init=False)
+    combat_range: int = field(init=False, default=0)
 
     def simulate(self) -> dict[str, int]:
         """Runs the full combat simulation following a 10-step timeline."""
@@ -211,12 +221,14 @@ class CombatEngine:
                 current_hp=self.attacker.current_hp,
                 current_cooldown=self.attacker.max_cooldown - self.attacker.pre_charge,
                 is_initiator=True,
+                style_enabled=self.attacker.style_enabled
             ),
             "defender": CombatantState(
                 unit=self.defender,
                 current_hp=self.defender.current_hp,
                 current_cooldown=self.defender.max_cooldown - self.defender.pre_charge,
                 is_initiator=False,
+                style_enabled=self.defender.style_enabled
             ),
         }
         self._phase_start_of_turn()
@@ -232,6 +244,8 @@ class CombatEngine:
         self._phase_AoE()
 
         self._combat_stat_calculations()
+
+        self._range_calculation()
 
         self._evaluate_conditions("start_of_combat")
 
@@ -565,6 +579,24 @@ class CombatEngine:
             target_state=self.combatant_states["attacker"],
         )
 
+    def _range_calculation(self):
+        """Determines the distance this combat happens at: the attacker's base
+        weapon range, overridden by a RANGE_EXTENSION from the attacker's own
+        style, if any (only the initiator's engagement range matters here).
+        """
+        self.combat_range = _base_combat_range(self.attacker.weapon_type)
+
+        atk_state = self.combatant_states["attacker"]
+        for effect in atk_state.effects_start_of_combat:
+            if effect.type != EffectType.RANGE_EXTENSION:
+                continue
+            min_range = effect.params["min"]
+            max_range = effect.params["max"]
+            self.combat_range = (
+                min_range if min_range == max_range else self.attacker.chosen_range
+            )
+            break
+
     def _determine_defensive_stat(
         self, striker_state: CombatantState, target_state: CombatantState
     ) -> Literal["defense", "res"]:
@@ -854,17 +886,22 @@ class CombatEngine:
                 Strike("defender", "attacker", StrikeType.POTENT, consecutive=True)
             )
 
+        defender_counterattack = (
+            self.combat_range == _base_combat_range(def_state.unit.weapon_type)
+            or any(e.type == EffectType.COUNTERATTACK for e in def_state.effects_strike_sequence)
+        )
+                 
         defender_flash = any(
             e.type == EffectType.FLASH for e in def_state.effects_strike_sequence
         )
-        if defender_flash:
-            defender_flash_neut = any(
-                e.type == EffectType.FLASH_NEUT
-                for e in def_state.effects_strike_sequence
-            )
-            if not defender_flash_neut:
-                defender_first = []
-                defender_followups = []
+        defender_flash_neut = any(
+            e.type == EffectType.FLASH_NEUT
+            for e in def_state.effects_strike_sequence
+        )
+
+        if not defender_counterattack or (defender_flash and not defender_flash_neut):
+            defender_first = []
+            defender_followups = []
 
         attacker_package = attacker_first + attacker_followups
         defender_package = defender_first + defender_followups

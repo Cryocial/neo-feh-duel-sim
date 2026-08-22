@@ -49,11 +49,12 @@ class EffectType(str, Enum):
     HEXBLADE_AOE = "HEXBLADE_AOE"
     PULSE_AOE = "PULSE_AOE"
 
-    # ── Stat modifications ────────────────────────────────────────────────────
+    # ── Start-of-combat effects ───────────────────────────────────────────────
     STAT_BOOST = "STAT_BOOST"
     STAT_DAUNT = "STAT_DAUNT"
     BONUS_NEUT = "BONUS_NEUT"
     PENALTY_NEUT = "PENALTY_NEUT"
+    RANGE_EXTENSION = "RANGE_EXTENSION"
 
     # ── Strike sequence ───────────────────────────────────────────────────────
     FU_DENY = "FU_DENY"
@@ -66,6 +67,7 @@ class EffectType(str, Enum):
     VANTAGE_NEUT = "VANTAGE_NEUT"
     DESPERATION = "DESPERATION"
     DESPERATION_NEUT = "DESPERATION_NEUT"
+    COUNTERATTACK = "COUNTERATTACK"
     FLASH = "FLASH"
     FLASH_NEUT = "FLASH_NEUT"
     OFF_FROZEN = "OFF_FROZEN"
