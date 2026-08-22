@@ -117,7 +117,6 @@ def _distribute_effects(attacker: CombatantState, defender: CombatantState) -> N
             effect = build_effect(desc, applied_by="self" if is_self else "foe")
             target = defender if is_self else attacker
             _add_to_bucket(target, effect)
-        defender.nb_styles += skill.grants_style
 
     for status in defender.unit.active_statuses:
         for desc in status.effects:
@@ -125,7 +124,6 @@ def _distribute_effects(attacker: CombatantState, defender: CombatantState) -> N
             effect = build_effect(desc, applied_by="self" if is_self else "foe")
             target = defender if is_self else attacker
             _add_to_bucket(target, effect)
-        defender.nb_styles += status.grants_style
 
 def _add_to_bucket(state: CombatantState, effect: Effect) -> None:
     list_name = EFFECT_LIST_MAP.get(effect.type)
