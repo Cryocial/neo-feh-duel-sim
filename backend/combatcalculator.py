@@ -1106,7 +1106,7 @@ class CombatEngine:
 
         effective_dr = perc_dr * pierce_mult
         damage_multiplier = 1.0 - effective_dr
-        final_damage = math.trunc(final_damage * damage_multiplier)
+        final_damage = math.ceil(final_damage * damage_multiplier)
 
         flat_dr = 0
         for effect in target_state.effects_on_strike:
