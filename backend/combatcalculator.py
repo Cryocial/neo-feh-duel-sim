@@ -25,6 +25,8 @@ class CombatantState:
     penalty_count: int = 0
     special_type: SpecialType = SpecialType.NONE
     special_use_count: int = 0
+    special_dr_count: dict[int, int] = field(default_factory=dict)
+    twin_value: int = 0
     strike_count: int = 0
     has_entered_combat: bool = False
     is_initiator: bool = False
@@ -280,6 +282,8 @@ class CombatEngine:
 
         for state in self.combatant_states.values():
             state.cd_start_of_cbt = state.current_cooldown
+
+        self._apply_twin_effects()
 
         while (
             len(strike_sequence) > 0
@@ -619,6 +623,20 @@ class CombatEngine:
                 min_range if min_range == max_range else self.attacker.chosen_range
             )
             break
+
+    def _apply_twin_effects(self):
+        """Apply twin effect if needed.
+        """
+        for state in self.combatant_states.values():
+            for effect in state.effects_on_strike:
+                if effect.type != EffectType.TWIN:
+                    continue
+                value = effect.params["value"]
+                if value == -1:
+                    state.twin_value = -1
+                    break
+                else:
+                    state.twin_value = max(state.twin_value, value)
 
     def _determine_defensive_stat(
         self, striker_state: CombatantState, target_state: CombatantState
@@ -1117,11 +1135,23 @@ class CombatEngine:
                 striker_special_triggers=striker_special_triggers,
                 target_special_triggers=target_special_triggers,
             ):
-                dr_val = (
-                    self._resolve_formula(effect.params, target_state, striker_state)
-                    / 100.0
-                )
-                perc_dr = 1.0 - ((1.0 - perc_dr) * (1.0 - dr_val))
+                piercable = effect.params["piercable"]
+                if piercable:
+                    can_trigger = True
+                else:
+                    trigger_count = target_state.special_dr_count.get(id(effect), 0)
+                    max_triggers = effect.params.get("max_triggers", -1)
+                    max_triggers = -1 if (max_triggers == -1 or target_state.twin_value == -1) else max(max_triggers, target_state.twin_value)
+                    can_trigger = max_triggers == -1 or trigger_count < max_triggers
+
+                if can_trigger:
+                    dr_val = (
+                        self._resolve_formula(effect.params, target_state, striker_state)
+                        / 100.0
+                    )
+                    perc_dr = 1.0 - ((1.0 - perc_dr) * (1.0 - dr_val))
+                    if not piercable:
+                        target_state.special_dr_count[id(effect)] = trigger_count + 1
 
         effective_dr = perc_dr * pierce_mult
         damage_multiplier = 1.0 - effective_dr
