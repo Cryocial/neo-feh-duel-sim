@@ -278,7 +278,10 @@ class Skill:
     {
       "effect": "SPECIAL_TRIGGER_NEUT",
       "target": "foe",
-      "params": {},
+      "params": {
+        "off": true,
+        "def": true
+      },
       "conditions": [
         {
           "type": "hp_above_pct", 
@@ -742,7 +745,7 @@ Processed by `_phase_start_of_turn` before combat begins. These grant visible st
 | `HEXBLADE_STRIKE` | Calculates damage using the lower of foe's Def or Res | `{}` |
 | `EFFECTIVE` | Effective against specific unit type | `{ movement_types: list[str], weapon_types: list[str] }` |
 | `NEUT_EFFECTIVE` | Neutralizes 'effective against specific unit type' | `{ movement_types: list[str], weapon_types: list[str] }` |
-| `SPECIAL_TRIGGER_NEUT` | Unit cannot trigger Specials | `{}` |
+| `SPECIAL_TRIGGER_NEUT` | Unit cannot trigger Specials | `{ aoe: bool, off: bool, def: bool }` |
 | `FLAT_DR_STRIKE` | Reduce damage from specific foe's attacks by X during combat | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
 | `PERC_DR_STRIKE` | Reduce damage from specific foe's attacks during combat by X% | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str, piercable: bool, max_triggers: int }` |
 | `TWIN` | Any "reduces damage by X%" effect can be triggered a new max of times | `{ value: int }` |
