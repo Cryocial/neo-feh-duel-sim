@@ -41,6 +41,14 @@ class StrikeType(Enum):
     POTENT = auto()
 
 
+class SpecialType(Enum):
+    NONE = auto()
+    AOE = auto()
+    OFF = auto()
+    DEF = auto()
+    OTHER = auto()
+
+
 class EffectType(str, Enum):
     # ── AoE ───────────────────────────────────────────────────────────────────
     TRIGGER_AOE = "TRIGGER_AOE"
