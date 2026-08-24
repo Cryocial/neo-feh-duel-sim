@@ -64,6 +64,21 @@ def heal(amount, strike):
     }
 
 
+def denial_status(types):
+    """Granted by the opposing unit: target "foe" lands the effect in the
+    denied unit's own list, which is where _apply_special_denial reads it."""
+    return Status(
+        name="Test Denial",
+        type="bonus",
+        effects=[{
+            "effect": "SPECIAL_TRIGGER_NEUT",
+            "target": "foe",
+            "params": types,
+            "conditions": [],
+        }],
+    )
+
+
 def trigger_aoe(coefficient):
     return {
         "effect": "TRIGGER_AOE",
@@ -328,3 +343,140 @@ def test_special_triggering_twice_is_counted_twice():
     # Triggers on A2 and A3, then resets
     assert engine.combatant_states["attacker"].special_use_count == 2
     assert engine.combatant_states["attacker"].current_cooldown == 0
+
+
+def test_denied_off_special_does_not_trigger():
+    """The foe denies offensive specials, so the attacker's never triggers."""
+    attacker = make_unit("A", atk=30, spd=30, defense=20)
+    give_special(attacker, SpecialType.OFF, [flat_damage(10, "unit_special_triggers")])
+    defender = make_unit("D", atk=25, spd=10, defense=20)
+    defender.active_statuses.append(denial_status({"off": True}))
+
+    engine = CombatEngine(attacker, defender)
+    result = engine.simulate()
+
+    # A1: special is not ready -> 10 damage
+    # D1: 5 damage
+    # A2: special is ready but denied, it doesn't trigger -> 10 damage
+    assert result["attacker_final_hp"] == 50 - 5
+    assert result["defender_final_hp"] == 50 - 10 - 10
+    # Never triggers, so it never resets
+    assert engine.combatant_states["attacker"].special_use_count == 0
+    assert engine.combatant_states["attacker"].current_cooldown == 0
+
+
+def test_denied_def_special_does_not_trigger():
+    """Same on the defensive side: the denied special grants no DR."""
+    attacker = make_unit("A", atk=40, spd=30, defense=20)
+    attacker.active_statuses.append(denial_status({"def": True}))
+    defender = make_unit("D", atk=25, spd=10, defense=20)
+    give_special(defender, SpecialType.DEF, [
+        perc_dr(50, "unit_special_triggers", piercable=False, max_triggers=1),
+    ])
+
+    engine = CombatEngine(attacker, defender)
+    result = engine.simulate()
+
+    # A1: defender special is not ready -> 20 damage
+    # D1: 5 damage
+    # A2: defender special is ready but denied, the DR doesn't apply -> 20 damage
+    assert result["attacker_final_hp"] == 50 - 5
+    assert result["defender_final_hp"] == 50 - 20 - 20
+    # Never triggers, so it never resets
+    assert engine.combatant_states["defender"].special_use_count == 0
+    assert engine.combatant_states["defender"].current_cooldown == 0
+
+
+def test_denied_aoe_special_does_not_fire_before_combat():
+    """AoE denial resolves before _phase_AoE, so no pre-combat damage lands."""
+    attacker = make_unit("A", atk=30, spd=30, defense=20)
+    give_special(attacker, SpecialType.AOE, [trigger_aoe(0.5)])
+    attacker.pre_charge = 1
+    defender = make_unit("D", atk=25, spd=10, defense=20)
+    defender.active_statuses.append(denial_status({"aoe": True}))
+
+    engine = CombatEngine(attacker, defender)
+    result = engine.simulate()
+
+    # AoE: special is ready but denied, no damage
+    # A1: 10 damage
+    # D1: 5 damage
+    # A2: 10 damage
+    assert result["attacker_final_hp"] == 50 - 5
+    assert result["defender_final_hp"] == 50 - 10 - 10
+    # Never triggers, so it never resets
+    assert engine.combatant_states["attacker"].special_use_count == 0
+    assert engine.combatant_states["attacker"].current_cooldown == 0
+
+
+def test_denial_does_not_affect_readiness():
+    """Denial blocks the trigger only: the special still counts as ready, so
+    readiness gated effects keep applying."""
+    attacker = make_unit("A", atk=30, spd=30, defense=20)
+    give_special(attacker, SpecialType.OFF, [
+        flat_damage(10, "unit_special_triggers"),
+        flat_damage(5, "unit_special_ready"),
+    ])
+    defender = make_unit("D", atk=25, spd=10, defense=20)
+    defender.active_statuses.append(denial_status({"off": True}))
+
+    engine = CombatEngine(attacker, defender)
+    result = engine.simulate()
+
+    # A1: special is not ready -> 10 damage
+    # D1: 5 damage
+    # A2: special is ready but denied, it doesn't trigger.
+    #     Still, damage applies -> 30 - 20 + 5
+    assert result["attacker_final_hp"] == 50 - 5
+    assert result["defender_final_hp"] == 50 - 10 - 15
+    # Ready at A2 but never triggers, so it floors at 0
+    assert engine.combatant_states["attacker"].special_use_count == 0
+    assert engine.combatant_states["attacker"].current_cooldown == 0
+
+
+def test_denied_special_does_not_satisfy_foe_special_triggers():
+    """Both units carry an offensive special, only the attacker's is denied.
+    The defender's DR is keyed on the foe triggering, so it never applies,
+    while the defender's own special still triggers."""
+    attacker = make_unit("A", atk=30, spd=30, defense=20)
+    give_special(attacker, SpecialType.OFF, [flat_damage(10, "unit_special_triggers")])
+    defender = make_unit("D", atk=25, spd=10, defense=20)
+    give_special(defender, SpecialType.OFF, [
+        flat_damage(5, "unit_special_triggers"),
+        perc_dr(50, "foe_special_triggers", piercable=False, max_triggers=1),
+    ])
+    # target "foe" lands the denial in the attacker's list only
+    defender.active_statuses.append(denial_status({"off": True}))
+
+    engine = CombatEngine(attacker, defender)
+    result = engine.simulate()
+
+    # A1: neither special is ready -> 10 damage
+    # D1: defender special ready, it triggers -> 5 + 5 = 10 damage
+    # A2: attacker special is ready but denied, it doesn't trigger.
+    #     The DR depending on the foe triggering doesn't apply either -> 10 damage
+    assert result["attacker_final_hp"] == 50 - 10
+    assert result["defender_final_hp"] == 50 - 10 - 10
+    # Same type on both units, but only the attacker's is denied
+    assert engine.combatant_states["attacker"].special_use_count == 0
+    assert engine.combatant_states["defender"].special_use_count == 1
+
+
+def test_aoe_denial_leaves_an_offensive_special_alone():
+    """A denial that only covers AoE doesn't touch an offensive special."""
+    attacker = make_unit("A", atk=30, spd=30, defense=20)
+    give_special(attacker, SpecialType.OFF, [flat_damage(10, "unit_special_triggers")])
+    defender = make_unit("D", atk=25, spd=10, defense=20)
+    defender.active_statuses.append(denial_status({"aoe": True}))
+
+    engine = CombatEngine(attacker, defender)
+    result = engine.simulate()
+
+    # A1: special is not ready -> 10 damage
+    # D1: 5 damage
+    # A2: offensive special ready, it triggers -> 10 + 10 = 20
+    assert result["attacker_final_hp"] == 50 - 5
+    assert result["defender_final_hp"] == 50 - 10 - 20
+    # Triggers on A2 and resets
+    assert engine.combatant_states["attacker"].special_use_count == 1
+    assert engine.combatant_states["attacker"].current_cooldown == 1

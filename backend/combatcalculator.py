@@ -24,6 +24,7 @@ class CombatantState:
     bonus_count: int = 0
     penalty_count: int = 0
     special_type: SpecialType = SpecialType.NONE
+    special_denied: bool = False
     special_use_count: int = 0
     special_dr_count: dict[int, int] = field(default_factory=dict)
     twin_value: int = 0
@@ -266,6 +267,8 @@ class CombatEngine:
 
         self._evaluate_conditions("pre_aoe")
 
+        self._apply_special_denial(aoe=True)
+
         self._phase_AoE()
 
         self._combat_stat_calculations()
@@ -284,6 +287,8 @@ class CombatEngine:
             state.cd_start_of_cbt = state.current_cooldown
 
         self._apply_twin_effects()
+
+        self._apply_special_denial(aoe=False)
 
         while (
             len(strike_sequence) > 0
@@ -492,8 +497,10 @@ class CombatEngine:
         )
         state.current_cooldown -= max(0, pulse)
 
-        triggers = [e for e in state.effects_AoE if e.type == EffectType.TRIGGER_AOE]
-        if not triggers or state.current_cooldown > 0:
+        trigger = next(
+            (e for e in state.effects_AoE if e.type == EffectType.TRIGGER_AOE), None
+        )
+        if trigger is None or state.current_cooldown > 0 or state.special_denied:
             return
 
         has_hexblade_aoe = any(
@@ -511,7 +518,7 @@ class CombatEngine:
                 else foe_state.unit.get_visible_stat("res")
             )
 
-        coefficient = triggers[0].params.get("coefficient", 0.0)
+        coefficient = trigger.params.get("coefficient", 0.0)
         visible_atk = state.unit.get_visible_stat("atk")
         damage = max(0, math.floor(coefficient * (visible_atk - visible_def)))
 
@@ -623,6 +630,25 @@ class CombatEngine:
                 min_range if min_range == max_range else self.attacker.chosen_range
             )
             break
+
+    def _apply_special_denial(self, aoe: bool):
+        """Deny a unit's special when a SPECIAL_TRIGGER_NEUT effect in its own
+        list covers that special's type. The JSON key is the type's own name in
+        lowercase ("aoe", "off", "def").
+
+        AoE denial resolves before _phase_AoE, the in-combat types before the
+        strike loop, hence the flag.
+        """
+        denied_types = (SpecialType.AOE,) if aoe else (SpecialType.OFF, SpecialType.DEF)
+        for state in self.combatant_states.values():
+            for effect in state.effects_on_strike:
+                if effect.type != EffectType.SPECIAL_TRIGGER_NEUT:
+                    continue
+                state.special_denied = state.special_denied or any(
+                    state.special_type == denied
+                    and effect.params.get(denied.name.lower(), False)
+                    for denied in denied_types
+                )
 
     def _apply_twin_effects(self):
         """Apply twin effect if needed.
@@ -1065,8 +1091,8 @@ class CombatEngine:
         striker_special_ready = striker_state.special_type is not SpecialType.NONE and striker_state.current_cooldown <= 0
         target_special_ready = target_state.special_type is not SpecialType.NONE and target_state.current_cooldown <= 0
 
-        striker_special_triggers = striker_special_ready and striker_state.special_type == SpecialType.OFF
-        target_special_triggers = target_special_ready and target_state.special_type == SpecialType.DEF
+        striker_special_triggers = striker_special_ready and striker_state.special_type == SpecialType.OFF and not striker_state.special_denied
+        target_special_triggers = target_special_ready and target_state.special_type == SpecialType.DEF and not target_state.special_denied
 
         striker_special_used = striker_state.special_use_count > 0
         target_special_used = target_state.special_use_count > 0
