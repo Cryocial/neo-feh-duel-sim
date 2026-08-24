@@ -1068,6 +1068,9 @@ class CombatEngine:
         striker_special_triggers = striker_special_ready and striker_state.special_type == SpecialType.OFF
         target_special_triggers = target_special_ready and target_state.special_type == SpecialType.DEF
 
+        striker_special_used = striker_state.special_use_count > 0
+        target_special_used = target_state.special_use_count > 0
+
         wta = self._get_wta_multiplier(striker_state, target_state)
         is_effective = any(
             e.type == EffectType.EFFECTIVE
@@ -1079,6 +1082,8 @@ class CombatEngine:
                 target_special_ready=target_special_ready,
                 striker_special_triggers=striker_special_triggers,
                 target_special_triggers=target_special_triggers,
+                striker_special_used=striker_special_used,
+                target_special_used=target_special_used,
             )
             for e in striker_state.effects_on_strike
         )
@@ -1102,6 +1107,8 @@ class CombatEngine:
                 target_special_ready=target_special_ready,
                 striker_special_triggers=striker_special_triggers,
                 target_special_triggers=target_special_triggers,
+                striker_special_used=striker_special_used,
+                target_special_used=target_special_used,
             ):
                 true_damage += self._resolve_formula(
                     effect.params, striker_state, target_state
@@ -1120,6 +1127,8 @@ class CombatEngine:
                 target_special_ready=target_special_ready,
                 striker_special_triggers=striker_special_triggers,
                 target_special_triggers=target_special_triggers,
+                striker_special_used=striker_special_used,
+                target_special_used=target_special_used,
             ):
                 pierce_value = effect.params.get("value", 0) / 100.0
                 pierce_mult *= 1.0 - pierce_value
@@ -1134,6 +1143,8 @@ class CombatEngine:
                 target_special_ready=target_special_ready,
                 striker_special_triggers=striker_special_triggers,
                 target_special_triggers=target_special_triggers,
+                striker_special_used=striker_special_used,
+                target_special_used=target_special_used,
             ):
                 piercable = effect.params["piercable"]
                 if piercable:
@@ -1167,6 +1178,8 @@ class CombatEngine:
                 target_special_ready=target_special_ready,
                 striker_special_triggers=striker_special_triggers,
                 target_special_triggers=target_special_triggers,
+                striker_special_used=striker_special_used,
+                target_special_used=target_special_used,
             ):
                 flat_dr += self._resolve_formula(
                     effect.params, target_state, striker_state
@@ -1184,6 +1197,8 @@ class CombatEngine:
                 target_special_ready=target_special_ready,
                 striker_special_triggers=striker_special_triggers,
                 target_special_triggers=target_special_triggers,
+                striker_special_used=striker_special_used,
+                target_special_used=target_special_used,
             ):
                 floor = self._resolve_formula(
                     effect.params, target_state, striker_state
@@ -1207,6 +1222,8 @@ class CombatEngine:
                 target_special_ready=target_special_ready,
                 striker_special_triggers=striker_special_triggers,
                 target_special_triggers=target_special_triggers,
+                striker_special_used=striker_special_used,
+                target_special_used=target_special_used,
             ):
                 hit_heal += self._resolve_formula(
                     effect.params, striker_state, target_state
@@ -1396,6 +1413,8 @@ class CombatEngine:
         target_special_ready: bool = False,
         striker_special_triggers: bool = False,
         target_special_triggers: bool = False,
+        striker_special_used: bool = False,
+        target_special_used: bool = False,
     ) -> bool:
         """Checks whether `params['strike']` applies to the current strike.
         `role` tells which side of this strike owns the effect, so the
@@ -1437,8 +1456,7 @@ class CombatEngine:
             case "any_special_ready_or_triggered":
                 return (
                     striker_special_ready or target_special_ready
-                    or self.combatant_states["attacker"].special_use_count > 0
-                    or self.combatant_states["defender"].special_use_count > 0
+                    or striker_special_used or target_special_used
                 )
             case _:
                 return False
