@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import Literal
-from .constants import MovementType, WeaponType, Color
+from .constants import MovementType, WeaponType, Color, SpecialType
 
 
 @dataclass(frozen=True)
@@ -62,6 +62,7 @@ class Skill:
     is_arcane: bool = False
     is_prf: bool = False
     grants_style: bool = False
+    special_type: SpecialType = SpecialType.NONE
 
 
 @dataclass(frozen=True)
@@ -261,8 +262,3 @@ class Unit:
             WeaponType.BEAST,
         }
 
-    @property
-    def has_AoE(self):
-        if not self.special:
-            return False
-        return any(e.get("effect") == "TRIGGER_AOE" for e in self.special.effects)
