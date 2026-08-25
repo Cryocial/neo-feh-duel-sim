@@ -1,7 +1,7 @@
 import json
 import os
 from .build import StatBlock, Skill, Status, DivineVein
-from .constants import MovementType, WeaponType
+from .constants import MovementType, WeaponType, SpecialType
 
 SKILL_DATABASE: dict[str, Skill] = {}
 BONUS_DATABASE: dict[str, Status] = {}
@@ -47,7 +47,8 @@ def _load_skills(path: str) -> None:
             ],
             is_arcane=entry.get("is_arcane", False),
             is_prf=entry.get("is_prf", False),
-            grants_style=entry.get("grants_style", False)
+            grants_style=entry.get("grants_style", False),
+            special_type=SpecialType[entry.get("special_type", "NONE")]
         )
 
 
