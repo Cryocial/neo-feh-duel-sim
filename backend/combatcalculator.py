@@ -390,7 +390,7 @@ class CombatEngine:
         elif effect.type == EffectType.GRANT_STATUS:
             name = effect.params.get("status")
             status = BONUS_DATABASE.get(name) or PENALTY_DATABASE.get(name)
-            if status is not None:
+            if status is None:
                 raise KeyError(
                     f"GRANT_STATUS references unknown status '{name}' — not in BONUS/PENALTY_DATABASE"
                 )
