@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import Literal
-from .constants import MovementType, WeaponType, Color
+from .constants import MovementType, WeaponType, Color, SpecialType
 
 
 @dataclass(frozen=True)
@@ -61,6 +61,8 @@ class Skill:
     allowed_weapon_types: list[WeaponType]
     is_arcane: bool = False
     is_prf: bool = False
+    grants_style: bool = False
+    special_type: SpecialType = SpecialType.NONE
 
 
 @dataclass(frozen=True)
@@ -68,7 +70,12 @@ class Status:
     name: str
     type: Literal["bonus", "penalty"]
     effects: list[dict]  # raw effect definitions from the JSON
+    grants_style: bool = False
 
+@dataclass(frozen=True)
+class DivineVein:
+    name: str
+    effects: list[dict]
 
 class Unit:
     """
@@ -129,6 +136,8 @@ class Unit:
         self._initialize_stats()
         self.first_combat_of_turn = True
         self.is_engaged = False
+        self.style_enabled = False
+        self.chosen_range: int | None = None
         self.allies_within_2_spaces = 0
         self.allies_within_3_spaces = 0
         self.allies_within_3_rows_cols = 0
@@ -253,8 +262,3 @@ class Unit:
             WeaponType.BEAST,
         }
 
-    @property
-    def has_AoE(self):
-        if not self.special:
-            return False
-        return any(e.get("effect") == "TRIGGER_AOE" for e in self.special.effects)
