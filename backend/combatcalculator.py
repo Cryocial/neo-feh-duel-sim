@@ -3,12 +3,13 @@ from dataclasses import dataclass, field, replace
 from typing import Literal
 
 from .build import Unit, StatBlock, DivineVein
-from .constants import Color, StrikeType, EffectType, WeaponType
+from .constants import Color, StrikeType, EffectType, WeaponType, SpecialType
 from .effects import Effect, build_effect, EFFECT_LIST_MAP
 from .conditions import Phase, Condition, AtomicCondition, AnyOf, AllOf
 from .jsonbootupstuff import BONUS_DATABASE, PENALTY_DATABASE
 
 UnitRole = Literal["attacker", "defender"]
+StrikeRole = Literal["striker", "target"]
 
 
 @dataclass
@@ -22,7 +23,11 @@ class CombatantState:
     damage_mitigated_bucket: int = 0
     bonus_count: int = 0
     penalty_count: int = 0
+    special_type: SpecialType = SpecialType.NONE
+    special_denied: bool = False
     special_use_count: int = 0
+    special_dr_count: dict[int, int] = field(default_factory=dict)
+    twin_value: int = 0
     strike_count: int = 0
     has_entered_combat: bool = False
     is_initiator: bool = False
@@ -239,7 +244,8 @@ class CombatEngine:
                 current_cooldown=self.attacker.max_cooldown - self.attacker.pre_charge,
                 is_initiator=True,
                 style_enabled=self.attacker.style_enabled,
-                active_ally_divine_vein=self.attacker_divine_vein
+                active_ally_divine_vein=self.attacker_divine_vein,
+                special_type=SpecialType.NONE if self.attacker.special is None else self.attacker.special.special_type
             ),
             "defender": CombatantState(
                 unit=self.defender,
@@ -247,7 +253,8 @@ class CombatEngine:
                 current_cooldown=self.defender.max_cooldown - self.defender.pre_charge,
                 is_initiator=False,
                 style_enabled=self.defender.style_enabled,
-                active_ally_divine_vein=self.defender_divine_vein
+                active_ally_divine_vein=self.defender_divine_vein,
+                special_type=SpecialType.NONE if self.defender.special is None else self.defender.special.special_type
             ),
         }
         self._phase_start_of_turn()
@@ -259,6 +266,8 @@ class CombatEngine:
         )
 
         self._evaluate_conditions("pre_aoe")
+
+        self._apply_special_denial(aoe=True)
 
         self._phase_AoE()
 
@@ -276,6 +285,10 @@ class CombatEngine:
 
         for state in self.combatant_states.values():
             state.cd_start_of_cbt = state.current_cooldown
+
+        self._apply_twin_effects()
+
+        self._apply_special_denial(aoe=False)
 
         while (
             len(strike_sequence) > 0
@@ -484,8 +497,10 @@ class CombatEngine:
         )
         state.current_cooldown -= max(0, pulse)
 
-        triggers = [e for e in state.effects_AoE if e.type == EffectType.TRIGGER_AOE]
-        if not triggers or state.current_cooldown > 0:
+        trigger = next(
+            (e for e in state.effects_AoE if e.type == EffectType.TRIGGER_AOE), None
+        )
+        if trigger is None or state.current_cooldown > 0 or state.special_denied:
             return
 
         has_hexblade_aoe = any(
@@ -503,7 +518,7 @@ class CombatEngine:
                 else foe_state.unit.get_visible_stat("res")
             )
 
-        coefficient = triggers[0].params.get("coefficient", 0.0)
+        coefficient = trigger.params.get("coefficient", 0.0)
         visible_atk = state.unit.get_visible_stat("atk")
         damage = max(0, math.floor(coefficient * (visible_atk - visible_def)))
 
@@ -615,6 +630,39 @@ class CombatEngine:
                 min_range if min_range == max_range else self.attacker.chosen_range
             )
             break
+
+    def _apply_special_denial(self, aoe: bool):
+        """Deny a unit's special when a SPECIAL_TRIGGER_NEUT effect in its own
+        list covers that special's type. The JSON key is the type's own name in
+        lowercase ("aoe", "off", "def").
+
+        AoE denial resolves before _phase_AoE, the in-combat types before the
+        strike loop, hence the flag.
+        """
+        denied_types = (SpecialType.AOE,) if aoe else (SpecialType.OFF, SpecialType.DEF)
+        for state in self.combatant_states.values():
+            for effect in state.effects_on_strike:
+                if effect.type != EffectType.SPECIAL_TRIGGER_NEUT:
+                    continue
+                state.special_denied = state.special_denied or any(
+                    state.special_type == denied
+                    and effect.params.get(denied.name.lower(), False)
+                    for denied in denied_types
+                )
+
+    def _apply_twin_effects(self):
+        """Apply twin effect if needed.
+        """
+        for state in self.combatant_states.values():
+            for effect in state.effects_on_strike:
+                if effect.type != EffectType.TWIN:
+                    continue
+                value = effect.params["value"]
+                if value == -1:
+                    state.twin_value = -1
+                    break
+                else:
+                    state.twin_value = max(state.twin_value, value)
 
     def _determine_defensive_stat(
         self, striker_state: CombatantState, target_state: CombatantState
@@ -1020,10 +1068,13 @@ class CombatEngine:
         raw_atk = striker_state.combat_stats.atk
         defensive_stat = getattr(target_state.combat_stats, target_state.defensive_stat)
 
-        for unit_state, foe_state in ((striker_state, target_state), (target_state, striker_state)):
+        for role, unit_state, foe_state in (
+            ("striker", striker_state, target_state),
+            ("target", target_state, striker_state),
+        ):
             total_pulse = 0
             for e in unit_state.effects_on_strike:
-                if e.type == EffectType.PULSE_STRIKE and self._strike_matches(strike, e.params):
+                if e.type == EffectType.PULSE_STRIKE and self._strike_matches(strike, role, e.params):
                     pulse = self._resolve_formula(e.params, unit_state, foe_state)
                     if e.params.get("cap_cd_start_of_cbt", False):
                         pulse = min(pulse, unit_state.cd_start_of_cbt)
@@ -1032,25 +1083,33 @@ class CombatEngine:
             total_scowl = sum(
                     self._resolve_formula(e.params, unit_state, foe_state)
                     for e in unit_state.effects_on_strike
-                    if e.type == EffectType.SCOWL_STRIKE and self._strike_matches(strike, e.params)
+                    if e.type == EffectType.SCOWL_STRIKE and self._strike_matches(strike, role, e.params)
             )
 
             unit_state.current_cooldown = max(0, unit_state.current_cooldown - total_pulse + total_scowl)
 
-        # Does either side's Special trigger on this exact strike?
-        # TODO: target-side cooldown charging from being attacked isn't
-        # implemented yet, so target_special only reflects its starting value.
-        striker_special = striker_state.current_cooldown <= 0
-        target_special = target_state.current_cooldown <= 0
+        striker_special_ready = striker_state.special_type is not SpecialType.NONE and striker_state.current_cooldown <= 0
+        target_special_ready = target_state.special_type is not SpecialType.NONE and target_state.current_cooldown <= 0
+
+        striker_special_triggers = striker_special_ready and striker_state.special_type == SpecialType.OFF and not striker_state.special_denied
+        target_special_triggers = target_special_ready and target_state.special_type == SpecialType.DEF and not target_state.special_denied
+
+        striker_special_used = striker_state.special_use_count > 0
+        target_special_used = target_state.special_use_count > 0
 
         wta = self._get_wta_multiplier(striker_state, target_state)
         is_effective = any(
             e.type == EffectType.EFFECTIVE
             and self._strike_matches(
                 strike,
+                "striker",
                 e.params,
-                unit_special=striker_special,
-                foe_special=target_special,
+                striker_special_ready=striker_special_ready,
+                target_special_ready=target_special_ready,
+                striker_special_triggers=striker_special_triggers,
+                target_special_triggers=target_special_triggers,
+                striker_special_used=striker_special_used,
+                target_special_used=target_special_used,
             )
             for e in striker_state.effects_on_strike
         )
@@ -1068,9 +1127,14 @@ class CombatEngine:
         for effect in striker_state.effects_on_strike:
             if effect.type == EffectType.FLAT_DAMAGE_STRIKE and self._strike_matches(
                 strike,
+                "striker",
                 effect.params,
-                unit_special=striker_special,
-                foe_special=target_special,
+                striker_special_ready=striker_special_ready,
+                target_special_ready=target_special_ready,
+                striker_special_triggers=striker_special_triggers,
+                target_special_triggers=target_special_triggers,
+                striker_special_used=striker_special_used,
+                target_special_used=target_special_used,
             ):
                 true_damage += self._resolve_formula(
                     effect.params, striker_state, target_state
@@ -1083,9 +1147,14 @@ class CombatEngine:
         for effect in striker_state.effects_on_strike:
             if effect.type == EffectType.DR_PIERCE and self._strike_matches(
                 strike,
+                "striker",
                 effect.params,
-                unit_special=striker_special,
-                foe_special=target_special,
+                striker_special_ready=striker_special_ready,
+                target_special_ready=target_special_ready,
+                striker_special_triggers=striker_special_triggers,
+                target_special_triggers=target_special_triggers,
+                striker_special_used=striker_special_used,
+                target_special_used=target_special_used,
             ):
                 pierce_value = effect.params.get("value", 0) / 100.0
                 pierce_mult *= 1.0 - pierce_value
@@ -1094,27 +1163,49 @@ class CombatEngine:
         for effect in target_state.effects_on_strike:
             if effect.type == EffectType.PERC_DR_STRIKE and self._strike_matches(
                 strike,
+                "target",
                 effect.params,
-                unit_special=target_special,
-                foe_special=striker_special,
+                striker_special_ready=striker_special_ready,
+                target_special_ready=target_special_ready,
+                striker_special_triggers=striker_special_triggers,
+                target_special_triggers=target_special_triggers,
+                striker_special_used=striker_special_used,
+                target_special_used=target_special_used,
             ):
-                dr_val = (
-                    self._resolve_formula(effect.params, target_state, striker_state)
-                    / 100.0
-                )
-                perc_dr = 1.0 - ((1.0 - perc_dr) * (1.0 - dr_val))
+                piercable = effect.params["piercable"]
+                if piercable:
+                    can_trigger = True
+                else:
+                    trigger_count = target_state.special_dr_count.get(id(effect), 0)
+                    max_triggers = effect.params.get("max_triggers", -1)
+                    max_triggers = -1 if (max_triggers == -1 or target_state.twin_value == -1) else max(max_triggers, target_state.twin_value)
+                    can_trigger = max_triggers == -1 or trigger_count < max_triggers
+
+                if can_trigger:
+                    dr_val = (
+                        self._resolve_formula(effect.params, target_state, striker_state)
+                        / 100.0
+                    )
+                    perc_dr = 1.0 - ((1.0 - perc_dr) * (1.0 - dr_val))
+                    if not piercable:
+                        target_state.special_dr_count[id(effect)] = trigger_count + 1
 
         effective_dr = perc_dr * pierce_mult
         damage_multiplier = 1.0 - effective_dr
-        final_damage = math.trunc(final_damage * damage_multiplier)
+        final_damage = math.ceil(final_damage * damage_multiplier)
 
         flat_dr = 0
         for effect in target_state.effects_on_strike:
             if effect.type == EffectType.FLAT_DR_STRIKE and self._strike_matches(
                 strike,
+                "target",
                 effect.params,
-                unit_special=target_special,
-                foe_special=striker_special,
+                striker_special_ready=striker_special_ready,
+                target_special_ready=target_special_ready,
+                striker_special_triggers=striker_special_triggers,
+                target_special_triggers=target_special_triggers,
+                striker_special_used=striker_special_used,
+                target_special_used=target_special_used,
             ):
                 flat_dr += self._resolve_formula(
                     effect.params, target_state, striker_state
@@ -1126,9 +1217,14 @@ class CombatEngine:
         for effect in target_state.effects_on_strike:
             if effect.type == EffectType.DR_FLOOR and self._strike_matches(
                 strike,
+                "target",
                 effect.params,
-                unit_special=target_special,
-                foe_special=striker_special,
+                striker_special_ready=striker_special_ready,
+                target_special_ready=target_special_ready,
+                striker_special_triggers=striker_special_triggers,
+                target_special_triggers=target_special_triggers,
+                striker_special_used=striker_special_used,
+                target_special_used=target_special_used,
             ):
                 floor = self._resolve_formula(
                     effect.params, target_state, striker_state
@@ -1146,16 +1242,21 @@ class CombatEngine:
         for effect in striker_state.effects_on_strike:
             if effect.type == EffectType.HEAL_STRIKE and self._strike_matches(
                 strike,
+                "striker",
                 effect.params,
-                unit_special=striker_special,
-                foe_special=target_special,
+                striker_special_ready=striker_special_ready,
+                target_special_ready=target_special_ready,
+                striker_special_triggers=striker_special_triggers,
+                target_special_triggers=target_special_triggers,
+                striker_special_used=striker_special_used,
+                target_special_used=target_special_used,
             ):
                 hit_heal += self._resolve_formula(
                     effect.params, striker_state, target_state
                 )
         self._apply_healing(strike.striker, hit_heal, phase="in_combat")
 
-        if striker_special:
+        if striker_special_triggers:
             striker_state.special_use_count += 1
             striker_state.current_cooldown = striker_state.unit.max_cooldown
         else:
@@ -1167,10 +1268,10 @@ class CombatEngine:
             striker_charge = 1 + int(striker_breath and not striker_breath_neut) - int(striker_guard and not striker_guard_neut)
             striker_state.current_cooldown = max(0, striker_state.current_cooldown - striker_charge)
 
-        if target_special:
+        if target_special_triggers:
             target_state.special_use_count += 1
             target_state.current_cooldown = target_state.unit.max_cooldown
-        else:            
+        else:
             target_breath = any(e.type == EffectType.DEF_BREATH for e in target_state.effects_on_strike)
             target_guard = any(e.type == EffectType.OFF_GUARD for e in target_state.effects_on_strike)
             target_breath_neut = any(e.type == EffectType.BREATH_NEUT for e in target_state.effects_on_strike)
@@ -1331,35 +1432,58 @@ class CombatEngine:
     def _strike_matches(
         self,
         strike: Strike,
+        role: StrikeRole,
         params: dict,
         *,
-        unit_special: bool = False,
-        foe_special: bool = False,
+        striker_special_ready: bool = False,
+        target_special_ready: bool = False,
+        striker_special_triggers: bool = False,
+        target_special_triggers: bool = False,
+        striker_special_used: bool = False,
+        target_special_used: bool = False,
     ) -> bool:
         """Checks whether `params['strike']` applies to the current strike.
-
-        `unit_special`/`foe_special` indicate whether the effect-owning unit's
-        or their opponent's Special triggers on this exact strike — used for
-        "on_unit_special" / "on_foe_special" (Dragon Fang, Arcane Cake).
+        `role` tells which side of this strike owns the effect, so the
+        "unit_*"/"foe_*" cases can be read from that owner's point of view.
+        The four flags are absolute: `_ready` means the Special could trigger,
+        `_triggers` means it actually does on this strike.
         """
         match params.get("strike", "every_strike"):
             case "every_strike":
                 return True
             case "first_strike":
-                return (
-                    strike.strike_type is StrikeType.FIRST
-                    and not strike.brave_second_hit
-                )
-            case "first_sequence":
+                return strike.strike_type is StrikeType.FIRST and not strike.brave_second_hit
+            case "first_attack":
                 return strike.strike_type is StrikeType.FIRST
-            case "first_strike_with_brave":
+            case "first_attack_brave":
+                return strike.strike_type is StrikeType.FIRST and strike.brave_second_hit
+            case "first_follow_up":
+                return strike.strike_type is StrikeType.FOLLOW_UP and not strike.brave_second_hit
+            case "follow_up":
+                return strike.strike_type is StrikeType.FOLLOW_UP
+            case "follow_up_brave":
+                return strike.strike_type is StrikeType.FOLLOW_UP and strike.brave_second_hit
+            case "both_first_strikes":
+                return not strike.brave_second_hit
+            case "both_second_strikes":
+                return strike.brave_second_hit
+            case "consecutive":
+                return strike.consecutive
+            case "unit_special_triggers":
+                return (role == "striker" and striker_special_triggers) or (role == "target" and target_special_triggers)
+            case "foe_special_triggers":
+                return (role == "striker" and target_special_triggers) or (role == "target" and striker_special_triggers)
+            case "unit_special_ready":
+                return (role == "striker" and striker_special_ready) or (role == "target" and target_special_ready)
+            case "foe_special_ready":
+                return (role == "striker" and target_special_ready) or (role == "target" and striker_special_ready)
+            case "any_special_ready":
+                return striker_special_ready or target_special_ready
+            case "any_special_ready_or_triggered":
                 return (
-                    strike.strike_type is StrikeType.FIRST and strike.brave_second_hit
+                    striker_special_ready or target_special_ready
+                    or striker_special_used or target_special_used
                 )
-            case "on_unit_special":
-                return unit_special
-            case "on_foe_special":
-                return foe_special
             case _:
                 return False
 
