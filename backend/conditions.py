@@ -267,6 +267,10 @@ def _evaluate_potent_patience(params: dict) -> Callable:
 
     def evaluate(unit, foe) -> bool:
         return True
+def _evaluate_style_enabled(params: dict) -> Callable:
+    """Checks if unit should use style if possible"""
+    def evaluate(unit: "CombatantState", foe: "CombatantState") -> bool:
+        return unit.nb_styles == 1 and unit.style_enabled
 
     return evaluate
 
@@ -291,6 +295,7 @@ CONDITION_REGISTRY: dict[str, tuple[Phase, Callable[[dict], Callable]]] = {
     "is_engaged": ("pre_aoe", _evaluate_is_engaged),
     "potent_patience": ("start_of_combat", _evaluate_potent_patience),
     "visible_stat_check": ("start_of_turn", _evaluate_visible_stat_check),
+    "style_enabled": ("pre_aoe", _evaluate_style_enabled),
 }
 
 # ── classes ─────────────────────────────────────────────────────────────────

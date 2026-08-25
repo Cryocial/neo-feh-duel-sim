@@ -10,12 +10,16 @@ EFFECT_LIST_MAP: dict[EffectType, str] = {
     EffectType.FLAT_DR_AOE: "effects_AoE",
     EffectType.HEXBLADE_AOE: "effects_AoE",
     EffectType.PULSE_AOE: "effects_AoE",
-    # ── Stat modifications ──────────────────────────────────────────────
+    # ── Start-of-combat effects ──────────────────────────────────────────
     EffectType.STAT_BOOST: "effects_start_of_combat",
     EffectType.STAT_DAUNT: "effects_start_of_combat",
     EffectType.BONUS_NEUT: "effects_start_of_combat",
     EffectType.PENALTY_NEUT: "effects_start_of_combat",
+<<<<<<< HEAD
     EffectType.PHANTOM_STAT: "effects_start_of_combat",
+=======
+    EffectType.RANGE_EXTENSION: "effects_start_of_combat",
+>>>>>>> c83964340a8e2590309ed2f5055218d6bc92a1a2
     # ── Strike sequence ─────────────────────────────────────────────────
     EffectType.FU_DENY: "effects_strike_sequence",
     EffectType.OFF_NFU: "effects_strike_sequence",
@@ -27,6 +31,7 @@ EFFECT_LIST_MAP: dict[EffectType, str] = {
     EffectType.VANTAGE_NEUT: "effects_strike_sequence",
     EffectType.DESPERATION: "effects_strike_sequence",
     EffectType.DESPERATION_NEUT: "effects_strike_sequence",
+    EffectType.COUNTERATTACK: "effects_strike_sequence",
     EffectType.FLASH: "effects_strike_sequence",
     EffectType.FLASH_NEUT: "effects_strike_sequence",
     EffectType.OFF_FROZEN: "effects_strike_sequence",
@@ -38,6 +43,7 @@ EFFECT_LIST_MAP: dict[EffectType, str] = {
     EffectType.PRE_CBT_DAMAGE: "effects_pre_combat",
     EffectType.PRE_CBT_HEAL: "effects_pre_combat",
     # ── On-strike ────────────────────────────────────────────────────────
+    EffectType.TWIN: "effects_on_strike",
     EffectType.DR_PIERCE: "effects_on_strike",
     EffectType.HEXBLADE_STRIKE: "effects_on_strike",
     EffectType.EFFECTIVE: "effects_on_strike",

@@ -278,7 +278,10 @@ class Skill:
     {
       "effect": "SPECIAL_TRIGGER_NEUT",
       "target": "foe",
-      "params": {},
+      "params": {
+        "off": true,
+        "def": true
+      },
       "conditions": [
         {
           "type": "hp_above_pct", 
@@ -735,6 +738,7 @@ Processed by `_phase_start_of_turn` before combat begins. These grant visible st
 | `STAT_DAUNT` | Inflicts -X to specific stats to unit | `{ stats: list[str] } + { formula: str, multiplier: float, flat: int, min: int, max: int }` |
 | `BONUS_NEUT` | Neutralizes bonuses to specific stats | `{}` |
 | `PENALTY_NEUT` | Neutralizes penalties to specific stats | `{}` |
+| `RANGE_EXTENSION` | Unit can attack foes within specific range | `{ min: int, max: int }` |
 
 #### `effects_strike_sequence`
 
@@ -770,9 +774,14 @@ Processed by `_phase_start_of_turn` before combat begins. These grant visible st
 | `HEXBLADE_STRIKE` | Calculates damage using the lower of foe's Def or Res | `{}` |
 | `EFFECTIVE` | Effective against specific unit type | `{ movement_types: list[str], weapon_types: list[str] }` |
 | `NEUT_EFFECTIVE` | Neutralizes 'effective against specific unit type' | `{ movement_types: list[str], weapon_types: list[str] }` |
-| `SPECIAL_TRIGGER_NEUT` | Unit cannot trigger Specials | `{}` |
+| `SPECIAL_TRIGGER_NEUT` | Unit cannot trigger Specials | `{ aoe: bool, off: bool, def: bool }` |
 | `FLAT_DR_STRIKE` | Reduce damage from specific foe's attacks by X during combat | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
+<<<<<<< HEAD
 | `PERC_DR_STRIKE` | Reduce damage from specific foe's attacks during combat by X%. `piercable` (default `true`) sources stack in one product and are reduced by `DR_PIERCE`; `piercable: false` (Special-grade, e.g. Pavise/Aegis) sources stack in a separate, pierce-immune product | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str, piercable: bool }` |
+=======
+| `PERC_DR_STRIKE` | Reduce damage from specific foe's attacks during combat by X% | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str, piercable: bool, max_triggers: int }` |
+| `TWIN` | Any "reduces damage by X%" effect can be triggered a new max of times | `{ value: int }` |
+>>>>>>> c83964340a8e2590309ed2f5055218d6bc92a1a2
 | `FLAT_DAMAGE_STRIKE` | Unit deals +X damage | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
 | `PULSE_STRIKE` | Grants Special count -X to unit before specific strikes | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str, cap_cd_start_of_cbt: bool }` |
 | `SCOWL_STRIKE` | Inflicts Special cooldown count + X on unit before unit's specific attacks | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
@@ -808,15 +817,26 @@ Processed by `_phase_start_of_turn` before combat begins. These grant visible st
 
 Used in the `params` of `effects_on_strike` effects to specify which strikes the effect applies to.
 
+In the Special-related values below, "unit" means the combatant who **owns the effect** and "foe" their opponent, whichever side of the strike each happens to be on. `_ready` means that side has a Special equipped whose cooldown has reached 0 and it *could* trigger. `_triggers` means it actually does trigger on this exact strike, which additionally requires its type to match its role here (an offensive Special while attacking, a defensive one while being attacked).
+
 | Value | Applies |
 |---|---|
 | `every_strike` | Every strike of the sequence |
 | `first_strike` | First attack, excluding the brave second hit |
 | `first_attack` | First attack, including the brave second hit |
-| `follow_up` | Follow-up attack, including the brave second hit |
+| `first_attack_brave` | Only the brave second hit of the first attack |
 | `first_follow_up` | First follow-up attack, excluding the brave second hit |
-| `on_unit_special` | When unit's Special triggers |
-| `on_foe_special` | When foe's Special triggers |
+| `follow_up` | Follow-up attack, including the brave second hit |
+| `follow_up_brave` | Only the brave second hit of a follow-up attack |
+| `both_first_strikes` | Every strike that is not a brave second hit (first attack and follow-up alike) |
+| `both_second_strikes` | Every brave second hit (first attack and follow-up alike) |
+| `consecutive` | Strikes made back-to-back by the same combatant |
+| `unit_special_triggers` | When unit's Special triggers on this strike |
+| `foe_special_triggers` | When foe's Special triggers on this strike |
+| `unit_special_ready` | When unit's Special is ready, whether or not it triggers |
+| `foe_special_ready` | When foe's Special is ready, whether or not it triggers |
+| `any_special_ready` | When either combatant's Special is ready |
+| `any_special_ready_or_triggered` | When either combatant's Special is ready, or either has already triggered one this combat (Ice Wall) |
 
 ---
 
