@@ -867,14 +867,12 @@ class CombatEngine:
             + defender_spd_check
         )
 
-        attacker_brave = any(
+        atk_state.triggers_brave = any(
             e.type == EffectType.BRAVE for e in atk_state.effects_strike_sequence
         )
-        defender_brave = any(
+        def_state.triggers_brave = any(
             e.type == EffectType.BRAVE for e in def_state.effects_strike_sequence
         )
-        atk_state.triggers_brave = attacker_brave
-        def_state.triggers_brave = defender_brave
 
         # POTENT TEMPORARILY DISABLED — _potent_active removed; the new
         # _potent_check_* system is being wired separately. Placeholder None
@@ -886,11 +884,8 @@ class CombatEngine:
         attacker_potent = attacker_potent_mult is not None
         defender_potent = defender_potent_mult is not None
 
-        attacker_brave_fu = attacker_brave and not attacker_potent
-        defender_brave_fu = defender_brave and not defender_potent
-
         attacker_first = [Strike("attacker", "defender", StrikeType.FIRST)]
-        if attacker_brave:
+        if atk_state.triggers_brave:
             attacker_first.append(
                 Strike(
                     "attacker",
@@ -906,7 +901,7 @@ class CombatEngine:
             attacker_followups.append(
                 Strike("attacker", "defender", StrikeType.FOLLOW_UP)
             )
-            if attacker_brave_fu:
+            if atk_state.triggers_brave:
                 attacker_followups.append(
                     Strike(
                         "attacker",
@@ -922,7 +917,7 @@ class CombatEngine:
             )
 
         defender_first = [Strike("defender", "attacker", StrikeType.FIRST)]
-        if defender_brave:
+        if def_state.triggers_brave:
             defender_first.append(
                 Strike(
                     "defender",
@@ -938,7 +933,7 @@ class CombatEngine:
             defender_followups.append(
                 Strike("defender", "attacker", StrikeType.FOLLOW_UP)
             )
-            if defender_brave_fu:
+            if def_state.triggers_brave:
                 defender_followups.append(
                     Strike(
                         "defender",
