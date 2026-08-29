@@ -1,6 +1,7 @@
 import math
 from dataclasses import dataclass, field, replace
 from typing import Literal
+from unittest import case
 
 from .build import Unit, StatBlock, DivineVein
 from .constants import Color, StrikeType, EffectType, WeaponType, SpecialType
@@ -18,6 +19,7 @@ class CombatantState:
     current_hp: int
     current_cooldown: int
     combat_stats: StatBlock | None = None
+    phantom_bonus: StatBlock = field(default_factory=StatBlock)
     defensive_stat: Literal["defense", "res"] | None = None
     cd_start_of_cbt: int = 0
     damage_mitigated_bucket: int = 0
@@ -58,6 +60,19 @@ class CombatantState:
         base += getattr(self.granted_visible_buffs, name)
         base -= getattr(self.granted_visible_debuffs, name)
         return base
+
+    def cbt_stat_with_phantom(self, name: str) -> int:
+        """Combat stat plus Phantom (Spd/Res/Def) bonuses, for checks that are
+        explicitly allowed to see Phantom — e.g. Dodge's Spd-diff DR.
+
+        Follow-up eligibility and Potent triggers must NOT use this: they read
+        combat_stats directly, since Phantom is defined to boost Spd checks
+        without affecting whether a follow-up attack happens.
+        """
+        base = getattr(self.combat_stats, name, None)
+        if base is None:
+            base = self.unit.get_visible_stat(name)
+        return base + getattr(self.phantom_bonus, name)
 
 
 @dataclass
@@ -147,8 +162,11 @@ def _distribute_effects(attacker: CombatantState, defender: CombatantState) -> N
 
 def _add_to_bucket(state: CombatantState, effect: Effect) -> None:
     list_name = EFFECT_LIST_MAP.get(effect.type)
-    if list_name is not None:
-        getattr(state, list_name).append(effect)
+    if list_name is None:
+        raise KeyError(
+            f"EffectType {effect.type} has no EFFECT_LIST_MAP entry — effect would be silently dropped"
+        )
+    getattr(state, list_name).append(effect)
 
 
 def _evaluate_conditions_for_effect(
@@ -372,13 +390,17 @@ class CombatEngine:
         elif effect.type == EffectType.GRANT_STATUS:
             name = effect.params.get("status")
             status = BONUS_DATABASE.get(name) or PENALTY_DATABASE.get(name)
-            if status is not None:
-                already_have = any(
-                    s.name == status.name
-                    for s in target_state.unit.active_statuses + target_state.granted_statuses
+            if status is None:
+                raise KeyError(
+                    f"GRANT_STATUS references unknown status '{name}' — not in BONUS/PENALTY_DATABASE"
                 )
-                if not already_have:
-                    target_state.granted_statuses.append(status)
+            already_have = any(
+                s.name == status.name
+                for s in target_state.unit.active_statuses
+                + target_state.granted_statuses
+            )
+            if not already_have:
+                target_state.granted_statuses.append(status)
 
     def _compute_counts(self):
         """Tallies bonus_count / penalty_count from final visible buffs/debuffs and
@@ -595,9 +617,29 @@ class CombatEngine:
                 stats = effect.params.get("stats", [])
                 updates = {s: getattr(state.combat_stats, s) + magnitude for s in stats}
                 state.combat_stats = replace(state.combat_stats, **updates)
+        # Apply PHANTOM_STAT effects. These accumulate into phantom_bonus
+        # instead of combat_stats, so it wont apply to normal follow ups and etc.
+        for state, foe in ((atk_state, def_state), (def_state, atk_state)):
+            for effect in state.effects_start_of_combat:
+                if effect.type != EffectType.PHANTOM_STAT:
+                    continue
+
+                if effect.applied_by == "foe":
+                    owner, opponent = foe, state
+                else:
+                    owner, opponent = state, foe
+
+                magnitude = self._resolve_formula(effect.params, owner, opponent)
+                stats = effect.params.get("stats", [])
+                updates = {
+                    s: getattr(state.phantom_bonus, s) + magnitude for s in stats
+                }
+                state.phantom_bonus = replace(state.phantom_bonus, **updates)
 
         self.attacker.combat_stats = self.combatant_states["attacker"].combat_stats
         self.defender.combat_stats = self.combatant_states["defender"].combat_stats
+        self.attacker.phantom_bonus = self.combatant_states["attacker"].phantom_bonus
+        self.defender.phantom_bonus = self.combatant_states["defender"].phantom_bonus
 
         # Adaptive damage targeting
         self.combatant_states[
@@ -682,102 +724,71 @@ class CombatEngine:
 
         return target_stat
 
-    def _potent_active(self, effects, spd_diff, is_attacker, made_fu, triggers_brave):
-        current_mult = 0
-        final_mult = 0
-        potent_check = 0
-
-        """Determine the highest multiplier for the potent hit. We need to add a condition to make sure the unit is allowed to meet each one in the first place."""
-        current_mult = self._potent_check_10
-        if final_mult < current_mult:
-            final_mult = current_mult
-
-        current_mult = self._potent_check_25
-        if final_mult < current_mult:
-            final_mult = current_mult
-
-        current_mult = self._potent_check_30
-        if final_mult < current_mult:
-            final_mult = current_mult
-
-        current_mult = self._potent_check_guarantee
-        if final_mult < current_mult:
-            final_mult = current_mult
-
-        if final_mult > 0:
-            return final_mult
-        else:
-            return None
-
-    def _potent_check_10(self, effects, spd_diff, is_attacker):
-        """Check the Potent damage multipler for potent effects that decrease the spd diff by 10"""
-        potent_100 = 0
+    def _potent_active(self, effects, made_fu, triggers_brave):
+        """Highest Potent multiplier among POTENT effects still in the strike
+        sequence (their spd/patience condition already passed in the condition
+        phase, so no spd check here). Returns None if none present.
+        'Highest value applied; does not stack.'"""
+        best = None
         for e in effects:
-            if e.type == EffectType.POTENT:
-                if spd_diff + 5 >= 0:
-                    potent_100 = 1
-        return potent_100
+            if e.type != EffectType.POTENT:
+                continue
+            if (triggers_brave or made_fu) and "damage_pct_if_fu" in e.params:
+                pct = e.params["damage_pct_if_fu"]
+            else:
+                pct = e.params["damage_pct"]
+            mult = pct / 100
+            best = mult if best is None else max(best, mult)
+        return best
 
-    def _potent_check_25(self, effects, spd_diff, is_attacker, made_fu, triggers_brave):
-        """Check the Potent damage multipler for potent effects that decrease the spd diff by 25"""
-        mult_25 = 0
-        for e in effects:
-            if e.type == EffectType.POTENT:
-                if spd_diff + 20 >= 0:
-                    if (triggers_brave or made_fu) and "damage_pct_if_fu" in e.params:
-                        pct_25 = e.params["damage_pct_if_fu"]
-                    else:
-                        pct_25 = e.params.get("damage_pct", 100)
-                    mult_25 = pct_25 / 100
-        return mult_25
+    def _staff_full_damage(self, striker_state) -> bool:
+        """True if a Wrathful-type effect makes this staff deal full (non-halved)
+        damage. Checks for a STAFF_FULL_DAMAGE effect in the striker's on-strike
+        list. Returns False by default, so staves halve damage unless a Wrathful
+        effect is present."""
+        return any(
+            e.type == EffectType.STAFF_FULL_DAMAGE
+            for e in striker_state.effects_on_strike
+        )
 
-    def _potent_check_30(self, effects, spd_diff, is_attacker, made_fu, triggers_brave):
-        """Check the Potent damage multipler for potent effects that decrease the spd diff by 30"""
-        mult_30 = 0
-        for e in effects:
-            if e.type == EffectType.POTENT:
-                if spd_diff + 25 >= 0:
-                    if (triggers_brave or made_fu) and "damage_pct_if_fu" in e.params:
-                        pct_30 = e.params["damage_pct_if_fu"]
-                    else:
-                        pct_30 = e.params.get("damage_pct", 100)
-                    mult_30 = pct_30 / 100
-        return mult_30
+    def _special_trigger_neutralized(self, state, strike) -> bool:
+        """True if a SPECIAL_TRIGGER_NEUT effect on `state` blocks its Special
+        from triggering on this strike, even though its cooldown has reached 0.
+        The cooldown is simply held at 0 (via the normal breath/guard charge
+        path in _process_strike) until the effect is no longer active."""
+        return any(
+            e.type == EffectType.SPECIAL_TRIGGER_NEUT
+            and self._strike_matches(strike, e.params)
+            for e in state.effects_on_strike
+        )
 
-    def _potent_check_guarantee(
-        self, effects, spd_diff, is_attacker, made_fu, triggers_brave
-    ):
-        """Check the Potent damage multipler for guaranteed potent effects (like patience)"""
-        mult_pat = 0
-        """Not sure what to use for this check"""
-        for e in effects:
-            if e.type == EffectType.POTENT:
-                if (triggers_brave or made_fu) and "damage_pct_if_fu" in e.params:
-                    pct_pat = e.params["damage_pct_if_fu"]
-                else:
-                    pct_pat = e.params.get("damage_pct", 100)
-                mult_pat = pct_pat / 100
-        return mult_pat
+    def _miracle_survives(
+        self, strike, target_state, striker_state, target_special
+    ) -> bool:
+        """True if a Miracle lets the target survive this lethal hit at 1 HP.
 
-    """Legacy Function?
-    def _potent_active(self, effects, spd_diff, is_attacker, made_fu):
-        relevant_diff = spd_diff if is_attacker else -spd_diff
-        best_mult = None
-        for e in effects:
-            if e.type == EffectType.POTENT:
-                threshold = e.params.get("spd_threshold", 25)
-                if relevant_diff >= threshold:
-                    if made_fu and "damage_pct_if_fu" in e.params:
-                        pct = e.params["damage_pct_if_fu"]
-                    else:
-                        pct = e.params.get("damage_pct", 100)
-                    mult = pct / 100.0
-                    if best_mult is None or mult > best_mult:
-                        best_mult = mult
-        return best_mult
-    """
+        Distinguished by the MIRACLE effect's params:
+          - Special miracle: strike == "on_unit_special" (requires the target's
+            special charged/ready) and cannot be bypassed by Fatal Smoke.
+          - Skill miracle: otherwise. Once per combat (target_state.miracle_used),
+            and bypassed by FATAL_SMOKE on the attacker.
 
-    # TODO CHECK POTENT LOGIC TMR
+        Only checks; caller sets miracle_used for the skill-miracle case.
+        """
+        fatal_smoke = any(
+            e.type == EffectType.FATAL_SMOKE for e in striker_state.effects_on_strike
+        )
+        for e in target_state.effects_on_strike:
+            if e.type != EffectType.MIRACLE:
+                continue
+            is_special = e.params.get("strike") == "on_unit_special"
+            if is_special:
+                if target_special:  # needs special ready; not bypassable
+                    return True
+            else:
+                if not target_state.miracle_used and not fatal_smoke:
+                    return True
+        return False
 
     def _determine_strike_sequence(self) -> list[Strike]:
         """Calculates the combat sequence using effects_strike_sequence instead of keywords."""
@@ -876,12 +887,16 @@ class CombatEngine:
         atk_state.triggers_brave = attacker_brave
         def_state.triggers_brave = defender_brave
 
-        # POTENT TEMPORARILY DISABLED — _potent_active removed; the new
-        # _potent_check_* system is being wired separately. Placeholder None
-        # keeps the downstream attacker_potent/defender_potent logic working
-        # (Potent simply never triggers until reconnected).
-        attacker_potent_mult = None
-        defender_potent_mult = None
+        attacker_potent_mult = self._potent_active(
+            atk_state.effects_strike_sequence,
+            made_fu=attacker_FU > 0,
+            triggers_brave=attacker_brave,
+        )
+        defender_potent_mult = self._potent_active(
+            def_state.effects_strike_sequence,
+            made_fu=defender_FU > 0,
+            triggers_brave=defender_brave,
+        )
 
         attacker_potent = attacker_potent_mult is not None
         defender_potent = defender_potent_mult is not None
@@ -895,6 +910,18 @@ class CombatEngine:
                 Strike(
                     "attacker",
                     "defender",
+                    StrikeType.FIRST,
+                    brave_second_hit=True,
+                    consecutive=True,
+                )
+            )
+
+        defender_first = [Strike("defender", "attacker", StrikeType.FIRST)]
+        if defender_brave:
+            defender_first.append(
+                Strike(
+                    "defender",
+                    "attacker",
                     StrikeType.FIRST,
                     brave_second_hit=True,
                     consecutive=True,
@@ -918,18 +945,12 @@ class CombatEngine:
                 )
         if attacker_potent:
             attacker_followups.append(
-                Strike("attacker", "defender", StrikeType.POTENT, consecutive=True)
-            )
-
-        defender_first = [Strike("defender", "attacker", StrikeType.FIRST)]
-        if defender_brave:
-            defender_first.append(
                 Strike(
-                    "defender",
                     "attacker",
-                    StrikeType.FIRST,
-                    brave_second_hit=True,
+                    "defender",
+                    StrikeType.POTENT,
                     consecutive=True,
+                    potent_mult=attacker_potent_mult,
                 )
             )
 
@@ -950,7 +971,13 @@ class CombatEngine:
                 )
         if defender_potent:
             defender_followups.append(
-                Strike("defender", "attacker", StrikeType.POTENT, consecutive=True)
+                Strike(
+                    "defender",
+                    "attacker",
+                    StrikeType.POTENT,
+                    consecutive=True,
+                    potent_mult=defender_potent_mult,
+                )
             )
 
         defender_counterattack = (
@@ -1086,7 +1113,9 @@ class CombatEngine:
                     if e.type == EffectType.SCOWL_STRIKE and self._strike_matches(strike, role, e.params)
             )
 
-            unit_state.current_cooldown = max(0, unit_state.current_cooldown - total_pulse + total_scowl)
+            unit_state.current_cooldown = max(
+                0, unit_state.current_cooldown - total_pulse + total_scowl
+            )
 
         striker_special_ready = striker_state.special_type is not SpecialType.NONE and striker_state.current_cooldown <= 0
         target_special_ready = target_state.special_type is not SpecialType.NONE and target_state.current_cooldown <= 0
@@ -1142,6 +1171,9 @@ class CombatEngine:
 
         final_damage = base_damage + true_damage
         pre_mitigation_damage = final_damage
+        if striker_state.unit.weapon_type is WeaponType.STAFF:
+            if not self._staff_full_damage(striker_state):
+                final_damage = math.trunc(final_damage * 0.5)
 
         pierce_mult = 1.0
         for effect in striker_state.effects_on_strike:
@@ -1160,6 +1192,7 @@ class CombatEngine:
                 pierce_mult *= 1.0 - pierce_value
 
         perc_dr = 0.0
+        unpierceable_dr = 0.0
         for effect in target_state.effects_on_strike:
             if effect.type == EffectType.PERC_DR_STRIKE and self._strike_matches(
                 strike,
@@ -1190,9 +1223,11 @@ class CombatEngine:
                     if not piercable:
                         target_state.special_dr_count[id(effect)] = trigger_count + 1
 
-        effective_dr = perc_dr * pierce_mult
+        effective_dr = 1.0 - ((1.0 - perc_dr) * (1.0 - unpierceable_dr))
         damage_multiplier = 1.0 - effective_dr
         final_damage = math.ceil(final_damage * damage_multiplier)
+        if strike.strike_type is StrikeType.POTENT:
+            final_damage = math.trunc(final_damage * strike.potent_mult)
 
         flat_dr = 0
         for effect in target_state.effects_on_strike:
@@ -1234,6 +1269,25 @@ class CombatEngine:
         if dmg_floor is not None and final_damage > dmg_floor:
             final_damage = dmg_floor
 
+        lethal = final_damage >= target_state.current_hp
+        if (
+            lethal
+            and target_state.current_hp > 1
+            and self._miracle_survives(
+                strike, target_state, striker_state, target_special
+            )
+        ):
+            final_damage = target_state.current_hp - 1  # survive at exactly 1 HP
+            # Skill miracle is once-per-combat; special miracle is gated by
+            # cooldown instead, so only burn the flag for skill miracle.
+            special_miracle = any(
+                e.type == EffectType.MIRACLE
+                and e.params.get("strike") == "on_unit_special"
+                for e in target_state.effects_on_strike
+            )
+            if not special_miracle:
+                target_state.miracle_used = True
+
         mitigated_amount = pre_mitigation_damage - final_damage
         target_state.damage_mitigated_bucket += mitigated_amount
         target_state.current_hp -= final_damage
@@ -1260,13 +1314,28 @@ class CombatEngine:
             striker_state.special_use_count += 1
             striker_state.current_cooldown = striker_state.unit.max_cooldown
         else:
-            striker_breath = any(e.type == EffectType.OFF_BREATH for e in striker_state.effects_on_strike)
-            striker_guard = any(e.type == EffectType.DEF_GUARD for e in striker_state.effects_on_strike)
-            striker_breath_neut = any(e.type == EffectType.BREATH_NEUT for e in striker_state.effects_on_strike)
-            striker_guard_neut = any(e.type == EffectType.GUARD_NEUT for e in striker_state.effects_on_strike)
-            
-            striker_charge = 1 + int(striker_breath and not striker_breath_neut) - int(striker_guard and not striker_guard_neut)
-            striker_state.current_cooldown = max(0, striker_state.current_cooldown - striker_charge)
+            striker_breath = any(
+                e.type == EffectType.OFF_BREATH for e in striker_state.effects_on_strike
+            )
+            striker_guard = any(
+                e.type == EffectType.DEF_GUARD for e in striker_state.effects_on_strike
+            )
+            striker_breath_neut = any(
+                e.type == EffectType.BREATH_NEUT
+                for e in striker_state.effects_on_strike
+            )
+            striker_guard_neut = any(
+                e.type == EffectType.GUARD_NEUT for e in striker_state.effects_on_strike
+            )
+
+            striker_charge = (
+                1
+                + int(striker_breath and not striker_breath_neut)
+                - int(striker_guard and not striker_guard_neut)
+            )
+            striker_state.current_cooldown = max(
+                0, striker_state.current_cooldown - striker_charge
+            )
 
         if target_special_triggers:
             target_state.special_use_count += 1
@@ -1277,8 +1346,14 @@ class CombatEngine:
             target_breath_neut = any(e.type == EffectType.BREATH_NEUT for e in target_state.effects_on_strike)
             target_guard_neut = any(e.type == EffectType.GUARD_NEUT for e in target_state.effects_on_strike)
 
-            target_charge = 1 + int(target_breath and not target_breath_neut) - int(target_guard and not target_guard_neut)
-            target_state.current_cooldown = max(0, target_state.current_cooldown - target_charge)
+            target_charge = (
+                1
+                + int(target_breath and not target_breath_neut)
+                - int(target_guard and not target_guard_neut)
+            )
+            target_state.current_cooldown = max(
+                0, target_state.current_cooldown - target_charge
+            )
 
     def _check_color_advantage(
         self, striker_state: CombatantState, target_state: CombatantState
@@ -1397,9 +1472,14 @@ class CombatEngine:
                     variable = unit_state.damage_mitigated_bucket
                 case "unit_max_hp":
                     variable = unit_state.unit.base_stats.hp
-                case "spd_diff":
+                case "phantom_spd_diff":
+                    # Distinct from the follow-up/Potent spd_diff locals in
+                    # _determine_strike_sequence and _evaluate_potent_spd_check —
+                    # this one is phantom-inclusive by name and by design.
                     variable = max(
-                        0, unit_state.combat_stats.spd - foe_state.combat_stats.spd
+                        0,
+                        unit_state.cbt_stat_with_phantom("spd")
+                        - foe_state.cbt_stat_with_phantom("spd"),
                     )
                 case "foe_penalty_count":
                     variable = foe_state.penalty_count
@@ -1420,7 +1500,7 @@ class CombatEngine:
                 case "num_bonus_and_penalties_on_unit":
                     variable = unit_state.bonus_count + unit_state.penalty_count
                 case _:
-                    variable = 0.0
+                    raise ValueError(f"Unknown formula '{formula}' in _resolve_formula")
 
         value = math.floor(variable * multiplier) + flat
         if min_val >= 0:
