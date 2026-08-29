@@ -46,6 +46,7 @@ class SpecialType(Enum):
     AOE = auto()
     OFF = auto()
     DEF = auto()
+    MIRACLE = auto()
     OTHER = auto()
 
 
