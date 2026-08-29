@@ -15,6 +15,7 @@ EFFECT_LIST_MAP: dict[EffectType, str] = {
     EffectType.STAT_DAUNT: "effects_start_of_combat",
     EffectType.BONUS_NEUT: "effects_start_of_combat",
     EffectType.PENALTY_NEUT: "effects_start_of_combat",
+    EffectType.PHANTOM_STAT: "effects_start_of_combat",
     EffectType.RANGE_EXTENSION: "effects_start_of_combat",
     # ── Strike sequence ─────────────────────────────────────────────────
     EffectType.FU_DENY: "effects_strike_sequence",
@@ -63,6 +64,9 @@ EFFECT_LIST_MAP: dict[EffectType, str] = {
     EffectType.REDUCE_DEEP_WOUNDS_IN_CBT: "effects_on_strike",
     EffectType.TRIANGLE_ADEPT: "effects_on_strike",
     EffectType.CANCEL_AFFINITY: "effects_on_strike",
+    EffectType.STAFF_FULL_DAMAGE: "effects_on_strike",
+    EffectType.MIRACLE: "effects_on_strike",
+    EffectType.FATAL_SMOKE: "effects_on_strike",
     # ── Post-combat ──────────────────────────────────────────────────────
     EffectType.HEAL_POST_CBT: "effects_after_combat",
     EffectType.DAMAGE_POST_CBT: "effects_after_combat",
