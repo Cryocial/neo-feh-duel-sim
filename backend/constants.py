@@ -62,6 +62,7 @@ class EffectType(str, Enum):
     STAT_DAUNT = "STAT_DAUNT"
     BONUS_NEUT = "BONUS_NEUT"
     PENALTY_NEUT = "PENALTY_NEUT"
+    PHANTOM_STAT = "PHANTOM_STAT"
     RANGE_EXTENSION = "RANGE_EXTENSION"
 
     # ── Strike sequence ───────────────────────────────────────────────────────
@@ -114,6 +115,9 @@ class EffectType(str, Enum):
     REDUCE_DEEP_WOUNDS_IN_CBT = "REDUCE_DEEP_WOUNDS_IN_CBT"
     TRIANGLE_ADEPT = "TRIANGLE_ADEPT"
     CANCEL_AFFINITY = "CANCEL_AFFINITY"
+    STAFF_FULL_DAMAGE = "STAFF_FULL_DAMAGE"
+    MIRACLE = "MIRACLE"
+    FATAL_SMOKE = "FATAL_SMOKE"
     # ── Post-combat ───────────────────────────────────────────────────────────
     HEAL_POST_CBT = "HEAL_POST_CBT"
     DAMAGE_POST_CBT = "DAMAGE_POST_CBT"

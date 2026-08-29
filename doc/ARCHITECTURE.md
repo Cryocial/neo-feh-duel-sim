@@ -649,6 +649,35 @@ At startup, three JSON files are parsed to build the in-memory databases.
 3. **Simulation launch**: the `Skill` and `Status` objects of both units are read to instantiate `Effect` objects (with condition compilation) and distribute them into the 6 lists of each `CombatantState`.
 
 ---
+## Damage Calculation Pipeline
+
+1. **Base damage** — `max(0, trunc(Atk × effectiveness × WTA) − defensive_stat)`.
+   Effectiveness (×1.5, unless `NEUT_EFFECTIVE`) and the weapon-triangle
+   multiplier (`_get_wta_multiplier`, incl. Triangle Adept / Cancel Affinity)
+   apply to Atk here.
+2. **Fixed / true damage** — `FLAT_DAMAGE_STRIKE` effects added on
+   (Change of Fate, Treachery, etc.).
+3. **Offensive Special damage** — special-trigger damage boosts.
+4. **StaffMod** — staff users deal ×0.5 unless Wrathful.
+5. **Percent damage reduction** — all percent DR is expressed as a single
+   `PERC_DR_STRIKE` effect type with a `piercable: bool` param:
+   - `piercable: true` (default; non-Special sources): reduced by `DR_PIERCE`
+     (`pierce_mult`) before stacking, and (⚠ future) halvable by "reduce foe's
+     DR%" effects. Multiple pierceable sources stack multiplicatively into
+     one product.
+   - `piercable: false` (Special-grade, Pavise/Aegis): NOT reduced by
+     `DR_PIERCE`, NOT halvable. Kept in its own product, immune to piercing.
+   The two products combine multiplicatively (`1 − (1−perc)(1−unpierceable)`)
+   and never reach 100% from percentages alone (e.g. Dodge 40% + Archrival
+   40% → 64% total, not 80%).
+6. **Flat damage reduction** — `FLAT_DR_STRIKE` subtracted, floored at 0.
+7. **Damage floor** — `DR_FLOOR` caps the damage at a maximum (Collapsed Star
+   "reduce to 1"): if `final_damage > floor`, set to `floor`. Lowest floor wins.
+8. **Survival effects** — Miracle / survive-at-1-HP.
+
+Percent DR (step 5) is applied AFTER fixed/true damage (step 2) and offensive
+Specials (step 3), matching the wiki. Flat DR (step 6) and the floor (step 7)
+come after percent DR.
 
 ## Simulation Timeline
 
@@ -747,8 +776,12 @@ Processed by `_phase_start_of_turn` before combat begins. These grant visible st
 | `NEUT_EFFECTIVE` | Neutralizes 'effective against specific unit type' | `{ movement_types: list[str], weapon_types: list[str] }` |
 | `SPECIAL_TRIGGER_NEUT` | Unit cannot trigger Specials | `{ aoe: bool, off: bool, def: bool }` |
 | `FLAT_DR_STRIKE` | Reduce damage from specific foe's attacks by X during combat | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
+<<<<<<< HEAD
+| `PERC_DR_STRIKE` | Reduce damage from specific foe's attacks during combat by X%. `piercable` (default `true`) sources stack in one product and are reduced by `DR_PIERCE`; `piercable: false` (Special-grade, e.g. Pavise/Aegis) sources stack in a separate, pierce-immune product | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str, piercable: bool }` |
+=======
 | `PERC_DR_STRIKE` | Reduce damage from specific foe's attacks during combat by X% | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str, piercable: bool, max_triggers: int }` |
 | `TWIN` | Any "reduces damage by X%" effect can be triggered a new max of times | `{ value: int }` |
+>>>>>>> c83964340a8e2590309ed2f5055218d6bc92a1a2
 | `FLAT_DAMAGE_STRIKE` | Unit deals +X damage | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
 | `PULSE_STRIKE` | Grants Special count -X to unit before specific strikes | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str, cap_cd_start_of_cbt: bool }` |
 | `SCOWL_STRIKE` | Inflicts Special cooldown count + X on unit before unit's specific attacks | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
@@ -766,6 +799,9 @@ Processed by `_phase_start_of_turn` before combat begins. These grant visible st
 | `REDUCE_DEEP_WOUNDS_IN_CBT` | Reduces \[Deep Wounds] for in-combat healing — lets a % of healing through. Multiple sources stack multiplicatively and the surviving heal rounds UP | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
 | `TRIANGLE_ADEPT` | Amplifies an existing Weapon Triangle advantage (on either combatant) to a larger magnitude. Never creates advantage where none exists | `{ flat: int }` (the advantage %, e.g. 40) |
 | `CANCEL_AFFINITY` | Neutralizes Triangle Adept amplification (on either side), reverting to the base ±20% Weapon Triangle | `{}` |
+| `STAFF_FULL_DAMAGE` | Cancels the staff-damage halving (Wrathful-type), so the staff user deals full damage. Presence flag. | (none) |
+| `MIRACLE` | Survive a lethal hit at 1 HP (if HP was >1). `strike: "on_unit_special"` = special miracle (needs special ready, unbypassable); otherwise skill miracle (once per combat, bypassed by FATAL_SMOKE). | `{ strike, piercable }` |
+| `FATAL_SMOKE` | On the attacker; bypasses the foe's *skill* miracle (not special miracle). Presence flag. | (none) |
 
 #### `effects_after_combat`
 
@@ -809,7 +845,7 @@ In the Special-related values below, "unit" means the combatant who **owns the e
 
 ### C - `formula` Value Reference
 
-Formula names resolve to raw game quantities; skill-specific offsets and caps live in the params (`flat` for offsets, `min`/`max` for clamps), not baked into the formula. For example, the Liberate "+4, max 8" is `"formula": "bonus_count", "multiplier": 1, "flat": 4, "max": 8`, and Dodge's "Spd diff ×4, max 40%" is `"formula": "spd_diff", "multiplier": 4, "min": 0, "max": 40`.
+Formula names resolve to raw game quantities; skill-specific offsets and caps live in the params (`flat` for offsets, `min`/`max` for clamps), not baked into the formula. For example, the Liberate "+4, max 8" is `"formula": "bonus_count", "multiplier": 1, "flat": 4, "max": 8`, and Dodge's "Spd diff ×4, max 40%" is `"formula": "phantom_spd_diff", "multiplier": 4, "min": 0, "max": 40`.
 .
 
 | Value | Resolves to | Extra params |
@@ -823,7 +859,7 @@ Formula names resolve to raw game quantities; skill-specific offsets and caps li
 | `sum_foe_visible_debuffs` | Sum of foe's visible stat penalties, each floored at 0 (Dominance) | — |
 | `mitigated_bucket` | Unit's accumulated mitigated-damage total (Reflex) | — |
 | `unit_max_hp` | Unit's max HP (percent heals: pair with `multiplier`) | — |
-| `spd_diff` | `unit_spd - foe_spd`, in-combat, floored at 0 (Dodge: pair with `multiplier`/`max` for the cap) | — |
+| `phantom_spd_diff` | `unit_spd - foe_spd`, in-combat, **including Phantom Spd**, floored at 0 (Dodge: pair with `multiplier`/`max` for the cap). Distinct from the plain `spd_diff` locals used by the follow-up check and `potent_spd_check`, which deliberately exclude Phantom. | — |
 | `foe_penalty_count` | Foe's active penalty count (Creation Pulse: pair with `max` for the cap) | — |
 | `unit_cbt_atk` | Unit's in-combat Atk | — |
 | `unit_cbt_spd` | Unit's in-combat Spd | — |
@@ -840,9 +876,7 @@ Formula names resolve to raw game quantities; skill-specific offsets and caps li
 | `unit_initiates` | `pre_aoe` | `{}` |
 | `foe_initiates` | `pre_aoe` | `{}` |
 | `spaces_moved` | `pre_aoe` | `{ "target": "self"\|"foe"\|"either"\|"initiator", "min_spaces": int }` |
-| `ally_within_spaces` | `pre_aoe` | `{ "min_allies": int, "spaces": int }` |
-| `ally_within_spaces123` | `pre_aoe` | `{ "check": "1_space"\|"2_spaces"\|"3_spaces"\|"3_rows_cols", "min_allies": int, "target": "self"\|"foe" }` |
-### NOTE: CHECK WHICH ALLY COND METHOD WE WANT TO USE 
+| `ally_within_spaces` | `pre_aoe` | `{ "check": "1_space"\|"2_spaces"\|"3_spaces"\|"3_rows_cols", "min_allies": int, "target": "self"\|"foe" }` |
 | `foe_weapon_type` | `pre_aoe` | `{ "types": list[str] }` |
 | `bonus_penalty_total` | `pre_aoe` | `{ "min_count": int, "include_foe": bool }` |
 | `is_engaged` | `pre_aoe` | `{}` |
@@ -851,6 +885,10 @@ Formula names resolve to raw game quantities; skill-specific offsets and caps li
 | `hp_below_pct` | `start_of_combat` | `{ "unit": "self"\|"foe", "threshold": int }` — true when HP% is strictly below threshold (exact complement of `hp_above_pct`) |
 | `triggers_brave` | `post_sequence` | `{ "target": "self"\|"foe" }` |
 | `cbt_stat_check` | `start_of_combat` | `{ "stat": str, "unit": "self"\|"foe", "margin": int, "comparison": "greater_or_equal"\|"lesser_than" }` | *`cbt_stat_check`'s `comparison` is optional and defaults to `greater_or_equal` (`unit_stat >= foe_stat + margin`). `lesser_than` evaluates `unit_stat < foe_stat + margin`. The two are exact complements at the same `margin`, so a pair of effects with opposite comparisons partitions every case (e.g. Breath of Life 4's 40%/20% heal split on Def).*
+| `potent_spd_check` | `start_of_combat` | `{ "spd_lower": int }` — triggers when `(unit_spd - foe_spd) >= 5 - spd_lower`; the base-5 natural-follow-up requirement is lowered by `spd_lower`. Excludes Phantom, includes frozen. |
+| `cbt_stat_sum_check` | `start_of_combat` | `{ "stats": list[str], "margin": int, "comparison": "greater_or_equal"\|"lesser_than" }` — compares the SUM of the unit's in-combat stats vs the foe's (e.g. Spd+Def Potent). |
+| `potent_patience` | `start_of_combat` | `{ "spd_threshold": int }` — guaranteed Potent, gated on the unit's BASE Spd (from `Unit`, excluding legendary/mythic/GT bonuses per FEH) >= threshold. |
+| `visible_stat_check` | `start_of_turn` | `{ "stat": str, "margin": int, "comparison": "greater_or_equal"\|"lesser_than" }` | Same semantics as `cbt_stat_check` but compares visible stats via `CombatantState.visible_stat()` (Ploy, Eldhrímnir). The `start_of_turn` phase is NOT part of the three-phase `_evaluate_conditions` system — it's evaluated eagerly by `_start_of_turn_conditions_pass`, which calls `cond.func` directly, so a conditional grant sees unconditional grants applied earlier in the same pass. |
 
 
 

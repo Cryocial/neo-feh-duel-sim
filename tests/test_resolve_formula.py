@@ -10,7 +10,10 @@ Key behaviors verified here:
   - min defaults to 0, so results never go negative unless min is set negative
   - max defaults to -1 (no cap); a non-negative max clamps
   - each named formula reads the field it claims to
+  - an unrecognized formula name raises (loud failure), not a silent fallback
 """
+
+import pytest
 
 from backend.build import StatBlock
 from conftest import make_state
@@ -160,7 +163,7 @@ def test_spd_diff_positive(engine, plain_unit, plain_foe):
     foe = make_state(
         plain_foe, combat_stats=StatBlock(hp=50, atk=25, spd=20, defense=25, res=25)
     )
-    params = {"formula": "spd_diff", "multiplier": 1}
+    params = {"formula": "phantom_spd_diff", "multiplier": 1}
     assert engine._resolve_formula(params, unit, foe) == 15
 
 
@@ -172,7 +175,7 @@ def test_spd_diff_floored_at_zero_when_slower(engine, plain_unit, plain_foe):
     foe = make_state(
         plain_foe, combat_stats=StatBlock(hp=50, atk=25, spd=30, defense=25, res=25)
     )
-    params = {"formula": "spd_diff", "multiplier": 4, "max": 40}
+    params = {"formula": "phantom_spd_diff", "multiplier": 4, "max": 40}
     assert engine._resolve_formula(params, unit, foe) == 0
 
 
@@ -184,10 +187,8 @@ def test_unit_cbt_atk_uses_combat_stats_when_present(engine, plain_unit, plain_f
     assert engine._resolve_formula(params, unit, make_state(plain_foe)) == 22
 
 
-def test_unknown_formula_falls_back_to_flat(engine, plain_unit, plain_foe):
-    # unrecognized formula name -> variable stays 0, only flat applies
+def test_unknown_formula_raises(engine, plain_unit, plain_foe):
+    # unrecognized formula name -> loud failure, not a silent flat-only fallback
     params = {"formula": "this_formula_does_not_exist", "multiplier": 5, "flat": 3}
-    result = engine._resolve_formula(
-        params, make_state(plain_unit), make_state(plain_foe)
-    )
-    assert result == 3
+    with pytest.raises(ValueError):
+        engine._resolve_formula(params, make_state(plain_unit), make_state(plain_foe))
