@@ -263,10 +263,11 @@ def _evaluate_cbt_stat_sum_check(params: dict) -> Callable:
 
 
 def _evaluate_potent_patience(params: dict) -> Callable:
-    """Patience-type (guaranteed) Potent: triggers regardless of Spd."""
+    """Patience-type (guaranteed) Potent: triggers whenever the unit's base
+    Spd is 30 or higher, regardless of the foe's Spd."""
 
     def evaluate(unit, foe) -> bool:
-        return True
+        return unit.unit.base_stats.spd >= 30
 
     return evaluate
 
