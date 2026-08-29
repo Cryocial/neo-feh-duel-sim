@@ -27,6 +27,7 @@ class CombatantState:
     special_type: SpecialType = SpecialType.NONE
     special_denied: bool = False
     special_use_count: int = 0
+    miracle_used: bool = False
     special_dr_count: dict[int, int] = field(default_factory=dict)
     twin_value: int = 0
     strike_count: int = 0
@@ -284,7 +285,7 @@ class CombatEngine:
 
         self._evaluate_conditions("pre_aoe")
 
-        self._apply_special_denial(aoe=True)
+        self._apply_special_denial()
 
         self._phase_AoE()
 
@@ -305,7 +306,7 @@ class CombatEngine:
 
         self._apply_twin_effects()
 
-        self._apply_special_denial(aoe=False)
+        self._apply_special_denial()
 
         while (
             len(strike_sequence) > 0
@@ -672,7 +673,7 @@ class CombatEngine:
             )
             break
 
-    def _apply_special_denial(self, aoe: bool):
+    def _apply_special_denial(self):
         """Deny a unit's special when a SPECIAL_TRIGGER_NEUT effect in its own
         list covers that special's type. The JSON key is the type's own name in
         lowercase ("aoe", "off", "def").
@@ -680,15 +681,16 @@ class CombatEngine:
         AoE denial resolves before _phase_AoE, the in-combat types before the
         strike loop, hence the flag.
         """
-        denied_types = (SpecialType.AOE,) if aoe else (SpecialType.OFF, SpecialType.DEF)
         for state in self.combatant_states.values():
             for effect in state.effects_on_strike:
                 if effect.type != EffectType.SPECIAL_TRIGGER_NEUT:
                     continue
-                state.special_denied = state.special_denied or any(
-                    state.special_type == denied
-                    and effect.params.get(denied.name.lower(), False)
-                    for denied in denied_types
+                state.special_denied = (
+                    state.special_denied
+                    or state.special_type == SpecialType.AOE and effect.params.get("aoe", False)
+                    or state.special_type == SpecialType.OFF and effect.params.get("off", False)
+                    or state.special_type == SpecialType.DEF and effect.params.get("def", False)
+                    or state.special_type == SpecialType.MIRACLE and effect.params.get("def", False)
                 )
 
     def _apply_twin_effects(self):
@@ -751,7 +753,7 @@ class CombatEngine:
         )
 
     def _miracle_survives(
-        self, strike, target_state, striker_state, target_special
+        self, strike, target_miracle_triggers
     ) -> bool:
         """True if a Miracle lets the target survive this lethal hit at 1 HP.
 
@@ -763,6 +765,8 @@ class CombatEngine:
 
         Only checks; caller sets miracle_used for the skill-miracle case.
         """
+        striker_state = self.combatant_states[strike.striker]
+        target_state = self.combatant_states[strike.target]
         fatal_smoke = any(
             e.type == EffectType.FATAL_SMOKE for e in striker_state.effects_on_strike
         )
@@ -771,7 +775,9 @@ class CombatEngine:
                 continue
             is_special = e.params.get("strike") == "on_unit_special"
             if is_special:
-                if target_special:  # needs special ready; not bypassable
+                if target_miracle_triggers:
+                    target_state.special_use_count += 1
+                    target_state.current_cooldown = target_state.unit.max_cooldown
                     return True
             else:
                 if not target_state.miracle_used and not fatal_smoke:
@@ -1075,6 +1081,8 @@ class CombatEngine:
         striker_state = self.combatant_states[strike.striker]
         target_state = self.combatant_states[strike.target]
 
+        initial_use_count = target_state.special_use_count
+
         raw_atk = striker_state.combat_stats.atk
         defensive_stat = getattr(target_state.combat_stats, target_state.defensive_stat)
 
@@ -1104,7 +1112,16 @@ class CombatEngine:
         target_special_ready = target_state.special_type is not SpecialType.NONE and target_state.current_cooldown <= 0
 
         striker_special_triggers = striker_special_ready and striker_state.special_type == SpecialType.OFF and not striker_state.special_denied
-        target_special_triggers = target_special_ready and target_state.special_type == SpecialType.DEF and not target_state.special_denied
+        target_special_triggers = (
+            target_special_ready
+            and target_state.special_type == SpecialType.DEF
+            and not target_state.special_denied
+        )
+        target_miracle_triggers = (
+            target_special_ready
+            and target_state.special_type == SpecialType.MIRACLE
+            and not target_state.special_denied
+        )
 
         striker_special_used = striker_state.special_use_count > 0
         target_special_used = target_state.special_use_count > 0
@@ -1257,7 +1274,7 @@ class CombatEngine:
             lethal
             and target_state.current_hp > 1
             and self._miracle_survives(
-                strike, target_state, striker_state, target_special
+                strike, target_miracle_triggers
             )
         ):
             final_damage = target_state.current_hp - 1  # survive at exactly 1 HP
@@ -1323,11 +1340,19 @@ class CombatEngine:
         if target_special_triggers:
             target_state.special_use_count += 1
             target_state.current_cooldown = target_state.unit.max_cooldown
-        else:
-            target_breath = any(e.type == EffectType.DEF_BREATH for e in target_state.effects_on_strike)
-            target_guard = any(e.type == EffectType.OFF_GUARD for e in target_state.effects_on_strike)
-            target_breath_neut = any(e.type == EffectType.BREATH_NEUT for e in target_state.effects_on_strike)
-            target_guard_neut = any(e.type == EffectType.GUARD_NEUT for e in target_state.effects_on_strike)
+        if target_state.special_use_count == initial_use_count:
+            target_breath = any(
+                e.type == EffectType.DEF_BREATH for e in target_state.effects_on_strike
+                )
+            target_guard = any(
+                e.type == EffectType.OFF_GUARD for e in target_state.effects_on_strike
+                )
+            target_breath_neut = any(
+                e.type == EffectType.BREATH_NEUT for e in target_state.effects_on_strike
+                                     )
+            target_guard_neut = any(
+                e.type == EffectType.GUARD_NEUT for e in target_state.effects_on_strike
+                                    )
 
             target_charge = (
                 1
