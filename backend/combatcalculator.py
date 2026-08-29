@@ -1,7 +1,6 @@
 import math
 from dataclasses import dataclass, field, replace
 from typing import Literal
-from unittest import case
 
 from .build import Unit, StatBlock, DivineVein
 from .constants import Color, StrikeType, EffectType, WeaponType, SpecialType
