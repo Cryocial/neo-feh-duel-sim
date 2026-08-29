@@ -34,7 +34,7 @@ def _evaluate_spaces_moved(params: dict) -> Callable:
     movement is always 0 — clash-style skills should use the default."""
     min_spaces = params.get("min_spaces", 1)
 
-    def evaluate(unit, foe) -> bool:
+    def evaluate(unit: "CombatantState", foe: "CombatantState") -> bool:
         initiator = unit if getattr(unit, "is_initiator", False) else foe
         return getattr(initiator, "spaces_moved", 0) >= min_spaces
 
@@ -233,7 +233,7 @@ def _evaluate_potent_spd_check(params: dict) -> Callable:
     spd_lower = params["spd_lower"]
     base = 5  # the standard natural-follow-up Spd requirement
 
-    def evaluate(unit, foe) -> bool:
+    def evaluate(unit: "CombatantState", foe: "CombatantState") -> bool:
         spd_diff = unit.combat_stats.spd - foe.combat_stats.spd
         return spd_diff >= base - spd_lower
 
@@ -253,7 +253,7 @@ def _evaluate_cbt_stat_sum_check(params: dict) -> Callable:
     margin = params.get("margin", 0)
     comparison = params.get("comparison", "greater_or_equal")
 
-    def evaluate(unit, foe) -> bool:
+    def evaluate(unit: "CombatantState", foe: "CombatantState") -> bool:
         u = sum(getattr(unit.combat_stats, s) for s in stats)
         f = sum(getattr(foe.combat_stats, s) for s in stats)
         threshold = f + margin
@@ -268,6 +268,14 @@ def _evaluate_potent_patience(params: dict) -> Callable:
 
     def evaluate(unit, foe) -> bool:
         return unit.unit.base_stats.spd >= 30
+    """Patience-type (guaranteed) Potent: triggers regardless of Spd."""
+    def evaluate(unit: "CombatantState", foe: "CombatantState") -> bool:
+        return True
+    
+def _evaluate_style_enabled(params: dict) -> Callable:
+    """Checks if unit should use style if possible"""
+    def evaluate(unit: "CombatantState", foe: "CombatantState") -> bool:
+        return unit.nb_styles == 1 and unit.style_enabled
 
     return evaluate
 
@@ -291,7 +299,8 @@ CONDITION_REGISTRY: dict[str, tuple[Phase, Callable[[dict], Callable]]] = {
     "bonus_penalty_total": ("pre_aoe", _evaluate_num_bonus_penalty_total),
     "is_engaged": ("pre_aoe", _evaluate_is_engaged),
     "potent_patience": ("start_of_combat", _evaluate_potent_patience),
-    "visible_stat_check": ("start_of_turn", _evaluate_visible_stat_check),
+    "visible_stat_check": ("pre_aoe", _evaluate_visible_stat_check),
+    "style_enabled": ("pre_aoe", _evaluate_style_enabled),
 }
 
 # ── classes ─────────────────────────────────────────────────────────────────
