@@ -790,6 +790,9 @@ Processed by `_phase_start_of_turn` before combat begins. These grant visible st
 | `REDUCE_DEEP_WOUNDS_IN_CBT` | Reduces \[Deep Wounds] for in-combat healing — lets a % of healing through. Multiple sources stack multiplicatively and the surviving heal rounds UP | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
 | `TRIANGLE_ADEPT` | Amplifies an existing Weapon Triangle advantage (on either combatant) to a larger magnitude. Never creates advantage where none exists | `{ flat: int }` (the advantage %, e.g. 40) |
 | `CANCEL_AFFINITY` | Neutralizes Triangle Adept amplification (on either side), reverting to the base ±20% Weapon Triangle | `{}` |
+| `STAFF_FULL_DAMAGE` | Cancels the staff-damage halving (Wrathful-type), so the staff user deals full damage. Presence flag. | (none) |
+| `MIRACLE` | Survive a lethal hit at 1 HP (if HP was >1). `strike: "on_unit_special"` = special miracle (needs special ready, unbypassable); otherwise skill miracle (once per combat, bypassed by FATAL_SMOKE). | `{ strike, piercable }` |
+| `FATAL_SMOKE` | On the attacker; bypasses the foe's *skill* miracle (not special miracle). Presence flag. | (none) |
 
 #### `effects_after_combat`
 
@@ -853,9 +856,7 @@ Formula names resolve to raw game quantities; skill-specific offsets and caps li
 | `unit_initiates` | `pre_aoe` | `{}` |
 | `foe_initiates` | `pre_aoe` | `{}` |
 | `spaces_moved` | `pre_aoe` | `{ "target": "self"\|"foe"\|"either"\|"initiator", "min_spaces": int }` |
-| `ally_within_spaces` | `pre_aoe` | `{ "min_allies": int, "spaces": int }` |
-| `ally_within_spaces123` | `pre_aoe` | `{ "check": "1_space"\|"2_spaces"\|"3_spaces"\|"3_rows_cols", "min_allies": int, "target": "self"\|"foe" }` |
-### NOTE: CHECK WHICH ALLY COND METHOD WE WANT TO USE 
+| `ally_within_spaces` | `pre_aoe` | `{ "check": "1_space"\|"2_spaces"\|"3_spaces"\|"3_rows_cols", "min_allies": int, "target": "self"\|"foe" }` |
 | `foe_weapon_type` | `pre_aoe` | `{ "types": list[str] }` |
 | `bonus_penalty_total` | `pre_aoe` | `{ "min_count": int, "include_foe": bool }` |
 | `is_engaged` | `pre_aoe` | `{}` |
@@ -864,6 +865,9 @@ Formula names resolve to raw game quantities; skill-specific offsets and caps li
 | `hp_below_pct` | `start_of_combat` | `{ "unit": "self"\|"foe", "threshold": int }` — true when HP% is strictly below threshold (exact complement of `hp_above_pct`) |
 | `triggers_brave` | `post_sequence` | `{ "target": "self"\|"foe" }` |
 | `cbt_stat_check` | `start_of_combat` | `{ "stat": str, "unit": "self"\|"foe", "margin": int, "comparison": "greater_or_equal"\|"lesser_than" }` | *`cbt_stat_check`'s `comparison` is optional and defaults to `greater_or_equal` (`unit_stat >= foe_stat + margin`). `lesser_than` evaluates `unit_stat < foe_stat + margin`. The two are exact complements at the same `margin`, so a pair of effects with opposite comparisons partitions every case (e.g. Breath of Life 4's 40%/20% heal split on Def).*
+| `potent_spd_check` | `start_of_combat` | `{ "spd_lower": int }` — triggers when `(unit_spd - foe_spd) >= 5 - spd_lower`; the base-5 natural-follow-up requirement is lowered by `spd_lower`. Excludes Phantom, includes frozen. |
+| `cbt_stat_sum_check` | `start_of_combat` | `{ "stats": list[str], "margin": int, "comparison": "greater_or_equal"\|"lesser_than" }` — compares the SUM of the unit's in-combat stats vs the foe's (e.g. Spd+Def Potent). |
+| `potent_patience` | `start_of_combat` | `{ "spd_threshold": int }` — guaranteed Potent, gated on the unit's BASE Spd (from `Unit`, excluding legendary/mythic/GT bonuses per FEH) >= threshold. |
 | `visible_stat_check` | `start_of_turn` | `{ "stat": str, "margin": int, "comparison": "greater_or_equal"\|"lesser_than" }` | Same semantics as `cbt_stat_check` but compares visible stats via `CombatantState.visible_stat()` (Ploy, Eldhrímnir). The `start_of_turn` phase is NOT part of the three-phase `_evaluate_conditions` system — it's evaluated eagerly by `_start_of_turn_conditions_pass`, which calls `cond.func` directly, so a conditional grant sees unconditional grants applied earlier in the same pass. |
 
 
