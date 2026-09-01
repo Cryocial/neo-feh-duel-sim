@@ -82,7 +82,6 @@ class Strike:
     strike_type: StrikeType
     brave_second_hit: bool = False
     consecutive: bool = False
-    is_first_hit: bool = False
     potent_mult: float = 1.0
 
 
