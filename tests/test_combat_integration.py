@@ -12,9 +12,7 @@ Setup choices that keep expected damage exact and hand-verifiable:
   - no specials / no other skills, so damage per hit = atk - def
 """
 
-import pytest
-
-from backend.build import Unit, Status, StatBlock
+from backend.build import Unit, Status
 from backend.constants import MovementType, WeaponType, Color
 from backend.combatcalculator import CombatEngine
 
