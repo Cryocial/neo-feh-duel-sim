@@ -266,12 +266,12 @@ def _evaluate_potent_patience(params: dict) -> Callable:
     """Patience-type (guaranteed) Potent: triggers whenever the unit's base
     Spd is 30 or higher, regardless of the foe's Spd."""
 
-    def evaluate(unit, foe) -> bool:
-        return unit.unit.base_stats.spd >= 30
-    """Patience-type (guaranteed) Potent: triggers regardless of Spd."""
     def evaluate(unit: "CombatantState", foe: "CombatantState") -> bool:
-        return True
-    
+        return unit.unit.base_stats.spd >= 30
+
+    return evaluate
+
+
 def _evaluate_style_enabled(params: dict) -> Callable:
     """Checks if unit should use style if possible"""
     def evaluate(unit: "CombatantState", foe: "CombatantState") -> bool:
