@@ -5,7 +5,7 @@ from typing import Literal
 from .build import Unit, StatBlock, DivineVein
 from .constants import Color, StrikeType, EffectType, WeaponType, SpecialType
 from .effects import Effect, build_effect, EFFECT_LIST_MAP
-from .conditions import Phase, Condition, AtomicCondition, AnyOf, AllOf
+from .conditions import Phase, Condition, check_condition
 from .jsonbootupstuff import BONUS_DATABASE, PENALTY_DATABASE
 
 UnitRole = Literal["attacker", "defender"]
@@ -178,64 +178,14 @@ def _evaluate_conditions_for_effect(
         owner, opponent = foe_state, unit_state
     else:
         owner, opponent = unit_state, foe_state
-    return _check_phase(effect.conditions, phase, owner, opponent)
-
-
-def _check_phase(
-    conditions: list[Condition],
-    phase: Phase,
-    unit: CombatantState,
-    foe: CombatantState,
-) -> tuple[bool, list[Condition]]:
     remaining = []
-    for cond in conditions:
-        result = _check_condition(cond, phase, unit, foe)
+    for cond in effect.conditions:
+        result = check_condition(cond, phase, owner, opponent)
         if result is False:
             return False, []
         if result is None:
             remaining.append(cond)
     return True, remaining
-
-
-def _check_condition(
-    cond: Condition,
-    phase: Phase,
-    unit: CombatantState,
-    foe: CombatantState,
-) -> bool | None:
-    if isinstance(cond, AtomicCondition):
-        if cond.phase != phase:
-            return None
-        return cond.func(unit, foe)
-    if isinstance(cond, AllOf):
-        return _check_allof(cond, phase, unit, foe)
-    return _check_anyof(cond, phase, unit, foe)
-
-
-def _check_anyof(
-    anyof: AnyOf,
-    phase: Phase,
-    unit: CombatantState,
-    foe: CombatantState,
-) -> bool | None:
-    results = [_check_condition(c, phase, unit, foe) for c in anyof.conditions]
-    phase_results = [r for r in results if r is not None]
-    if not phase_results:
-        return None
-    return any(phase_results)
-
-
-def _check_allof(
-    allof: AllOf,
-    phase: Phase,
-    unit: CombatantState,
-    foe: CombatantState,
-) -> bool | None:
-    results = [_check_condition(c, phase, unit, foe) for c in allof.conditions]
-    phase_results = [r for r in results if r is not None]
-    if not phase_results:
-        return None
-    return all(phase_results)
 
 
 @dataclass
