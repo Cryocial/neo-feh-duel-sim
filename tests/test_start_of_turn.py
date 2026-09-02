@@ -17,8 +17,6 @@ Requires (must be present in source):
   - _apply_grant / _phase_start_of_turn wired into simulate()
 """
 
-import pytest
-
 from backend.build import Unit, Skill, StatBlock
 from backend.constants import MovementType, WeaponType, Color
 from backend.combatcalculator import CombatEngine
