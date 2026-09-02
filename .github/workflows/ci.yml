@@ -1,0 +1,72 @@
+# Name shown in the Actions tab and in the PR checks list.
+name: CI
+
+on:
+  # Runs on every push to a branch that has an open PR targeting main.
+  pull_request:
+    branches: [main]
+  # Safety net for anything landing on main another way (direct push, hotfix),
+  # and it is what gives the default branch its pass/fail state.
+  push:
+    branches: [main]
+
+# Least privilege for the automatic GITHUB_TOKEN. None of the following jobs
+# write anything, so read is enough.
+permissions:
+  contents: read
+
+jobs:
+  # Test suite.
+  test:
+    # GitHub-hosted runner.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Clones the repo into the runner.
+      - uses: actions/checkout@v4
+
+      # Installs uv and makes it available on PATH.
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.9.7"
+
+      # Runs the suite.
+      # -q keeps the log readable; a failure still prints the full traceback.
+      - run: uv run pytest -q
+
+  # Lint check. Separate job, so a lint failure and a test failure are
+  #  reported independently instead of one masking the other.
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.9.7"
+
+      # Same pinned ruff as everyone runs locally, from pyproject.toml.
+      - run: uv run ruff check .
+
+  # Checks that no conflict markers are committed.
+  no-conflict-markers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reject committed conflict markers
+        run: |
+          # Search every tracked file for a line starting with <<<<<<<, =======
+          # or >>>>>>>. -n prefixes each hit with its line number, -E switches
+          # to extended regexes.
+          #
+          # grep returns true as soon as it finds one match, so here "found
+          # something" is the failure case.
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)( |$)'; then
+            echo "::error::Conflict markers found in committed files"
+
+            # A non-zero exit makes the job fail, which blocks the merge.
+            exit 1
+          fi
