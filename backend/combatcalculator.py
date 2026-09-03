@@ -42,7 +42,7 @@ class CombatantState:
     granted_visible_debuffs: StatBlock = field(default_factory=StatBlock)
     effects_start_of_turn: list[Effect] = field(default_factory=list)
     effects_AoE: list[Effect] = field(default_factory=list)
-    effects_start_of_combat: list[Effect] = field(default_factory=list)
+    effects_combat_stats: list[Effect] = field(default_factory=list)
     effects_strike_sequence: list[Effect] = field(default_factory=list)
     effects_pre_combat: list[Effect] = field(default_factory=list)
     effects_on_strike: list[Effect] = field(default_factory=list)
@@ -224,7 +224,7 @@ class CombatEngine:
                 special_type=SpecialType.NONE if self.defender.special is None else self.defender.special.special_type
             ),
         }
-        self._phase_start_of_turn()
+        self._initialize()
 
         self._compute_counts()
 
@@ -236,7 +236,7 @@ class CombatEngine:
 
         self._apply_special_denial()
 
-        self._phase_AoE()
+        self._resolve_aoe()
 
         self._combat_stat_calculations()
 
@@ -248,7 +248,7 @@ class CombatEngine:
 
         self._evaluate_conditions("post_sequence")
 
-        self._phase_pre_combat()
+        self._resolve_pre_combat()
 
         for state in self.combatant_states.values():
             state.cd_start_of_cbt = state.current_cooldown
@@ -265,14 +265,14 @@ class CombatEngine:
             strike = strike_sequence.pop(0)
             self._process_strike(strike)
 
-        self._phase_after_combat()
+        self._resolve_after_combat()
 
         return {
             "attacker_final_hp": self.combatant_states["attacker"].current_hp,
             "defender_final_hp": self.combatant_states["defender"].current_hp,
         }
 
-    def _phase_start_of_turn(self):
+    def _initialize(self):
         """Grants visible stats and statuses at start of turn (Hone, Ploy, etc.).
 
         Two passes so stat-dependent grants (Ploy reads visible Res) see the
@@ -382,7 +382,7 @@ class CombatEngine:
             foe_state = self.combatant_states[foe_role]
             for list_name in (
                 "effects_AoE",
-                "effects_start_of_combat",
+                "effects_combat_stats",
                 "effects_strike_sequence",
                 "effects_pre_combat",
                 "effects_on_strike",
@@ -456,7 +456,7 @@ class CombatEngine:
         new_hp = unit_state.current_hp + amount
         unit_state.current_hp = min(unit_state.unit.base_stats.hp, new_hp)
 
-    def _phase_AoE(self):
+    def _resolve_aoe(self):
         """Processes effects_AoE. Only the initiator can trigger an AoE special."""
         state = self.combatant_states["attacker"]
         foe_state = self.combatant_states["defender"]
@@ -517,16 +517,16 @@ class CombatEngine:
         def_state = self.combatant_states["defender"]
 
         atk_ignore_debuffs = any(
-            e.type == EffectType.PENALTY_NEUT for e in atk_state.effects_start_of_combat
+            e.type == EffectType.PENALTY_NEUT for e in atk_state.effects_combat_stats
         )
         def_ignore_debuffs = any(
-            e.type == EffectType.PENALTY_NEUT for e in def_state.effects_start_of_combat
+            e.type == EffectType.PENALTY_NEUT for e in def_state.effects_combat_stats
         )
         atk_ignore_buffs = any(
-            e.type == EffectType.BONUS_NEUT for e in def_state.effects_start_of_combat
+            e.type == EffectType.BONUS_NEUT for e in def_state.effects_combat_stats
         )
         def_ignore_buffs = any(
-            e.type == EffectType.BONUS_NEUT for e in atk_state.effects_start_of_combat
+            e.type == EffectType.BONUS_NEUT for e in atk_state.effects_combat_stats
         )
 
         atk_vals = {
@@ -546,9 +546,9 @@ class CombatEngine:
         def_state.combat_stats = StatBlock(**def_vals)
 
         # Apply in-combat STAT_BOOST / STAT_DAUNT effects.
-        # These live in effects_start_of_combat and were previously never applied.
+        # These live in effects_combat_stats and were previously never applied.
         for state, foe in ((atk_state, def_state), (def_state, atk_state)):
-            for effect in state.effects_start_of_combat:
+            for effect in state.effects_combat_stats:
                 if effect.type not in (EffectType.STAT_BOOST, EffectType.STAT_DAUNT):
                     continue
 
@@ -569,7 +569,7 @@ class CombatEngine:
         # Apply PHANTOM_STAT effects. These accumulate into phantom_bonus
         # instead of combat_stats, so it wont apply to normal follow ups and etc.
         for state, foe in ((atk_state, def_state), (def_state, atk_state)):
-            for effect in state.effects_start_of_combat:
+            for effect in state.effects_combat_stats:
                 if effect.type != EffectType.PHANTOM_STAT:
                     continue
 
@@ -612,7 +612,7 @@ class CombatEngine:
         self.combat_range = _base_combat_range(self.attacker.weapon_type)
 
         atk_state = self.combatant_states["attacker"]
-        for effect in atk_state.effects_start_of_combat:
+        for effect in atk_state.effects_combat_stats:
             if effect.type != EffectType.RANGE_EXTENSION:
                 continue
             min_range = effect.params["min"]
@@ -627,7 +627,7 @@ class CombatEngine:
         list covers that special's type. The JSON key is the type's own name in
         lowercase ("aoe", "off", "def").
 
-        AoE denial resolves before _phase_AoE, the in-combat types before the
+        AoE denial resolves before _resolve_aoe, the in-combat types before the
         strike loop, hence the flag.
         """
         for state in self.combatant_states.values():
@@ -989,7 +989,7 @@ class CombatEngine:
 
         return strike_sequence
 
-    def _phase_pre_combat(self):
+    def _resolve_pre_combat(self):
         """Processes PRE_CBT_DAMAGE and PRE_CBT_HEAL."""
         atk_state = self.combatant_states["attacker"]
         def_state = self.combatant_states["defender"]
@@ -1524,7 +1524,7 @@ class CombatEngine:
             case _:
                 return False
 
-    def _phase_after_combat(self):
+    def _resolve_after_combat(self):
         """Processes effects_after_combat: post-combat healing/damage."""
         for role, foe_role in (("attacker", "defender"), ("defender", "attacker")):
             state = self.combatant_states[role]

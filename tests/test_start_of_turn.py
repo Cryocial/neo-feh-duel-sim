@@ -1,5 +1,5 @@
 """
-End-to-end tests for the start-of-turn phase (_phase_start_of_turn +
+End-to-end tests for the start-of-turn phase (_initialize +
 _apply_grant + the visible_stat accessor + _compute_counts).
 
 The headline scenario is Ploy: at start of turn, if the unit's visible Res
@@ -14,7 +14,7 @@ whole chain:
 Requires (must be present in source):
   - EffectType.GRANT_VISIBLE_STAT
   - "visible_stat_check" condition registered under the "start_of_turn" phase
-  - _apply_grant / _phase_start_of_turn wired into simulate()
+  - _apply_grant / _initialize wired into simulate()
 """
 
 from backend.build import Unit, Skill, StatBlock
