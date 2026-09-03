@@ -519,7 +519,7 @@ def test_denied_miracle_special_does_not_trigger():
 
 
 def test_denied_aoe_special_does_not_fire_before_combat():
-    """AoE denial resolves before _phase_AoE, so no pre-combat damage lands."""
+    """AoE denial resolves before _resolve_aoe, so no pre-combat damage lands."""
     attacker = make_unit("A", atk=30, spd=30, defense=20)
     give_special(attacker, SpecialType.AOE, [trigger_aoe(0.5)])
     attacker.pre_charge = 1
