@@ -6,7 +6,7 @@ from typing import Callable, Literal, TYPE_CHECKING
 if TYPE_CHECKING:
     from .combatcalculator import CombatantState
 
-Phase = Literal["pre_aoe", "start_of_combat", "post_sequence"]
+Timing = Literal["static", "post_aoe", "post_combat_stats", "post_strike_sequence"]
 
 # ── evaluator functions ──────────────────────────────────────────────────────
 
@@ -116,9 +116,8 @@ def _evaluate_visible_stat_check(params: dict) -> Callable:
     """Generic visible-stat comparison (Ploy, Eldhrimnir, etc.).
 
     Used by start-of-turn grants, which are evaluated eagerly outside the
-    pre_aoe/start_of_combat/post_sequence phase system (see
-    CombatEngine._start_of_turn_conditions_pass, which calls cond.func
-    directly). Reads through CombatantState.visible_stat so a conditional
+    timing system (see CombatEngine._start_of_turn_conditions_pass, which
+    calls cond.func directly). Reads through CombatantState.visible_stat so a conditional
     grant sees the results of unconditional grants applied earlier in the
     same start-of-turn pass.
     """
@@ -167,10 +166,6 @@ def _evaluate_cbt_stat_check(params: dict) -> Callable:
         return unit_stat >= threshold
 
     return evaluate
-
-
-# Phase literal:
-Phase = Literal["start_of_turn", "pre_aoe", "start_of_combat", "post_sequence"]
 
 
 def _evaluate_num_bonus_penalty_total(params: dict) -> Callable:
@@ -283,24 +278,24 @@ def _evaluate_style_enabled(params: dict) -> Callable:
 # ── registry ─────────────────────────────────────────────────────────────────
 
 
-CONDITION_REGISTRY: dict[str, tuple[Phase, Callable[[dict], Callable]]] = {
-    "unit_initiates": ("pre_aoe", _evaluate_unit_initiates),
-    "foe_initiates": ("pre_aoe", _evaluate_foe_initiates),
-    "spaces_moved": ("pre_aoe", _evaluate_spaces_moved),
-    "ally_within_spaces": ("pre_aoe", _evaluate_ally_within_spaces),
-    "foe_weapon_type": ("pre_aoe", _evaluate_foe_weapon_type),
-    "first_combat_of_turn": ("pre_aoe", _evaluate_first_combat_of_turn),
-    "potent_spd_check": ("start_of_combat", _evaluate_potent_spd_check),
-    "hp_above_pct": ("start_of_combat", _evaluate_hp_above_pct),
-    "hp_below_pct": ("start_of_combat", _evaluate_hp_below_pct),
-    "cbt_stat_check": ("start_of_combat", _evaluate_cbt_stat_check),
-    "cbt_stat_sum_check": ("start_of_combat", _evaluate_cbt_stat_sum_check),
-    "triggers_brave": ("post_sequence", _evaluate_triggers_brave),
-    "bonus_penalty_total": ("pre_aoe", _evaluate_num_bonus_penalty_total),
-    "is_engaged": ("pre_aoe", _evaluate_is_engaged),
-    "potent_patience": ("start_of_combat", _evaluate_potent_patience),
-    "visible_stat_check": ("pre_aoe", _evaluate_visible_stat_check),
-    "style_enabled": ("pre_aoe", _evaluate_style_enabled),
+CONDITION_REGISTRY: dict[str, tuple[Timing, Callable[[dict], Callable]]] = {
+    "unit_initiates": ("static", _evaluate_unit_initiates),
+    "foe_initiates": ("static", _evaluate_foe_initiates),
+    "spaces_moved": ("static", _evaluate_spaces_moved),
+    "ally_within_spaces": ("static", _evaluate_ally_within_spaces),
+    "first_combat_of_turn": ("static", _evaluate_first_combat_of_turn),
+    "foe_weapon_type": ("static", _evaluate_foe_weapon_type),
+    "is_engaged": ("static", _evaluate_is_engaged),
+    "style_enabled": ("static", _evaluate_style_enabled),
+    "potent_patience": ("static", _evaluate_potent_patience),
+    "visible_stat_check": ("static", _evaluate_visible_stat_check),
+    "bonus_penalty_total": ("static", _evaluate_num_bonus_penalty_total),
+    "hp_above_pct": ("post_aoe", _evaluate_hp_above_pct),
+    "hp_below_pct": ("post_aoe", _evaluate_hp_below_pct),
+    "cbt_stat_check": ("post_combat_stats", _evaluate_cbt_stat_check),
+    "cbt_stat_sum_check": ("post_combat_stats", _evaluate_cbt_stat_sum_check),
+    "potent_spd_check": ("post_combat_stats", _evaluate_potent_spd_check),
+    "triggers_brave": ("post_strike_sequence", _evaluate_triggers_brave),
 }
 
 # ── classes ─────────────────────────────────────────────────────────────────
@@ -310,7 +305,7 @@ CONDITION_REGISTRY: dict[str, tuple[Phase, Callable[[dict], Callable]]] = {
 class AtomicCondition:
     type: str
     params: dict
-    phase: Phase
+    timing: Timing
     func: Callable
 
 
@@ -328,43 +323,43 @@ Condition = AtomicCondition | AnyOf | AllOf
 
 def check_condition(
     cond: Condition,
-    phase: Phase,
+    timing: Timing,
     unit: CombatantState,
     foe: CombatantState,
 ) -> bool | None:
     if isinstance(cond, AtomicCondition):
-        if cond.phase != phase:
+        if cond.timing != timing:
             return None
         return cond.func(unit, foe)
     if isinstance(cond, AllOf):
-        return _check_allof(cond, phase, unit, foe)
-    return _check_anyof(cond, phase, unit, foe)
+        return _check_allof(cond, timing, unit, foe)
+    return _check_anyof(cond, timing, unit, foe)
 
 
 def _check_anyof(
     anyof: AnyOf,
-    phase: Phase,
+    timing: Timing,
     unit: CombatantState,
     foe: CombatantState,
 ) -> bool | None:
-    results = [check_condition(c, phase, unit, foe) for c in anyof.conditions]
-    phase_results = [r for r in results if r is not None]
-    if not phase_results:
+    results = [check_condition(c, timing, unit, foe) for c in anyof.conditions]
+    timing_results = [r for r in results if r is not None]
+    if not timing_results:
         return None
-    return any(phase_results)
+    return any(timing_results)
 
 
 def _check_allof(
     allof: AllOf,
-    phase: Phase,
+    timing: Timing,
     unit: CombatantState,
     foe: CombatantState,
 ) -> bool | None:
-    results = [check_condition(c, phase, unit, foe) for c in allof.conditions]
-    phase_results = [r for r in results if r is not None]
-    if not phase_results:
+    results = [check_condition(c, timing, unit, foe) for c in allof.conditions]
+    timing_results = [r for r in results if r is not None]
+    if not timing_results:
         return None
-    return all(phase_results)
+    return all(timing_results)
 
 
 # ── builders ─────────────────────────────────────────────────────────────────
@@ -377,12 +372,12 @@ def _build_atomic_condition(data: dict) -> AtomicCondition:
     if c_type not in CONDITION_REGISTRY:
         raise ValueError(f"Unknown condition type: {c_type}")
 
-    phase, func_builder = CONDITION_REGISTRY[c_type]
+    timing, func_builder = CONDITION_REGISTRY[c_type]
 
     return AtomicCondition(
         type=c_type,
         params=params,
-        phase=phase,
+        timing=timing,
         func=func_builder(params),
     )
 

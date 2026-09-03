@@ -5,7 +5,7 @@ from typing import Literal
 from .build import Unit, StatBlock, DivineVein
 from .constants import Color, StrikeType, EffectType, WeaponType, SpecialType
 from .effects import Effect, build_effect, EFFECT_LIST_MAP
-from .conditions import Phase, Condition, check_condition
+from .conditions import Timing, Condition, check_condition
 from .jsonbootupstuff import BONUS_DATABASE, PENALTY_DATABASE
 
 UnitRole = Literal["attacker", "defender"]
@@ -172,7 +172,7 @@ def _evaluate_conditions_for_effect(
     effect: Effect,
     unit_state: CombatantState,
     foe_state: CombatantState,
-    phase: Phase,
+    timing: Timing,
 ) -> tuple[bool, list[Condition]]:
     if effect.applied_by == "foe":
         owner, opponent = foe_state, unit_state
@@ -180,7 +180,7 @@ def _evaluate_conditions_for_effect(
         owner, opponent = unit_state, foe_state
     remaining = []
     for cond in effect.conditions:
-        result = check_condition(cond, phase, owner, opponent)
+        result = check_condition(cond, timing, owner, opponent)
         if result is False:
             return False, []
         if result is None:
@@ -232,38 +232,23 @@ class CombatEngine:
             self.combatant_states["attacker"], self.combatant_states["defender"]
         )
 
-        self._evaluate_conditions("pre_aoe")
-
-        self._apply_special_denial()
-
-        self._resolve_aoe()
-
-        self._combat_stat_calculations()
+        self._evaluate_conditions("static")
 
         self._range_calculation()
 
-        self._evaluate_conditions("start_of_combat")
+        self._resolve_aoe()
+
+        self._evaluate_conditions("post_aoe")
+
+        self._combat_stat_calculations()
+
+        self._evaluate_conditions("post_combat_stats")
 
         strike_sequence = self._determine_strike_sequence()
 
-        self._evaluate_conditions("post_sequence")
+        self._evaluate_conditions("post_strike_sequence")
 
-        self._resolve_pre_combat()
-
-        for state in self.combatant_states.values():
-            state.cd_start_of_cbt = state.current_cooldown
-
-        self._apply_twin_effects()
-
-        self._apply_special_denial()
-
-        while (
-            len(strike_sequence) > 0
-            and self.combatant_states["attacker"].current_hp > 0
-            and self.combatant_states["defender"].current_hp > 0
-        ):
-            strike = strike_sequence.pop(0)
-            self._process_strike(strike)
+        self._resolve_combat(strike_sequence)
 
         self._resolve_after_combat()
 
@@ -376,7 +361,7 @@ class CombatEngine:
             state.bonus_count = bonuses
             state.penalty_count = penalties
 
-    def _evaluate_conditions(self, phase: Phase) -> None:
+    def _evaluate_conditions(self, timing: Timing) -> None:
         for role, foe_role in (("attacker", "defender"), ("defender", "attacker")):
             state = self.combatant_states[role]
             foe_state = self.combatant_states[foe_role]
@@ -391,7 +376,7 @@ class CombatEngine:
                 updated_conditions = []
                 for effect in getattr(state, list_name):
                     keep, remaining_conditions = _evaluate_conditions_for_effect(
-                        effect, state, foe_state, phase
+                        effect, state, foe_state, timing
                     )
                     if keep:
                         effect.conditions = remaining_conditions
@@ -458,6 +443,8 @@ class CombatEngine:
 
     def _resolve_aoe(self):
         """Processes effects_AoE. Only the initiator can trigger an AoE special."""
+        self._apply_special_denial()
+
         state = self.combatant_states["attacker"]
         foe_state = self.combatant_states["defender"]
 
@@ -589,20 +576,6 @@ class CombatEngine:
         self.defender.combat_stats = self.combatant_states["defender"].combat_stats
         self.attacker.phantom_bonus = self.combatant_states["attacker"].phantom_bonus
         self.defender.phantom_bonus = self.combatant_states["defender"].phantom_bonus
-
-        # Adaptive damage targeting
-        self.combatant_states[
-            "defender"
-        ].defensive_stat = self._determine_defensive_stat(
-            striker_state=self.combatant_states["attacker"],
-            target_state=self.combatant_states["defender"],
-        )
-        self.combatant_states[
-            "attacker"
-        ].defensive_stat = self._determine_defensive_stat(
-            striker_state=self.combatant_states["defender"],
-            target_state=self.combatant_states["attacker"],
-        )
 
     def _range_calculation(self):
         """Determines the distance this combat happens at: the attacker's base
@@ -988,6 +961,43 @@ class CombatEngine:
                 )
 
         return strike_sequence
+
+    def _resolve_combat(self, strike_sequence: list[Strike]) -> None:
+        """Runs the combat itself: the one-off effects that fill CombatantState
+        fields read later, then the strike loop.
+
+        cd_start_of_cbt is captured first: it is a snapshot of the cooldown as
+        combat opens, read by PULSE effects capped on it.
+        """
+        for state in self.combatant_states.values():
+            state.cd_start_of_cbt = state.current_cooldown
+
+        self._resolve_pre_combat()
+
+        self._apply_twin_effects()
+
+        self._apply_special_denial()
+
+        self.combatant_states["defender"].defensive_stat = (
+            self._determine_defensive_stat(
+                striker_state=self.combatant_states["attacker"],
+                target_state=self.combatant_states["defender"],
+            )
+        )
+        self.combatant_states["attacker"].defensive_stat = (
+            self._determine_defensive_stat(
+                striker_state=self.combatant_states["defender"],
+                target_state=self.combatant_states["attacker"],
+            )
+        )
+
+        while (
+            len(strike_sequence) > 0
+            and self.combatant_states["attacker"].current_hp > 0
+            and self.combatant_states["defender"].current_hp > 0
+        ):
+            strike = strike_sequence.pop(0)
+            self._process_strike(strike)
 
     def _resolve_pre_combat(self):
         """Processes PRE_CBT_DAMAGE and PRE_CBT_HEAL."""
