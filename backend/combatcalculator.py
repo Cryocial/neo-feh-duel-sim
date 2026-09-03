@@ -631,7 +631,7 @@ class CombatEngine:
         strike loop, hence the flag.
         """
         for state in self.combatant_states.values():
-            for effect in state.effects_on_strike:
+            for effect in state.effects_pre_combat:
                 if effect.type != EffectType.SPECIAL_TRIGGER_NEUT:
                     continue
                 state.special_denied = (
@@ -646,7 +646,7 @@ class CombatEngine:
         """Apply twin effect if needed.
         """
         for state in self.combatant_states.values():
-            for effect in state.effects_on_strike:
+            for effect in state.effects_pre_combat:
                 if effect.type != EffectType.TWIN:
                     continue
                 value = effect.params["value"]
@@ -663,7 +663,7 @@ class CombatEngine:
         target_stat = "defense" if striker_state.unit.is_physical() else "res"
         has_hexblade = any(
             e.type == EffectType.HEXBLADE_STRIKE
-            for e in striker_state.effects_on_strike
+            for e in striker_state.effects_pre_combat
         )
 
         if has_hexblade:
