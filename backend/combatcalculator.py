@@ -202,6 +202,8 @@ class CombatEngine:
     combatant_states: dict[UnitRole, CombatantState] = field(init=False)
     combat_range: int = field(init=False, default=0)
 
+# ── Simulation entry point ───────────────────────────────────────────────────
+
     def simulate(self) -> dict[str, int]:
         """Runs the full combat simulation following a 10-step timeline."""
         self.combatant_states = {
@@ -256,6 +258,8 @@ class CombatEngine:
             "attacker_final_hp": self.combatant_states["attacker"].current_hp,
             "defender_final_hp": self.combatant_states["defender"].current_hp,
         }
+
+# ── Start of turn ────────────────────────────────────────────────────────────
 
     def _initialize(self):
         """Grants visible stats and statuses at start of turn (Hone, Ploy, etc.).
@@ -361,6 +365,8 @@ class CombatEngine:
             state.bonus_count = bonuses
             state.penalty_count = penalties
 
+# ── Condition evaluation ─────────────────────────────────────────────────────
+
     def _evaluate_conditions(self, timing: Timing) -> None:
         for role, foe_role in (("attacker", "defender"), ("defender", "attacker")):
             state = self.combatant_states[role]
@@ -383,63 +389,27 @@ class CombatEngine:
                         updated_conditions.append(effect)
                 setattr(state, list_name, updated_conditions)
 
-    def _apply_healing(self, role: UnitRole, amount: int, phase: str = "in_combat"):
-        """Applies healing, with respect to the Deep Wounds effect.
+# ── Combat Range calculation ─────────────────────────────────────────────────
 
-        phase: "pre_combat" | "in_combat" | "post_combat"
-
-        How it works:
-        - Deep Wounds blocks ALL healing (all phases).
-        - Neutralize Deep Wounds turns it off entirely.
-        - Reduce Deep Wounds applies to pre_combat and in_combat by default;
-            post_combat is still fully blocked UNLESS a post-combat-relief
-            reduce effect is present (rn only L!Fae, but im adding this for a
-            "just in case".
-        - Reduce rounds the surviving heal UP (ceil).
+    def _range_calculation(self):
+        """Determines the distance this combat happens at: the attacker's base
+        weapon range, overridden by a RANGE_EXTENSION from the attacker's own
+        style, if any (only the initiator's engagement range matters here).
         """
-        if amount <= 0:
-            return
+        self.combat_range = _base_combat_range(self.attacker.weapon_type)
 
-        unit_state = self.combatant_states[role]
-        foe_role: UnitRole = "defender" if role == "attacker" else "attacker"
-        foe_state = self.combatant_states[foe_role]
+        atk_state = self.combatant_states["attacker"]
+        for effect in atk_state.effects_combat_stats:
+            if effect.type != EffectType.RANGE_EXTENSION:
+                continue
+            min_range = effect.params["min"]
+            max_range = effect.params["max"]
+            self.combat_range = (
+                min_range if min_range == max_range else self.attacker.chosen_range
+            )
+            break
 
-        if phase == "post_combat":
-            effects = unit_state.effects_after_combat
-            dw_type = EffectType.DEEP_WOUNDS_POST_CBT
-            neut_type = EffectType.NEUT_DEEP_WOUNDS_POST_CBT
-            reduce_type = EffectType.REDUCE_DEEP_WOUNDS_POST_CBT
-        else:
-            effects = unit_state.effects_on_strike
-            dw_type = EffectType.DEEP_WOUNDS_IN_CBT
-            neut_type = EffectType.NEUT_DEEP_WOUNDS_IN_CBT
-            reduce_type = EffectType.REDUCE_DEEP_WOUNDS_IN_CBT
-
-        if any(e.type == dw_type for e in effects):
-            if not any(e.type == neut_type for e in effects):
-                survive = 1.0
-                found = False
-                for e in effects:
-                    if e.type != reduce_type:
-                        continue
-                    # The effect sits in unit_state's list, but its formula may
-                    # scale off whoever OWNS it. applied_by == "foe" means the foe
-                    # inflicted it, so the foe's state is the formula's "unit".
-                    if e.applied_by == "foe":
-                        owner, opponent = foe_state, unit_state
-                    else:
-                        owner, opponent = unit_state, foe_state
-                    pct = self._resolve_formula(e.params, owner, opponent)
-                    survive *= (100 - pct) / 100
-                    found = True
-                if not found:
-                    return
-                amount = math.ceil(amount * survive)
-
-        if amount <= 0:
-            return
-        new_hp = unit_state.current_hp + amount
-        unit_state.current_hp = min(unit_state.unit.base_stats.hp, new_hp)
+# ── Area of effect specials ──────────────────────────────────────────────────
 
     def _resolve_aoe(self):
         """Processes effects_AoE. Only the initiator can trigger an AoE special."""
@@ -495,6 +465,8 @@ class CombatEngine:
         state.special_use_count += 1
         state.current_cooldown = state.unit.max_cooldown
 
+# ── Combat stats calculation ─────────────────────────────────────────────────
+ 
     def _combat_stat_calculations(self):
         """Calculates combat stats incorporating STAT_BOOST and STAT_DAUNT effects."""
         self.attacker.start_of_combat_hp = self.combatant_states["attacker"].current_hp
@@ -577,134 +549,7 @@ class CombatEngine:
         self.attacker.phantom_bonus = self.combatant_states["attacker"].phantom_bonus
         self.defender.phantom_bonus = self.combatant_states["defender"].phantom_bonus
 
-    def _range_calculation(self):
-        """Determines the distance this combat happens at: the attacker's base
-        weapon range, overridden by a RANGE_EXTENSION from the attacker's own
-        style, if any (only the initiator's engagement range matters here).
-        """
-        self.combat_range = _base_combat_range(self.attacker.weapon_type)
-
-        atk_state = self.combatant_states["attacker"]
-        for effect in atk_state.effects_combat_stats:
-            if effect.type != EffectType.RANGE_EXTENSION:
-                continue
-            min_range = effect.params["min"]
-            max_range = effect.params["max"]
-            self.combat_range = (
-                min_range if min_range == max_range else self.attacker.chosen_range
-            )
-            break
-
-    def _apply_special_denial(self):
-        """Deny a unit's special when a SPECIAL_TRIGGER_NEUT effect in its own
-        list covers that special's type. The JSON key is the type's own name in
-        lowercase ("aoe", "off", "def").
-
-        AoE denial resolves before _resolve_aoe, the in-combat types before the
-        strike loop, hence the flag.
-        """
-        for state in self.combatant_states.values():
-            for effect in state.effects_pre_combat:
-                if effect.type != EffectType.SPECIAL_TRIGGER_NEUT:
-                    continue
-                state.special_denied = (
-                    state.special_denied
-                    or state.special_type == SpecialType.AOE and effect.params.get("aoe", False)
-                    or state.special_type == SpecialType.OFF and effect.params.get("off", False)
-                    or state.special_type == SpecialType.DEF and effect.params.get("def", False)
-                    or state.special_type == SpecialType.MIRACLE and effect.params.get("def", False)
-                )
-
-    def _apply_twin_effects(self):
-        """Apply twin effect if needed.
-        """
-        for state in self.combatant_states.values():
-            for effect in state.effects_pre_combat:
-                if effect.type != EffectType.TWIN:
-                    continue
-                value = effect.params["value"]
-                if value == -1:
-                    state.twin_value = -1
-                    break
-                else:
-                    state.twin_value = max(state.twin_value, value)
-
-    def _determine_defensive_stat(
-        self, striker_state: CombatantState, target_state: CombatantState
-    ) -> Literal["defense", "res"]:
-        """Checks for Hexblade/Adaptive effects and returns the correct targeted stat."""
-        target_stat = "defense" if striker_state.unit.is_physical() else "res"
-        has_hexblade = any(
-            e.type == EffectType.HEXBLADE_STRIKE
-            for e in striker_state.effects_pre_combat
-        )
-
-        if has_hexblade:
-            if target_state.combat_stats.res < target_state.combat_stats.defense:
-                target_stat = "res"
-            else:
-                target_stat = "defense"
-
-        return target_stat
-
-    def _potent_active(self, effects, made_fu, triggers_brave):
-        """Highest Potent multiplier among POTENT effects still in the strike
-        sequence (their spd/patience condition already passed in the condition
-        phase, so no spd check here). Returns None if none present.
-        'Highest value applied; does not stack.'"""
-        best = None
-        for e in effects:
-            if e.type != EffectType.POTENT:
-                continue
-            if (triggers_brave or made_fu) and "damage_pct_if_fu" in e.params:
-                pct = e.params["damage_pct_if_fu"]
-            else:
-                pct = e.params["damage_pct"]
-            mult = pct / 100
-            best = mult if best is None else max(best, mult)
-        return best
-
-    def _staff_full_damage(self, striker_state) -> bool:
-        """True if a Wrathful-type effect makes this staff deal full (non-halved)
-        damage. Checks for a STAFF_FULL_DAMAGE effect in the striker's on-strike
-        list. Returns False by default, so staves halve damage unless a Wrathful
-        effect is present."""
-        return any(
-            e.type == EffectType.STAFF_FULL_DAMAGE
-            for e in striker_state.effects_on_strike
-        )
-
-    def _miracle_survives(
-        self, strike, target_miracle_triggers
-    ) -> bool:
-        """True if a Miracle lets the target survive this lethal hit at 1 HP.
-
-        Distinguished by the MIRACLE effect's params:
-          - Special miracle: strike == "on_unit_special" (requires the target's
-            special charged/ready) and cannot be bypassed by Fatal Smoke.
-          - Skill miracle: otherwise. Once per combat (target_state.miracle_used),
-            and bypassed by FATAL_SMOKE on the attacker.
-
-        Only checks; caller sets miracle_used for the skill-miracle case.
-        """
-        striker_state = self.combatant_states[strike.striker]
-        target_state = self.combatant_states[strike.target]
-        fatal_smoke = any(
-            e.type == EffectType.FATAL_SMOKE for e in striker_state.effects_on_strike
-        )
-        for e in target_state.effects_on_strike:
-            if e.type != EffectType.MIRACLE:
-                continue
-            is_special = e.params.get("strike") == "on_unit_special"
-            if is_special:
-                if target_miracle_triggers:
-                    target_state.special_use_count += 1
-                    target_state.current_cooldown = target_state.unit.max_cooldown
-                    return True
-            else:
-                if not target_state.miracle_used and not fatal_smoke:
-                    return True
-        return False
+# ── Strike sequence calculation ──────────────────────────────────────────────
 
     def _determine_strike_sequence(self) -> list[Strike]:
         """Calculates the combat sequence using effects_strike_sequence instead of keywords."""
@@ -962,6 +807,25 @@ class CombatEngine:
 
         return strike_sequence
 
+    def _potent_active(self, effects, made_fu, triggers_brave):
+        """Highest Potent multiplier among POTENT effects still in the strike
+        sequence (their spd/patience condition already passed in the condition
+        phase, so no spd check here). Returns None if none present.
+        'Highest value applied; does not stack.'"""
+        best = None
+        for e in effects:
+            if e.type != EffectType.POTENT:
+                continue
+            if (triggers_brave or made_fu) and "damage_pct_if_fu" in e.params:
+                pct = e.params["damage_pct_if_fu"]
+            else:
+                pct = e.params["damage_pct"]
+            mult = pct / 100
+            best = mult if best is None else max(best, mult)
+        return best
+
+# ── Combat phase and mechanics ───────────────────────────────────────────────
+
     def _resolve_combat(self, strike_sequence: list[Strike]) -> None:
         """Runs the combat itself: the one-off effects that fill CombatantState
         fields read later, then the strike loop.
@@ -1034,6 +898,58 @@ class CombatEngine:
 
         self._apply_healing("attacker", atk_preheal, phase="in_combat")
         self._apply_healing("defender", def_preheal, phase="in_combat")
+
+    def _apply_twin_effects(self):
+        """Apply twin effect if needed.
+        """
+        for state in self.combatant_states.values():
+            for effect in state.effects_pre_combat:
+                if effect.type != EffectType.TWIN:
+                    continue
+                value = effect.params["value"]
+                if value == -1:
+                    state.twin_value = -1
+                    break
+                else:
+                    state.twin_value = max(state.twin_value, value)
+
+    def _apply_special_denial(self):
+        """Deny a unit's special when a SPECIAL_TRIGGER_NEUT effect in its own
+        list covers that special's type. The JSON key is the type's own name in
+        lowercase ("aoe", "off", "def").
+
+        AoE denial resolves before _resolve_aoe, the in-combat types before the
+        strike loop, hence the flag.
+        """
+        for state in self.combatant_states.values():
+            for effect in state.effects_pre_combat:
+                if effect.type != EffectType.SPECIAL_TRIGGER_NEUT:
+                    continue
+                state.special_denied = (
+                    state.special_denied
+                    or state.special_type == SpecialType.AOE and effect.params.get("aoe", False)
+                    or state.special_type == SpecialType.OFF and effect.params.get("off", False)
+                    or state.special_type == SpecialType.DEF and effect.params.get("def", False)
+                    or state.special_type == SpecialType.MIRACLE and effect.params.get("def", False)
+                )
+
+    def _determine_defensive_stat(
+        self, striker_state: CombatantState, target_state: CombatantState
+    ) -> Literal["defense", "res"]:
+        """Checks for Hexblade/Adaptive effects and returns the correct targeted stat."""
+        target_stat = "defense" if striker_state.unit.is_physical() else "res"
+        has_hexblade = any(
+            e.type == EffectType.HEXBLADE_STRIKE
+            for e in striker_state.effects_pre_combat
+        )
+
+        if has_hexblade:
+            if target_state.combat_stats.res < target_state.combat_stats.defense:
+                target_stat = "res"
+            else:
+                target_stat = "defense"
+
+        return target_stat
 
     def _process_strike(self, strike: Strike):
         """Fully data-driven strike processing via effects_on_strike."""
@@ -1322,39 +1238,63 @@ class CombatEngine:
                 0, target_state.current_cooldown - target_charge
             )
 
-    def _check_color_advantage(
-        self, striker_state: CombatantState, target_state: CombatantState
-    ) -> int:
-        """Returns 1 (advantage), -1 (disadvantage), or 0 (neutral) based on the color triangle.
+    def _apply_healing(self, role: UnitRole, amount: int, phase: str = "in_combat"):
+        """Applies healing, with respect to the Deep Wounds effect.
 
-        TODO: Raven-Tome-style "treat Colorless as the weapon's color" effects
-        have no EffectType yet — once added, check for them here before the
-        plain color comparison.
+        phase: "pre_combat" | "in_combat" | "post_combat"
+
+        How it works:
+        - Deep Wounds blocks ALL healing (all phases).
+        - Neutralize Deep Wounds turns it off entirely.
+        - Reduce Deep Wounds applies to pre_combat and in_combat by default;
+            post_combat is still fully blocked UNLESS a post-combat-relief
+            reduce effect is present (rn only L!Fae, but im adding this for a
+            "just in case".
+        - Reduce rounds the surviving heal UP (ceil).
         """
-        striker_color = striker_state.unit.color
-        target_color = target_state.unit.color
+        if amount <= 0:
+            return
 
-        match striker_color:
-            case Color.RED:
-                return (
-                    1
-                    if target_color == Color.GREEN
-                    else (-1 if target_color == Color.BLUE else 0)
-                )
-            case Color.GREEN:
-                return (
-                    1
-                    if target_color == Color.BLUE
-                    else (-1 if target_color == Color.RED else 0)
-                )
-            case Color.BLUE:
-                return (
-                    1
-                    if target_color == Color.RED
-                    else (-1 if target_color == Color.GREEN else 0)
-                )
-            case _:
-                return 0
+        unit_state = self.combatant_states[role]
+        foe_role: UnitRole = "defender" if role == "attacker" else "attacker"
+        foe_state = self.combatant_states[foe_role]
+
+        if phase == "post_combat":
+            effects = unit_state.effects_after_combat
+            dw_type = EffectType.DEEP_WOUNDS_POST_CBT
+            neut_type = EffectType.NEUT_DEEP_WOUNDS_POST_CBT
+            reduce_type = EffectType.REDUCE_DEEP_WOUNDS_POST_CBT
+        else:
+            effects = unit_state.effects_on_strike
+            dw_type = EffectType.DEEP_WOUNDS_IN_CBT
+            neut_type = EffectType.NEUT_DEEP_WOUNDS_IN_CBT
+            reduce_type = EffectType.REDUCE_DEEP_WOUNDS_IN_CBT
+
+        if any(e.type == dw_type for e in effects):
+            if not any(e.type == neut_type for e in effects):
+                survive = 1.0
+                found = False
+                for e in effects:
+                    if e.type != reduce_type:
+                        continue
+                    # The effect sits in unit_state's list, but its formula may
+                    # scale off whoever OWNS it. applied_by == "foe" means the foe
+                    # inflicted it, so the foe's state is the formula's "unit".
+                    if e.applied_by == "foe":
+                        owner, opponent = foe_state, unit_state
+                    else:
+                        owner, opponent = unit_state, foe_state
+                    pct = self._resolve_formula(e.params, owner, opponent)
+                    survive *= (100 - pct) / 100
+                    found = True
+                if not found:
+                    return
+                amount = math.ceil(amount * survive)
+
+        if amount <= 0:
+            return
+        new_hp = unit_state.current_hp + amount
+        unit_state.current_hp = min(unit_state.unit.base_stats.hp, new_hp)
 
     def _get_wta_multiplier(
         self, striker_state: CombatantState, target_state: CombatantState
@@ -1391,6 +1331,107 @@ class CombatEngine:
             )
 
         return 1.0 + (magnitude * advantage)
+    
+    def _check_color_advantage(
+        self, striker_state: CombatantState, target_state: CombatantState
+    ) -> int:
+        """Returns 1 (advantage), -1 (disadvantage), or 0 (neutral) based on the color triangle.
+
+        TODO: Raven-Tome-style "treat Colorless as the weapon's color" effects
+        have no EffectType yet — once added, check for them here before the
+        plain color comparison.
+        """
+        striker_color = striker_state.unit.color
+        target_color = target_state.unit.color
+
+        match striker_color:
+            case Color.RED:
+                return (
+                    1
+                    if target_color == Color.GREEN
+                    else (-1 if target_color == Color.BLUE else 0)
+                )
+            case Color.GREEN:
+                return (
+                    1
+                    if target_color == Color.BLUE
+                    else (-1 if target_color == Color.RED else 0)
+                )
+            case Color.BLUE:
+                return (
+                    1
+                    if target_color == Color.RED
+                    else (-1 if target_color == Color.GREEN else 0)
+                )
+            case _:
+                return 0
+
+    def _staff_full_damage(self, striker_state) -> bool:
+        """True if a Wrathful-type effect makes this staff deal full (non-halved)
+        damage. Checks for a STAFF_FULL_DAMAGE effect in the striker's on-strike
+        list. Returns False by default, so staves halve damage unless a Wrathful
+        effect is present."""
+        return any(
+            e.type == EffectType.STAFF_FULL_DAMAGE
+            for e in striker_state.effects_on_strike
+        )
+
+    def _miracle_survives(
+        self, strike, target_miracle_triggers
+    ) -> bool:
+        """True if a Miracle lets the target survive this lethal hit at 1 HP.
+
+        Distinguished by the MIRACLE effect's params:
+          - Special miracle: strike == "on_unit_special" (requires the target's
+            special charged/ready) and cannot be bypassed by Fatal Smoke.
+          - Skill miracle: otherwise. Once per combat (target_state.miracle_used),
+            and bypassed by FATAL_SMOKE on the attacker.
+
+        Only checks; caller sets miracle_used for the skill-miracle case.
+        """
+        striker_state = self.combatant_states[strike.striker]
+        target_state = self.combatant_states[strike.target]
+        fatal_smoke = any(
+            e.type == EffectType.FATAL_SMOKE for e in striker_state.effects_on_strike
+        )
+        for e in target_state.effects_on_strike:
+            if e.type != EffectType.MIRACLE:
+                continue
+            is_special = e.params.get("strike") == "on_unit_special"
+            if is_special:
+                if target_miracle_triggers:
+                    target_state.special_use_count += 1
+                    target_state.current_cooldown = target_state.unit.max_cooldown
+                    return True
+            else:
+                if not target_state.miracle_used and not fatal_smoke:
+                    return True
+        return False
+
+# ── After combat ─────────────────────────────────────────────────────────────
+ 
+    def _resolve_after_combat(self):
+        """Processes effects_after_combat: post-combat healing/damage."""
+        for role, foe_role in (("attacker", "defender"), ("defender", "attacker")):
+            state = self.combatant_states[role]
+            foe_state = self.combatant_states[foe_role]
+
+            heal = sum(
+                self._resolve_formula(e.params, state, foe_state)
+                for e in state.effects_after_combat
+                if e.type == EffectType.HEAL_POST_CBT
+            )
+            self._apply_healing(role, heal, phase="post_combat")
+
+            dmg = sum(
+                self._resolve_formula(e.params, state, foe_state)
+                for e in state.effects_after_combat
+                if e.type == EffectType.DAMAGE_POST_CBT
+            )
+            if dmg > 0:
+                foe_state.current_hp = max(1, foe_state.current_hp - dmg)
+
+# ── Utils ──────────────────────────────────────────────────────────────────
 
     def _resolve_formula(
         self, params: dict, unit_state: CombatantState, foe_state: CombatantState
@@ -1533,24 +1574,3 @@ class CombatEngine:
                 )
             case _:
                 return False
-
-    def _resolve_after_combat(self):
-        """Processes effects_after_combat: post-combat healing/damage."""
-        for role, foe_role in (("attacker", "defender"), ("defender", "attacker")):
-            state = self.combatant_states[role]
-            foe_state = self.combatant_states[foe_role]
-
-            heal = sum(
-                self._resolve_formula(e.params, state, foe_state)
-                for e in state.effects_after_combat
-                if e.type == EffectType.HEAL_POST_CBT
-            )
-            self._apply_healing(role, heal, phase="post_combat")
-
-            dmg = sum(
-                self._resolve_formula(e.params, state, foe_state)
-                for e in state.effects_after_combat
-                if e.type == EffectType.DAMAGE_POST_CBT
-            )
-            if dmg > 0:
-                foe_state.current_hp = max(1, foe_state.current_hp - dmg)
