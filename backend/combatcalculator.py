@@ -63,17 +63,20 @@ class CombatantState:
         return base
 
     def cbt_stat_with_phantom(self, name: str) -> int:
-        """Combat stat plus Phantom (Spd/Res/Def) bonuses, for checks that are
-        explicitly allowed to see Phantom — e.g. Dodge's Spd-diff DR.
-
-        Follow-up eligibility and Potent triggers must NOT use this: they read
-        combat_stats directly, since Phantom is defined to boost Spd checks
-        without affecting whether a follow-up attack happens.
-        """
-        base = getattr(self.combat_stats, name, None)
-        if base is None:
-            base = self.unit.get_visible_stat(name)
-        return base + getattr(self.phantom_bonus, name)
+            """Combat stat plus Phantom (Spd/Res/Def) bonuses, for checks that are
+            explicitly allowed to see Phantom — e.g. Dodge's Spd-diff DR.
+    
+            Follow-up eligibility and Potent triggers must NOT use this: they read
+            combat_stats directly, since Phantom is defined to boost Spd checks
+            without affecting whether a follow-up attack happens.
+            """
+            if self.combat_stats is None:
+                raise RuntimeError(
+                    f"{self.unit.name}: combat_stats not initialized before Phantom check"
+                )
+    
+            base = getattr(self.combat_stats, name)
+            return base + getattr(self.phantom_bonus, name)
 
 
 @dataclass
