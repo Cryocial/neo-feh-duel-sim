@@ -17,7 +17,8 @@ defender survives the exchange so damage can be read off final HP.
 
 from backend.build import Unit, Skill, Status, StatBlock
 from backend.constants import MovementType, WeaponType, Color
-from backend.combatcalculator import CombatEngine
+from backend.combatcalculator import CombatEngine, CombatantState
+from backend.conditions import build_conditions, check_condition
 
 
 def make_unit(name, hp=50, atk=40, spd=10, defense=20, res=20, **kwargs):
@@ -127,3 +128,58 @@ def test_bonus_neut_still_strips_a_granted_buff():
 
     # 2 x (40 - 20)
     assert damage_dealt(result) == 40
+
+
+# ── any_of / all_of across timings ───────────────────────────────────────────
+
+
+def condition_state(unit, *, is_initiator):
+    """25/50 HP, so hp_below_pct 100 passes and hp_below_pct 0 fails."""
+    return CombatantState(
+        unit=unit, current_hp=25, current_cooldown=0,
+        is_initiator=is_initiator, start_of_combat_hp=25,
+    )
+
+
+def test_any_of_waits_for_a_later_timing_branch():
+    """unit_initiates fails at static timing but hp_below_pct passes at
+    post_aoe: the any_of must stay pending, then resolve True."""
+    cond = build_conditions([{"any_of": [
+        {"type": "unit_initiates"},
+        {"type": "hp_below_pct", "params": {"threshold": 100}},
+    ]}])[0]
+    unit = condition_state(make_unit("A"), is_initiator=False)
+    foe = condition_state(make_unit("F"), is_initiator=True)
+
+    assert check_condition(cond, "static", unit, foe) is None
+    assert check_condition(cond, "post_aoe", unit, foe) is True
+
+
+def test_all_of_waits_for_a_later_timing_branch():
+    """foe_initiates passes at static timing but hp_below_pct fails at
+    post_aoe: the all_of must stay pending, then resolve False."""
+    cond = build_conditions([{"all_of": [
+        {"type": "foe_initiates"},
+        {"type": "hp_below_pct", "params": {"threshold": 0}},
+    ]}])[0]
+    unit = condition_state(make_unit("A"), is_initiator=False)
+    foe = condition_state(make_unit("F"), is_initiator=True)
+
+    assert check_condition(cond, "static", unit, foe) is None
+    assert check_condition(cond, "post_aoe", unit, foe) is False
+
+
+def test_composites_short_circuit_on_a_decisive_branch():
+    unit = condition_state(make_unit("A"), is_initiator=True)
+    foe = condition_state(make_unit("F"), is_initiator=False)
+    any_of = build_conditions([{"any_of": [
+        {"type": "unit_initiates"},
+        {"type": "hp_below_pct", "params": {"threshold": 0}},
+    ]}])[0]
+    all_of = build_conditions([{"all_of": [
+        {"type": "foe_initiates"},
+        {"type": "hp_below_pct", "params": {"threshold": 100}},
+    ]}])[0]
+
+    assert check_condition(any_of, "static", unit, foe) is True
+    assert check_condition(all_of, "static", unit, foe) is False
