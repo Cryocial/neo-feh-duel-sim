@@ -795,12 +795,8 @@ Processed by `_phase_start_of_turn` before combat begins. These grant visible st
 | `NEUT_EFFECTIVE` | Neutralizes 'effective against specific unit type' | `{ movement_types: list[str], weapon_types: list[str] }` |
 | `SPECIAL_TRIGGER_NEUT` | Unit cannot trigger Specials | `{ aoe: bool, off: bool, def: bool }` |
 | `FLAT_DR_STRIKE` | Reduce damage from specific foe's attacks by X during combat | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
-<<<<<<< HEAD
 | `PERC_DR_STRIKE` | Reduce damage from specific foe's attacks during combat by X%. `piercable` (default `true`) sources stack in one product and are reduced by `DR_PIERCE`; `piercable: false` (Special-grade, e.g. Pavise/Aegis) sources stack in a separate, pierce-immune product | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str, piercable: bool }` |
-=======
-| `PERC_DR_STRIKE` | Reduce damage from specific foe's attacks during combat by X% | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str, piercable: bool, max_triggers: int }` |
 | `TWIN` | Any "reduces damage by X%" effect can be triggered a new max of times | `{ value: int }` |
->>>>>>> c83964340a8e2590309ed2f5055218d6bc92a1a2
 | `FLAT_DAMAGE_STRIKE` | Unit deals +X damage | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
 | `PULSE_STRIKE` | Grants Special count -X to unit before specific strikes | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str, cap_cd_start_of_cbt: bool }` |
 | `SCOWL_STRIKE` | Inflicts Special cooldown count + X on unit before unit's specific attacks | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
