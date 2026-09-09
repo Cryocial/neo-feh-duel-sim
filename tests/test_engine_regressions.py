@@ -183,3 +183,22 @@ def test_composites_short_circuit_on_a_decisive_branch():
 
     assert check_condition(any_of, "static", unit, foe) is True
     assert check_condition(all_of, "static", unit, foe) is False
+
+
+# ── Dragonflowers ────────────────────────────────────────────────────────────
+
+
+def stat_total(unit):
+    return sum(
+        getattr(unit.base_stats, s) for s in ("hp", "atk", "spd", "defense", "res")
+    )
+
+
+def test_dragonflowers_are_applied_once():
+    """5 flowers add 5 stat points total, one per stat in priority order."""
+    plain = make_unit("A")
+    flowered = make_unit("A", dragonflower=5)
+
+    assert stat_total(flowered) - stat_total(plain) == 5
+    for s in ("hp", "atk", "spd", "defense", "res"):
+        assert getattr(flowered.base_stats, s) == getattr(plain.base_stats, s) + 1

@@ -219,11 +219,6 @@ class Unit:
             for i in range(self.merges * 2):
                 d[priority[i % 5]] += 1
 
-        if self.dragonflower > 0:
-            priority = sorted(d.keys(), key=lambda k: (-d[k], priority_map[k]))
-            for i in range(self.dragonflower):
-                d[priority[i % 5]] += 1
-
         self.base_stats = StatBlock(**d)
 
     @property
