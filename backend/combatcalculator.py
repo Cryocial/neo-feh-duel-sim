@@ -818,12 +818,10 @@ class CombatEngine:
                 + defender_followups
             )
 
-        if strike_sequence:
-            strike_sequence[0].is_first_hit = True
-            for i in range(1, len(strike_sequence)):
-                strike_sequence[i].consecutive = (
-                    strike_sequence[i].striker == strike_sequence[i - 1].striker
-                )
+        for i in range(1, len(strike_sequence)):
+            strike_sequence[i].consecutive = (
+                strike_sequence[i].striker == strike_sequence[i - 1].striker
+            )
 
         return strike_sequence
 
@@ -1472,8 +1470,6 @@ class CombatEngine:
             match formula:
                 case "bonus_count":
                     variable = unit_state.bonus_count
-                case "debuff_count":
-                    variable = foe_state.penalty_count
                 case "all_bonus_penalty_both":  # mainly for empathy
                     variable = (
                         unit_state.bonus_count
