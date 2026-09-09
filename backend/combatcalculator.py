@@ -548,6 +548,21 @@ class CombatEngine:
             if e.type == EffectType.FLAT_DAMAGE_AOE:
                 damage += self._resolve_formula(e.params, state, foe_state)
 
+        pierce_mult = 1.0
+        for e in state.effects_AoE:
+            if e.type == EffectType.DR_PIERCE_AOE:
+                pierce_mult *= 1.0 - e.params.get("value", 0) / 100.0
+
+        perc_dr = 0.0
+        for e in foe_state.effects_AoE:
+            if e.type == EffectType.PERC_DR_AOE:
+                dr_val = (
+                    self._resolve_formula(e.params, foe_state, state) / 100.0
+                ) * pierce_mult
+                perc_dr = 1.0 - ((1.0 - perc_dr) * (1.0 - dr_val))
+
+        damage = math.ceil(damage * (1.0 - perc_dr))
+
         flat_dr = sum(
             self._resolve_formula(e.params, foe_state, state)
             for e in foe_state.effects_AoE

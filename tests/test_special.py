@@ -88,6 +88,19 @@ def trigger_aoe(coefficient):
     }
 
 
+def aoe_status(name, effects):
+    """Statuses hold their effects with target "self", so they land on the unit
+    the status is attached to."""
+    return Status(
+        name=name,
+        type="bonus",
+        effects=[
+            {"effect": eff, "target": "self", "params": params, "conditions": []}
+            for eff, params in effects
+        ],
+    )
+
+
 def perc_dr(pct, strike, piercable, max_triggers=1):
     params = {"flat": pct, "strike": strike, "piercable": piercable}
     if not piercable:
@@ -293,6 +306,68 @@ def test_aoe_special_fires_before_combat_and_not_during():
     # Triggers on the AoE phase only
     assert engine.combatant_states["attacker"].special_use_count == 1
     assert engine.combatant_states["attacker"].current_cooldown == 0
+
+
+def _aoe_setup(defender_effects=(), attacker_effects=()):
+    """AoE of 1.0 * (40 - 20) = 20 raw damage, then a predictable A1/D1/A2
+    exchange of 20 + 20 damage onto a defender with enough HP to survive it."""
+    attacker = make_unit("A", atk=40, spd=30, defense=20)
+    give_special(attacker, SpecialType.AOE, [trigger_aoe(1.0)])
+    attacker.pre_charge = 1
+    defender = make_unit("D", hp=100, atk=25, spd=10, defense=20)
+
+    if attacker_effects:
+        attacker.active_statuses.append(aoe_status("A Buff", attacker_effects))
+    if defender_effects:
+        defender.active_statuses.append(aoe_status("D Buff", defender_effects))
+
+    result = CombatEngine(attacker, defender).simulate()
+    return 100 - result["defender_final_hp"] - 40
+
+
+def test_aoe_percent_dr_reduces_aoe_damage():
+    """PERC_DR_AOE cuts the pre-combat Special damage by its percentage."""
+    assert _aoe_setup(defender_effects=[("PERC_DR_AOE", {"flat": 40})]) == 12
+
+
+def test_aoe_dr_pierce_weakens_percent_dr():
+    """DR_PIERCE_AOE reduces the foe's percent AoE DR: 40% pierced by 50% -> 20%."""
+    damage = _aoe_setup(
+        defender_effects=[("PERC_DR_AOE", {"flat": 40})],
+        attacker_effects=[("DR_PIERCE_AOE", {"value": 50})],
+    )
+    assert damage == 16
+
+
+def test_aoe_dr_pierce_does_not_touch_flat_dr():
+    """Pierce only applies to percent DR, so flat AoE DR lands in full."""
+    damage = _aoe_setup(
+        defender_effects=[("FLAT_DR_AOE", {"flat": 10})],
+        attacker_effects=[("DR_PIERCE_AOE", {"value": 100})],
+    )
+    assert damage == 10
+
+
+def test_aoe_percent_dr_stacks_multiplicatively():
+    """Two 40% sources give 64% total, not 80%."""
+    damage = _aoe_setup(
+        defender_effects=[
+            ("PERC_DR_AOE", {"flat": 40}),
+            ("PERC_DR_AOE", {"flat": 40}),
+        ]
+    )
+    assert damage == 8
+
+
+def test_aoe_percent_dr_applies_before_flat_dr():
+    """Percent DR first (20 -> 12), then flat DR subtracted (12 - 5)."""
+    damage = _aoe_setup(
+        defender_effects=[
+            ("PERC_DR_AOE", {"flat": 40}),
+            ("FLAT_DR_AOE", {"flat": 5}),
+        ]
+    )
+    assert damage == 7
 
 
 def test_other_special_is_ready_but_never_triggers():
