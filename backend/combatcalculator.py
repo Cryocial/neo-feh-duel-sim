@@ -320,7 +320,7 @@ class CombatEngine:
     def _apply_grant(self, effect, target_state):
         """Applies a single GRANT_* effect to the target's per-combat layers."""
         if effect.type == EffectType.GRANT_VISIBLE_STAT:
-            stats = effect.params.get("stats", {})
+            stats = effect.params["stats"]
             buff_updates, debuff_updates = {}, {}
             for stat, amount in stats.items():
                 if amount >= 0:
@@ -340,7 +340,7 @@ class CombatEngine:
                     target_state.granted_visible_debuffs, **debuff_updates
                 )
         elif effect.type == EffectType.GRANT_STATUS:
-            name = effect.params.get("status")
+            name = effect.params["status"]
             status = BONUS_DATABASE.get(name) or PENALTY_DATABASE.get(name)
             if status is None:
                 raise KeyError(
@@ -467,7 +467,7 @@ class CombatEngine:
                 else foe_state.visible_stat("res")
             )
 
-        coefficient = trigger.params.get("coefficient", 0.0)
+        coefficient = trigger.params["coefficient"]
         visible_atk = state.visible_stat("atk")
         damage = max(0, math.floor(coefficient * (visible_atk - visible_def)))
 
@@ -540,7 +540,7 @@ class CombatEngine:
                 if effect.type == EffectType.STAT_DAUNT:
                     magnitude = -abs(magnitude)
 
-                stats = effect.params.get("stats", [])
+                stats = effect.params["stats"]
                 updates = {s: getattr(state.combat_stats, s) + magnitude for s in stats}
                 state.combat_stats = replace(state.combat_stats, **updates)
         # Apply PHANTOM_STAT effects. These accumulate into phantom_bonus
@@ -556,7 +556,7 @@ class CombatEngine:
                     owner, opponent = state, foe
 
                 magnitude = self._resolve_formula(effect.params, owner, opponent)
-                stats = effect.params.get("stats", [])
+                stats = effect.params["stats"]
                 updates = {
                     s: getattr(state.phantom_bonus, s) + magnitude for s in stats
                 }
@@ -1081,7 +1081,7 @@ class CombatEngine:
                 striker_special_used=striker_special_used,
                 target_special_used=target_special_used,
             ):
-                pierce_value = effect.params.get("value", 0) / 100.0
+                pierce_value = effect.params["value"] / 100.0
                 pierce_mult *= 1.0 - pierce_value
 
         perc_dr = 0.0
@@ -1545,7 +1545,8 @@ class CombatEngine:
         The four flags are absolute: `_ready` means the Special could trigger,
         `_triggers` means it actually does on this strike.
         """
-        match params.get("strike", "every_strike"):
+        strike_value = params.get("strike", "every_strike")
+        match strike_value:
             case "every_strike":
                 return True
             case "first_strike":
@@ -1582,4 +1583,4 @@ class CombatEngine:
                     or striker_special_used or target_special_used
                 )
             case _:
-                return False
+                raise ValueError(f"Unknown strike value {strike_value!r} in _strike_matches")

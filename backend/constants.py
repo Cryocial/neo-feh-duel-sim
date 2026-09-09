@@ -125,3 +125,47 @@ class EffectType(str, Enum):
     DEEP_WOUNDS_POST_CBT = "DEEP_WOUNDS_POST_CBT"
     REDUCE_DEEP_WOUNDS_POST_CBT = "REDUCE_DEEP_WOUNDS_POST_CBT"
     NEUT_DEEP_WOUNDS_POST_CBT = "NEUT_DEEP_WOUNDS_POST_CBT"
+
+
+# Every value CombatEngine._strike_matches understands. build_effect validates a
+# params["strike"] against this at simulation start, so a typo fails loudly
+# instead of matching nothing. Keep in sync with Appendix B of ARCHITECTURE.md.
+STRIKE_VALUES: frozenset[str] = frozenset({
+    "every_strike",
+    "first_strike",
+    "first_attack",
+    "first_attack_brave",
+    "first_follow_up",
+    "follow_up",
+    "follow_up_brave",
+    "both_first_strikes",
+    "both_second_strikes",
+    "consecutive",
+    "unit_special_triggers",
+    "foe_special_triggers",
+    "unit_special_ready",
+    "foe_special_ready",
+    "any_special_ready",
+    "any_special_ready_or_triggered",
+})
+
+# Every formula CombatEngine._resolve_formula understands ("" = flat only).
+# Keep in sync with Appendix C of ARCHITECTURE.md.
+FORMULA_NAMES: frozenset[str] = frozenset({
+    "",
+    "bonus_count",
+    "all_bonus_penalty_both",
+    "spaces_moved",
+    "sum_visible_buffs",
+    "sum_foe_visible_debuffs",
+    "mitigated_bucket",
+    "unit_max_hp",
+    "phantom_spd_diff",
+    "foe_penalty_count",
+    "unit_cbt_atk",
+    "unit_cbt_spd",
+    "unit_cbt_def",
+    "unit_cbt_res",
+    "max_cooldown",
+    "num_bonus_and_penalties_on_unit",
+})

@@ -664,6 +664,8 @@ At startup, three JSON files are parsed to build the in-memory databases.
 
 **Conditions**: conditions are not compiled when `Skill` and `Status` objects are loaded. They are compiled into `AtomicCondition` objects (with `timing` and `func`) when `Effect` instances are created at the start of each simulation. At that point, `CONDITION_REGISTRY` provides both the timing and the function to produce `func`.
 
+**Validation**: `build_effect` checks each raw effect dict as it is compiled. The `effect` name must be an `EffectType` with an `EFFECT_LIST_MAP` entry, `target` must be `"self"` or `"foe"`, the keys listed for that type in `REQUIRED_PARAMS` (`effects.py`) must be present, and any `strike` / `formula` value must appear in `STRIKE_VALUES` / `FORMULA_NAMES` (`constants.py`) — except where `EXTRA_STRIKE_VALUES` (`effects.py`) allows an effect to overload `strike` as a mode flag, currently only `MIRACLE`'s `on_unit_special`. A malformed entry raises a `ValueError` naming the effect rather than silently doing nothing. `tests/test_data_integrity.py` runs the same checks over every entry of every JSON file, so a broken skill fails CI before it is ever equipped.
+
 ---
 
 ## User Flow
