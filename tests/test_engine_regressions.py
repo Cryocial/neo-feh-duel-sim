@@ -202,3 +202,48 @@ def test_dragonflowers_are_applied_once():
     assert stat_total(flowered) - stat_total(plain) == 5
     for s in ("hp", "atk", "spd", "defense", "res"):
         assert getattr(flowered.base_stats, s) == getattr(plain.base_stats, s) + 1
+
+
+# ── DR_PIERCE ────────────────────────────────────────────────────────────────
+
+
+def percent_dr(pct, piercable):
+    params = {"flat": pct, "strike": "every_strike", "piercable": piercable}
+    if not piercable:
+        params["max_triggers"] = -1
+    return status("DR", [{
+        "effect": "PERC_DR_STRIKE", "target": "self", "params": params, "conditions": [],
+    }])
+
+
+def pierce(value):
+    return skill("Pierce", "a", [{
+        "effect": "DR_PIERCE",
+        "target": "self",
+        "params": {"value": value, "strike": "every_strike"},
+        "conditions": [],
+    }])
+
+
+def test_dr_pierce_weakens_pierceable_percent_dr():
+    """40% DR pierced by 50% becomes 20%: 2 x ceil(20 * 0.8) = 32, not 24."""
+    attacker = make_unit("A", spd=30)
+    attacker.a_slot = pierce(50)
+    defender = make_unit("D", hp=100, atk=25)
+    defender.active_statuses.append(percent_dr(40, piercable=True))
+
+    result = CombatEngine(attacker, defender).simulate()
+
+    assert damage_dealt(result) == 32
+
+
+def test_dr_pierce_leaves_special_dr_alone():
+    """piercable: false sources are immune: 2 x ceil(20 * 0.6) = 24."""
+    attacker = make_unit("A", spd=30)
+    attacker.a_slot = pierce(50)
+    defender = make_unit("D", hp=100, atk=25)
+    defender.active_statuses.append(percent_dr(40, piercable=False))
+
+    result = CombatEngine(attacker, defender).simulate()
+
+    assert damage_dealt(result) == 24

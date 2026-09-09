@@ -1100,8 +1100,11 @@ class CombatEngine:
                         self._resolve_formula(effect.params, target_state, striker_state)
                         / 100.0
                     )
-                    perc_dr = 1.0 - ((1.0 - perc_dr) * (1.0 - dr_val))
-                    if not piercable:
+                    if piercable:
+                        dr_val *= pierce_mult
+                        perc_dr = 1.0 - ((1.0 - perc_dr) * (1.0 - dr_val))
+                    else:
+                        unpierceable_dr = 1.0 - ((1.0 - unpierceable_dr) * (1.0 - dr_val))
                         target_state.special_dr_count[id(effect)] = trigger_count + 1
 
         effective_dr = 1.0 - ((1.0 - perc_dr) * (1.0 - unpierceable_dr))
