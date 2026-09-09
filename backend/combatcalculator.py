@@ -21,6 +21,7 @@ class CombatantState:
     phantom_bonus: StatBlock = field(default_factory=StatBlock)
     defensive_stat: Literal["defense", "res"] | None = None
     cd_start_of_cbt: int = 0
+    start_of_combat_hp: int = 0
     damage_mitigated_bucket: int = 0
     bonus_count: int = 0
     penalty_count: int = 0
@@ -243,6 +244,9 @@ class CombatEngine:
         self._range_calculation()
 
         self._resolve_aoe()
+
+        for state in self.combatant_states.values():
+            state.start_of_combat_hp = state.current_hp
 
         self._evaluate_conditions("post_aoe")
 
@@ -473,9 +477,6 @@ class CombatEngine:
  
     def _combat_stat_calculations(self):
         """Calculates combat stats incorporating STAT_BOOST and STAT_DAUNT effects."""
-        self.attacker.start_of_combat_hp = self.combatant_states["attacker"].current_hp
-        self.defender.start_of_combat_hp = self.combatant_states["defender"].current_hp
-
         atk_state = self.combatant_states["attacker"]
         def_state = self.combatant_states["defender"]
 
@@ -547,11 +548,6 @@ class CombatEngine:
                     s: getattr(state.phantom_bonus, s) + magnitude for s in stats
                 }
                 state.phantom_bonus = replace(state.phantom_bonus, **updates)
-
-        self.attacker.combat_stats = self.combatant_states["attacker"].combat_stats
-        self.defender.combat_stats = self.combatant_states["defender"].combat_stats
-        self.attacker.phantom_bonus = self.combatant_states["attacker"].phantom_bonus
-        self.defender.phantom_bonus = self.combatant_states["defender"].phantom_bonus
 
 # ── Strike sequence calculation ──────────────────────────────────────────────
 

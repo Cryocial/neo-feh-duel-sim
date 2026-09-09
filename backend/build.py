@@ -152,7 +152,6 @@ class Unit:
             self._distribute_sequential_stats(applied_engage_stats)
 
         self.current_hp = self.base_stats.hp
-        self.start_of_combat_hp = self.base_stats.hp
 
     def _distribute_sequential_stats(self, total_points: int):
         """

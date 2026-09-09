@@ -100,7 +100,7 @@ def _make_hp_pct_evaluator(
 
         def evaluate(unit: "CombatantState", foe: "CombatantState") -> bool:
             target = unit if target_str == "self" else foe
-            pct = (target.unit.start_of_combat_hp / target.unit.base_stats.hp) * 100
+            pct = (target.start_of_combat_hp / target.unit.base_stats.hp) * 100
             return compare(pct, threshold)
 
         return evaluate
