@@ -41,6 +41,7 @@ class CombatantState:
     granted_visible_buffs: StatBlock = field(default_factory=StatBlock)
     granted_visible_debuffs: StatBlock = field(default_factory=StatBlock)
     effects_start_of_turn: list[Effect] = field(default_factory=list)
+    granted_statuses: list = field(default_factory=list)
     effects_AoE: list[Effect] = field(default_factory=list)
     effects_combat_stats: list[Effect] = field(default_factory=list)
     effects_strike_sequence: list[Effect] = field(default_factory=list)
@@ -582,8 +583,8 @@ class CombatEngine:
             if e.type == EffectType.DEF_FROZEN
         )  # harder FU for attacker inflicted in defender list
 
-        attacker_spd_check = 1 if spd_diff > 5 - atk_off_frozen + atk_def_frozen else 0
-        defender_spd_check = 1 if -spd_diff > 5 - def_off_frozen + def_def_frozen else 0
+        attacker_spd_check = 1 if spd_diff >= 5 - atk_off_frozen + atk_def_frozen else 0
+        defender_spd_check = 1 if -spd_diff >= 5 - def_off_frozen + def_def_frozen else 0
 
         nb_attacker_GFU = sum(
             1 for e in atk_state.effects_strike_sequence if e.type == EffectType.GFU

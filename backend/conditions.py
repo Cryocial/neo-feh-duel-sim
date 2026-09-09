@@ -182,17 +182,6 @@ def _evaluate_num_bonus_penalty_total(params: dict) -> Callable:
     return evaluate
 
 
-def _evaluate_triggers_brave(params: dict) -> Callable:
-    """Checks if the unit triggered the 'attacks twice' effect."""
-    target_str = params.get("target", "self")
-
-    def evaluate(unit: "CombatantState", foe: "CombatantState") -> bool:
-        target = unit if target_str == "self" else foe
-        return any(e.type == "BRAVE" for e in target.effects_strike_sequence)
-
-    return evaluate
-
-
 def _evaluate_is_engaged(params: dict) -> Callable:
     """Salvaged from Fell Spirit: Checks if either unit is Engaged."""
 
