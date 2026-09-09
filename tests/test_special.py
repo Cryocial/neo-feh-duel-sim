@@ -113,6 +113,32 @@ def perc_dr(pct, strike, piercable, max_triggers=1):
     }
 
 
+def special_miracle():
+    """The Special-slot Miracle: gated by the cooldown, not by miracle_used."""
+    return {
+        "effect": "MIRACLE",
+        "target": "self",
+        "params": {"strike": "on_unit_special"},
+        "conditions": [],
+    }
+
+
+def brave_status():
+    return Status(
+        name="Test Brave",
+        type="bonus",
+        effects=[{"effect": "BRAVE", "target": "self", "params": {}, "conditions": []}],
+    )
+
+
+def fatal_smoke_status():
+    return Status(
+        name="Test Fatal Smoke",
+        type="bonus",
+        effects=[{"effect": "FATAL_SMOKE", "target": "self", "params": {}, "conditions": []}],
+    )
+
+
 def test_off_special_deals_flat_damage_on_trigger():
     """An offensive Special adds damage on the unit's own attack, and only once
     its cooldown has reached 0."""
@@ -242,6 +268,64 @@ def test_def_special_also_granting_damage_on_readiness():
     # Ready at D2 but never triggers, so it floors at 0
     assert engine.combatant_states["defender"].current_cooldown == 0
     assert engine.combatant_states["defender"].special_use_count == 0
+
+
+def test_miracle_special_triggers_when_ready():
+    """A Miracle Special is charged like a defensive one but fires only on a
+    lethal strike, turning it into survival at 1 HP."""
+    attacker = make_unit("A", atk=40, spd=30, defense=20)
+    defender = make_unit("D", hp=50, atk=25, spd=10, defense=0)
+    give_special(defender, SpecialType.MIRACLE, [special_miracle()])
+
+    engine = CombatEngine(attacker, defender)
+    result = engine.simulate()
+
+    # A1: miracle isn't ready -> 40 damage, 50 -> 10, charges to 0
+    # D1: 5 damage
+    # A2: ready, the 40 would be lethal -> survives at 1 HP
+    assert result["attacker_final_hp"] == 50 - 5
+    assert result["defender_final_hp"] == 1
+    assert engine.combatant_states["defender"].special_use_count == 1
+    # Reset to max_cooldown, NOT max_cooldown - 1: a Special that fires does not
+    # also charge on the same strike.
+    assert engine.combatant_states["defender"].current_cooldown == 1
+
+
+def test_miracle_special_does_not_trigger_when_not_ready():
+    """An uncharged Miracle Special lets the lethal hit through."""
+    attacker = make_unit("A", atk=40, spd=30, defense=20)
+    defender = make_unit("D", hp=50, atk=25, spd=10, defense=0)
+    give_special(defender, SpecialType.MIRACLE, [special_miracle()], max_cooldown=3)
+
+    engine = CombatEngine(attacker, defender)
+    result = engine.simulate()
+
+    # A1: 40 damage, 50 -> 10, cooldown 3 -> 2
+    # D1: 5 damage, cooldown 2 -> 1
+    # A2: still at 1, so the 40 lands in full and the defender dies.
+    #     That strike charges the cooldown too, since nothing fired on it.
+    assert result["attacker_final_hp"] == 50 - 5
+    assert result["defender_final_hp"] == 10 - 40
+    assert engine.combatant_states["defender"].special_use_count == 0
+    assert engine.combatant_states["defender"].current_cooldown == 0
+
+
+def test_fatal_smoke_does_not_block_a_miracle_special():
+    """Fatal Smoke bypasses the skill Miracle only. The Special one goes
+    through it untouched."""
+    attacker = make_unit("A", atk=40, spd=30, defense=20)
+    attacker.active_statuses.append(fatal_smoke_status())
+    defender = make_unit("D", hp=50, atk=25, spd=10, defense=0)
+    give_special(defender, SpecialType.MIRACLE, [special_miracle()])
+
+    engine = CombatEngine(attacker, defender)
+    result = engine.simulate()
+
+    # Same trace as the plain trigger test: Fatal Smoke changes nothing here.
+    assert result["attacker_final_hp"] == 50 - 5
+    assert result["defender_final_hp"] == 1
+    assert engine.combatant_states["defender"].special_use_count == 1
+    assert engine.combatant_states["defender"].current_cooldown == 1
 
 
 def test_untyped_special_never_triggers():
@@ -420,6 +504,32 @@ def test_special_triggering_twice_is_counted_twice():
     assert engine.combatant_states["attacker"].current_cooldown == 0
 
 
+def test_miracle_special_can_trigger_twice_in_one_combat():
+    """Same counting on the Miracle side: it is capped by its cooldown, not once
+    per combat, so it fires again once charged back up — provided the unit is
+    above 1 HP again, hence the heal on the counterattack."""
+    attacker = make_unit("A", atk=40, spd=30, defense=20)
+    attacker.active_statuses.append(brave_status())
+    defender = make_unit("D", hp=50, atk=25, spd=10, defense=0)
+    give_special(defender, SpecialType.MIRACLE, [
+        special_miracle(),
+        heal(20, "every_strike"),
+    ])
+
+    engine = CombatEngine(attacker, defender)
+    result = engine.simulate()
+
+    # A1: miracle is not ready -> 40 damage, 50 -> 10, charges to 0
+    # A2: ready, the 40 would be lethal -> first save at 1 HP, cooldown back to 1
+    # D1: 5 damage, and the heal brings the defender to 21 HP, charges to 0
+    # A3: ready again, the 40 would be lethal -> second save at 1 HP
+    # A4: not ready, and at 1 HP the miracle no longer applies -> the defender dies
+    assert result["attacker_final_hp"] == 50 - 5
+    assert result["defender_final_hp"] == 1 - 40
+    # Triggers on A2 and A3
+    assert engine.combatant_states["defender"].special_use_count == 2
+
+
 def test_denied_off_special_does_not_trigger():
     """The foe denies offensive specials, so the attacker's never triggers."""
     attacker = make_unit("A", atk=30, spd=30, defense=20)
@@ -462,8 +572,29 @@ def test_denied_def_special_does_not_trigger():
     assert engine.combatant_states["defender"].current_cooldown == 0
 
 
+def test_denied_miracle_special_does_not_trigger():
+    """A Miracle Special carries its own SpecialType but is denied by the "def"
+    flag, like the defensive Specials it is grouped with."""
+    attacker = make_unit("A", atk=40, spd=30, defense=20)
+    attacker.active_statuses.append(denial_status({"def": True}))
+    defender = make_unit("D", hp=50, atk=25, spd=10, defense=0)
+    give_special(defender, SpecialType.MIRACLE, [special_miracle()])
+
+    engine = CombatEngine(attacker, defender)
+    result = engine.simulate()
+
+    # A1: miracle is not ready -> 40 damage, 50 -> 10
+    # D1: 5 damage
+    # A2: ready but denied, so the lethal hit lands in full and the defender dies
+    assert result["attacker_final_hp"] == 50 - 5
+    assert result["defender_final_hp"] == 10 - 40
+    # Never triggers, so it never resets
+    assert engine.combatant_states["defender"].special_use_count == 0
+    assert engine.combatant_states["defender"].current_cooldown == 0
+
+
 def test_denied_aoe_special_does_not_fire_before_combat():
-    """AoE denial resolves before _phase_AoE, so no pre-combat damage lands."""
+    """AoE denial resolves before _resolve_aoe, so no pre-combat damage lands."""
     attacker = make_unit("A", atk=30, spd=30, defense=20)
     give_special(attacker, SpecialType.AOE, [trigger_aoe(0.5)])
     attacker.pre_charge = 1

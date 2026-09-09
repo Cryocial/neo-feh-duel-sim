@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Literal
 from .constants import MovementType, WeaponType, Color, SpecialType
 
@@ -174,10 +174,15 @@ class Unit:
             ),
         )
 
+        updates = {stat: 0 for stat in tie_breaker_order}
         for i in range(total_points):
-            stat_to_buff = sorted_stats[i % 5]
-            current_val = getattr(self.base_stats, stat_to_buff)
-            setattr(self.base_stats, stat_to_buff, current_val + 1)
+            updates[sorted_stats[i % 5]] += 1
+
+        self.base_stats = replace(self.base_stats, **{
+            stat: getattr(self.base_stats, stat) + delta
+            for stat, delta in updates.items()
+            if delta > 0
+        })
 
     def _initialize_stats(self):
         """

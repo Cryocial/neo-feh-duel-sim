@@ -26,9 +26,9 @@ Unit instances (with Skill in each slot, Status in active_statuses)
         │
         │  simulation start
         ▼
-CombatantState (with 6 lists of Effect instances created from Skills and Statuses)
+CombatantState (with 7 lists of Effect instances created from Skills and Statuses)
         │
-        │  phase-by-phase simulation
+        │  step-by-step simulation
         ▼
 Result: final HP of both units
 ```
@@ -100,6 +100,8 @@ class Skill:
     allowed_weapon_types:    list[WeaponType]       # empty list = no restriction
     is_arcane:               bool = False           # bypasses prf restrictions
     is_prf:                  bool = False           # only certain units can equip it
+    grants_style:            bool = False           # skill grants a combat Style
+    special_type:            SpecialType = SpecialType.NONE   # AOE / OFF / DEF / OTHER, NONE for non-Specials
 ```
 
 **JSON encoding example for a skill:**
@@ -310,9 +312,10 @@ class Skill:
 ```python
 @dataclass(frozen=True)
 class Status:
-    name:    str
-    type:    Literal["bonus", "penalty"]
-    effects: list[dict]     # raw effect definitions from the JSON
+    name:         str
+    type:         Literal["bonus", "penalty"]
+    effects:      list[dict]     # raw effect definitions from the JSON
+    grants_style: bool = False   # status grants a combat Style
 ```
 
 **JSON encoding example for a status:**
@@ -404,7 +407,7 @@ class Unit:
 
 ### `CombatantState`
 
-At the start of a combat simulation, two `CombatantState` instances are created. They hold the current combat state of a unit with information that evolves throughout it. This includes current HP, the Special cooldown, and the 6 effect lists that drive the simulation.
+At the start of a combat simulation, two `CombatantState` instances are created. They hold the current combat state of a unit with information that evolves throughout it. This includes current HP, the Special cooldown, and the 7 effect lists that drive the simulation.
 
 ```python
 @dataclass
@@ -423,26 +426,24 @@ class CombatantState:
     is_initiator:            bool = False              # whether this unit initiated combat
     triggers_brave:          bool = False              # set during strike-sequence determination; read by triggers_brave condition
     spaces_moved:            int = 0                   # spaces moved before combat (clash conditions)
+    effects_start_of_turn:   list[Effect] = field(default_factory=list)
     effects_AoE:             list[Effect] = field(default_factory=list)
-    effects_start_of_combat: list[Effect] = field(default_factory=list)
+    effects_combat_stats:    list[Effect] = field(default_factory=list)
     effects_strike_sequence: list[Effect] = field(default_factory=list)
     effects_pre_combat:      list[Effect] = field(default_factory=list)
     effects_on_strike:       list[Effect] = field(default_factory=list)
     effects_after_combat:    list[Effect] = field(default_factory=list)
-    effects_start_of_turn: list[Effect] = field(default_factory=list)
-    effects_AoE: list[Effect] = field(default_factory=list)
-    effects_start_of_combat: list[Effect] = field(default_factory=list)
 ```
 `effects_start_of_turn` : for effects that grant visible stats or statuses at the start of the turn, i.e. of type `EffectType.GRANT_VISIBLE_STAT` and `EffectType.GRANT_STATUS`.
 `effects_AoE` : for effects related to AoE, for example effects of type `EffectType.TRIGGER_AOE`, `EffectType.HEXBLADE_AOE`, `EffectType.PULSE_AOE`, `EffectType.FLAT_DR_AOE`, etc.
 
-`effects_start_of_combat` : for effects that impact in-combat stats, i.e. of type `EffectType.STAT_BOOST` and `EffectType.STAT_DAUNT`.
+`effects_combat_stats` : for effects that impact in-combat stats, i.e. of type `EffectType.STAT_BOOST` and `EffectType.STAT_DAUNT`.
 
 `effects_strike_sequence` : for effects used to determine the strike sequence, for example effects of type `EffectType.FLASH`, `EffectType.GFU`, `EffectType.POTENT`, `EffectType.BRAVE`, `EffectType.VANTAGE`, `EffectType.DESPERATION_NEUT`, etc.
 
 `effects_pre_combat` : for pre-combat damage and healing effects, i.e. of type `EffectType.PRE_CBT_DAMAGE`, `EffectType.PRE_CBT_HEAL`.
 
-`effects_on_strike` : for per-strike effects, for example effects of type `EffectType.FLAT_DR_STRIKE`, `EffectType.PERC_DR_STRIKE`, `EffectType.FLAT_DAMAGE_STRIKE`, `EffectType.PULSE_STRIKE`, `EffectType.SCOWL_STRIKE`, `EffectType.HEAL_STRIKE`, `EffectType.OFF_BREATH`, `EffectType.DEF_TEMPO`, etc.
+`effects_on_strike` : for per-strike effects, for example effects of type `EffectType.FLAT_DR_STRIKE`, `EffectType.PERC_DR_STRIKE`, `EffectType.FLAT_DAMAGE_STRIKE`, `EffectType.PULSE_STRIKE`, `EffectType.SCOWL_STRIKE`, `EffectType.HEAL_STRIKE`, `EffectType.OFF_BREATH`, `EffectType.GUARD_NEUT`, etc.
 
 `effects_after_combat` : for post-combat effects, for example effects of type `EffectType.HEAL_POST_CBT`, `EffectType.DAMAGE_POST_CBT`.
 
@@ -453,13 +454,13 @@ class CombatantState:
 A condition is a tree made up of two node types:
 
 ```python
-Phase = Literal["pre_aoe", "start_of_combat", "post_sequence"]
+Timing = Literal["static", "post_aoe", "post_combat_stats", "post_strike_sequence"]
 
 @dataclass
 class AtomicCondition:
     type:   str       # "ally_within_spaces", "unit_initiates", "hp_above_pct", "triggers_brave"...
     params: dict      # {"min_allies": 1, "spaces": 3}, {"threshold": 25}, {}...
-    phase:  Phase     # deduced from the type at startup via CONDITION_REGISTRY, not stored in JSON
+    timing: Timing    # deduced from the type at startup via CONDITION_REGISTRY, not stored in JSON
     func:   Callable  # (unit: CombatantState, foe: CombatantState) -> bool
 
 @dataclass
@@ -473,11 +474,34 @@ class AllOf:
 Condition = AtomicCondition | AnyOf | AllOf
 ```
 
-**Phase `pre_aoe`** : evaluated before AoE. Covers conditions based on map context and visible stats: allies or foes within range, visible stats, transformation (beasts), `has_entered_combat`, active bonuses/penalties, Divine Vein or tile effects, initiation, weapon range, number of spaces moved, combat style, foe's movement type or color, Savior, equipped Special.
+A **timing** is not a moment of the combat: it is the point at which a set of
+data becomes final. Each one is named after the step whose completion makes it
+so, which is why three of the four carry a `post_` prefix.
 
-**Phase `start_of_combat`** : evaluated after `_combat_stat_calculations`. Covers conditions based on HP at the start of combat and on in-combat stats.
+The rule that follows is the one thing to remember when adding a condition:
 
-**Phase `post_sequence`** : evaluated after `_determine_strike_sequence`. Covers conditions that depend on the result of the strike sequence, for example whether the foe triggers the "attacks twice" effect.
+> a condition's timing must be resolved **strictly before** the list holding its
+> effect is consumed.
+
+`_evaluate_conditions` is a filter — it removes effects whose condition is
+false, it does not undo anything. An effect consumed before its condition is
+evaluated is applied unchecked, and removing it afterwards deletes the
+instruction, not its consequence.
+
+**`static`** : evaluated before anything runs. Covers everything the engine
+never computes — user input, map context, visible stats, bonus and penalty
+counts, base stats, weapon type and range, equipped Special, combat style,
+initiation, spaces moved, Savior, transformation.
+
+**`post_aoe`** : evaluated once `_resolve_aoe` is done. Covers HP percentages,
+which AoE damage can change, and whether an AoE fired.
+
+**`post_combat_stats`** : evaluated once `_combat_stat_calculations` is done.
+Covers comparisons of in-combat stats.
+
+**`post_strike_sequence`** : evaluated once `_determine_strike_sequence` is
+done. Covers conditions depending on the resolved sequence, for example whether
+the foe triggers the "attacks twice" effect.
 
 For an `Effect` `example`, `example.conditions` is a `list[Condition]`. The list is an implicit **AND** at the root level.
 
@@ -491,17 +515,17 @@ For an `Effect` `example`, `example.conditions` is a `list[Condition]`. The list
 - `(A or B or C) and (D or E) and G` → `[AnyOf([A, B, C]), AnyOf([D, E]), G]`
 
 **Compiled at startup:** for each `AtomicCondition`, the condition type is used to:
-1. Deduce the `phase` via `CONDITION_REGISTRY[type][0]`
+1. Deduce the `timing` via `CONDITION_REGISTRY[type][0]`
 2. Retrieve the evaluation function via `CONDITION_REGISTRY[type][1]` and call it with `params` to produce `func`
 
-**Evaluator:** at each phase, for each effect, the evaluator walks through `example.conditions`:
-- `AtomicCondition` of the current phase → evaluates `func`:
+**Evaluator:** at each timing, for each effect, the evaluator walks through `example.conditions`:
+- `AtomicCondition` of the current timing → evaluates `func`:
   - `True`: removes this node from the list
-  - `False`: removes the entire effect from the phase list
-- `AtomicCondition` of another phase → ignored
-- `AnyOf` → applies the same logic recursively on children belonging to the current phase
+  - `False`: removes the entire effect from its list
+- `AtomicCondition` of another timing → left pending for a later pass
+- `AnyOf` → applies the same logic recursively on children belonging to the current timing
 - Empty list → the effect is active
-- `AllOf` → like `AnyOf`, but all current-phase children must pass; recurses on children belonging to the current phase
+- `AllOf` → like `AnyOf`, but all current-timing children must pass; recurses on children belonging to the current timing
 
 
 **Concrete condition examples:**
@@ -512,7 +536,7 @@ For an `Effect` `example`, `example.conditions` is a `list[Condition]`. The list
 ```python
 condition = [
     AnyOf([
-        AtomicCondition("spaces_moved", {}, "pre_aoe", ...)
+        AtomicCondition("spaces_moved", {}, "static", ...)
     ])
 ]
 ```
@@ -528,8 +552,8 @@ condition = [
 >"If unit is within 3 spaces of an ally [...] and also, if foe triggers the 'attacks twice' effect"
 ```python
 condition = [
-    AtomicCondition("ally_within_spaces", {"min_allies": 1, "spaces": 3}, "pre_aoe",    ...),
-    AtomicCondition("triggers_brave",     {"target": "foe"},                             "post_sequence", ...)
+    AtomicCondition("ally_within_spaces", {"min_allies": 1, "spaces": 3}, "static", ...),
+    AtomicCondition("triggers_brave",     {"target": "foe"},              "post_strike_sequence", ...)
 ]
 ```
 ```json
@@ -544,8 +568,8 @@ condition = [
 ```python
 condition = [
     AnyOf([
-        AtomicCondition("unit_initiates",     {},                             "pre_aoe", ...),
-        AtomicCondition("ally_within_spaces", {"min_allies": 1, "spaces": 3}, "pre_aoe", ...)
+        AtomicCondition("unit_initiates",     {},                             "static", ...),
+        AtomicCondition("ally_within_spaces", {"min_allies": 1, "spaces": 3}, "static", ...)
     ])
 ]
 ```
@@ -562,9 +586,9 @@ condition = [
 >"At start of combat, if unit's HP ≥ 25%, [...] and also, if foe uses sword/lance/axe/dragon/beast and unit's Spd ≥ foe's Spd+5"
 ```python
 condition = [
-    AtomicCondition("hp_above_pct",         {"unit": "self", "threshold": 25},                        "start_of_combat", ...),
-    AtomicCondition("foe_weapon_type",      {"types": ["SWORD", "LANCE", "AXE", "DRAGON", "BEAST"]},  "pre_aoe",         ...),
-    AtomicCondition("cbt_stat_check",       {"stat": "spd", "unit": "self", "margin": -5},                           "start_of_combat", ...)
+    AtomicCondition("hp_above_pct",    {"unit": "self", "threshold": 25},                       "post_aoe",          ...),
+    AtomicCondition("foe_weapon_type", {"types": ["SWORD", "LANCE", "AXE", "DRAGON", "BEAST"]}, "static",            ...),
+    AtomicCondition("cbt_stat_check",  {"stat": "spd", "unit": "self", "margin": -5},          "post_combat_stats", ...)
 ]
 ```
 ```json
@@ -579,7 +603,7 @@ condition = [
 >"At start of combat, if unit's Res > foe's Res"
 ```python
 condition = [
-    AtomicCondition("visible_stat_check", {"stat": "res", "unit": "self", "margin": 0}, "start_of_combat", ...)
+    AtomicCondition("visible_stat_check", {"stat": "res", "unit": "self", "margin": 0}, "static", ...)
 ]
 ```
 ```json
@@ -588,7 +612,7 @@ condition = [
 ]
 ```
 
-**`CONDITION_REGISTRY`** : `dict[str, tuple[Phase, Callable[[dict], Callable]]]` defined in `conditions.py`. Maps each condition type to its evaluation phase and its evaluator factory. When an `AtomicCondition` is instantiated, `CONDITION_REGISTRY[type][0]` provides the phase and `CONDITION_REGISTRY[type][1](params)` produces `func`. The benefit is that `params` is captured in the closure once at initialization, rather than being passed on every evaluation.
+**`CONDITION_REGISTRY`** : `dict[str, tuple[Timing, Callable[[dict], Callable]]]` defined in `conditions.py`. Maps each condition type to its evaluation timing and its evaluator factory. When an `AtomicCondition` is instantiated, `CONDITION_REGISTRY[type][0]` provides the timing and `CONDITION_REGISTRY[type][1](params)` produces `func`. The benefit is that `params` is captured in the closure once at initialization, rather than being passed on every evaluation.
 
 Example for the two condition types from "Pair Up 4":
 
@@ -605,9 +629,9 @@ def _evaluate_triggers_brave(params: dict) -> Callable:
         ...
     return evaluate
 
-CONDITION_REGISTRY: dict[str, tuple[Phase, Callable[[dict], Callable]]] = {
-    "ally_within_spaces": ("pre_aoe",       _evaluate_ally_within_spaces),
-    "triggers_brave":     ("post_sequence", _evaluate_triggers_brave),
+CONDITION_REGISTRY: dict[str, tuple[Timing, Callable[[dict], Callable]]] = {
+    "ally_within_spaces": ("static",               _evaluate_ally_within_spaces),
+    "triggers_brave":     ("post_strike_sequence", _evaluate_triggers_brave),
     ...
 }
 ```
@@ -621,7 +645,7 @@ def _build_atomic_condition(data: dict) -> AtomicCondition:
     return AtomicCondition(
         type   = type,
         params = params,
-        phase  = CONDITION_REGISTRY[type][0],
+        timing = CONDITION_REGISTRY[type][0],
         func   = CONDITION_REGISTRY[type][1](params)
     )
 ```
@@ -638,7 +662,7 @@ At startup, three JSON files are parsed to build the in-memory databases.
 
 **Units**: raw data is stored in `UNIT_DATABASE` without instantiation — it is used solely to pre-populate a `Unit`'s fields when the user selects a hero.
 
-**Conditions**: conditions are not compiled when `Skill` and `Status` objects are loaded. They are compiled into `AtomicCondition` objects (with `phase` and `func`) when `Effect` instances are created at the start of each simulation. At that point, `CONDITION_REGISTRY` provides both the phase and the function to produce `func`.
+**Conditions**: conditions are not compiled when `Skill` and `Status` objects are loaded. They are compiled into `AtomicCondition` objects (with `timing` and `func`) when `Effect` instances are created at the start of each simulation. At that point, `CONDITION_REGISTRY` provides both the timing and the function to produce `func`.
 
 ---
 
@@ -646,7 +670,7 @@ At startup, three JSON files are parsed to build the in-memory databases.
 
 1. **Startup**: JSON files are read. `SKILL_DATABASE`, `BONUS_DATABASE`, `PENALTY_DATABASE`, and `UNIT_DATABASE` are built in memory. `BONUS_DATABASE` and `PENALTY_DATABASE` are fed from a single status JSON.
 2. **Team building**: the user selects a unit → a `Unit` instance is created from `UNIT_DATABASE` data. The user assigns skills → `Unit` slots receive references to `Skill` objects from `SKILL_DATABASE`. The user adds statuses → `unit.active_statuses` receives references to `Status` objects from `BONUS_DATABASE` or `PENALTY_DATABASE`.
-3. **Simulation launch**: the `Skill` and `Status` objects of both units are read to instantiate `Effect` objects (with condition compilation) and distribute them into the 6 lists of each `CombatantState`.
+3. **Simulation launch**: the `Skill` and `Status` objects of both units are read to instantiate `Effect` objects (with condition compilation) and distribute them into the 7 lists of each `CombatantState`.
 
 ---
 ## Damage Calculation Pipeline
@@ -681,7 +705,7 @@ come after percent DR.
 
 ### AoE Damage Pipeline
 
-`_phase_AoE` mirrors the same ordering with its own `*_AOE` effect types:
+`_resolve_aoe` mirrors the same ordering with its own `*_AOE` effect types:
 
 1. **Base damage** — `max(0, floor(coefficient × (visible Atk − visible Def)))`,
    using the foe's Res for magical units and `min(Def, Res)` under `HEXBLADE_AOE`.
@@ -698,28 +722,36 @@ come after percent DR.
 
 ## Simulation Timeline
 
-*Note: Start-of-Turn is ignored for now.*
-1. Call `_phase_start_of_turn`: processes `effects_start_of_turn`, granting visible stats and statuses (two passes: unconditional, then conditional). Then `_compute_counts` tallies `bonus_count` / `penalty_count` from the resulting buffs, debuffs, and statuses.
+Resolution and evaluation alternate, so that each list is filtered before the
+step that consumes it reads it.
 
-2. Initialize `self.combatant_states`: parse both units' skills and statuses to create `Effect` objects and distribute them into the 6 lists. Load the map context.
+1. Build `self.combatant_states` for both units.
 
-3. Call `_evaluate_conditions("pre_aoe")`: evaluates phase `pre_aoe` conditions (visible stats, initiation, etc.).
+2. Call `_initialize`: processes `effects_start_of_turn`, granting visible stats and statuses (two passes: unconditional, then conditional). Its conditions are evaluated eagerly by `_start_of_turn_conditions_pass`, outside the timing system.
 
-4. Call `_phase_AoE`: processes `effects_AoE`.
+3. Call `_compute_counts`: tallies `bonus_count` / `penalty_count` from the resulting buffs, debuffs, and statuses.
 
-5. Call `_combat_stat_calculations`: processes `effects_start_of_combat` and computes the in-combat stats for both units.
+4. Call `_distribute_effects`: parses both units' skills, statuses and Divine Veins to create `Effect` objects and distribute them into the 7 lists.
 
-6. Call `_evaluate_conditions("start_of_combat")`: evaluates phase `start_of_combat` conditions (HP% and in-combat stats).
+5. Call `_evaluate_conditions("static")`: everything the engine never computes — initiation, map context, visible stats, counts, weapon type.
 
-7. Call `_determine_strike_sequence`: processes `effects_strike_sequence` to determine the strike sequence.
+6. Call `_range_calculation`: settles the effective range this combat happens at.
 
-8. Call `_evaluate_conditions("post_sequence")`: evaluates phase `post_sequence` conditions (e.g. the foe triggers the "attacks twice" effect).
+7. Call `_resolve_aoe`: applies special denial, then processes `effects_AoE`.
 
-9. Call `_phase_pre_combat`: processes `effects_pre_combat` (Flared Sparrow, BoL, etc.).
+8. Call `_evaluate_conditions("post_aoe")`: HP percentages, now that AoE damage has landed.
 
-10. Loop over the strike sequence consulting `effects_on_strike`.
+9. Call `_combat_stat_calculations`: processes `effects_combat_stats` and computes the in-combat stats for both units.
 
-11. Call `_phase_after_combat`: processes `effects_after_combat`.
+10. Call `_evaluate_conditions("post_combat_stats")`: in-combat stat comparisons.
+
+11. Call `_determine_strike_sequence`: processes `effects_strike_sequence` to determine the strike sequence.
+
+12. Call `_evaluate_conditions("post_strike_sequence")`: conditions reading the resolved sequence, e.g. whether the foe triggers the "attacks twice" effect.
+
+13. Call `_resolve_combat`: snapshots `cd_start_of_cbt`, runs `_resolve_pre_combat` (`effects_pre_combat`: Flared Sparrow, BoL, etc.), applies twin, special denial and the defensive stat, then loops over the strike sequence consulting `effects_on_strike`.
+
+14. Call `_resolve_after_combat`: processes `effects_after_combat`.
 
 ---
 
@@ -730,104 +762,104 @@ come after percent DR.
 ---
 #### `effects_start_of_turn`
 
-Processed by `_phase_start_of_turn` before combat begins. These grant visible stats and statuses to a unit (or foe) at the start of the turn. Grants are written per-combat onto the `CombatantState` (`granted_visible_buffs` / `granted_visible_debuffs` / `granted_statuses`), never mutating the `Unit`, so repeated simulations stay isolated. Evaluated in two passes: unconditional grants first, then conditional grants (e.g. Ploy) so their conditions see the results of the earlier grants.
+Processed by `_initialize` before combat begins. These grant visible stats and statuses to a unit (or foe) at the start of the turn. Grants are written per-combat onto the `CombatantState` (`granted_visible_buffs` / `granted_visible_debuffs` / `granted_statuses`), never mutating the `Unit`, so repeated simulations stay isolated. Evaluated in two passes: unconditional grants first, then conditional grants (e.g. Ploy) so their conditions see the results of the earlier grants.
 
-| Effect | Description | `params` |
-|---|---|---|
-| `GRANT_VISIBLE_STAT` | Grants visible (stat-screen) stat changes to the target at start of turn. Positive values become visible buffs, negative values become visible debuffs. Feeds `CombatantState.visible_stat()` and the bonus/penalty counts. | `{ stats: { atk: int, spd: int, defense: int, res: int } }` (only the stats being changed need be listed) |
-| `GRANT_STATUS` | Grants a named status to the target at start of turn, looked up by name in `BONUS_DATABASE` / `PENALTY_DATABASE` and appended to `granted_statuses`. Skipped if the target already has a status of that name (in `active_statuses` or `granted_statuses`), so non-stacking statuses aren't duplicated. | `{ status: str }` (the status name, must exist in a database) |
+| Effect | FEH accurate Description | Details | `params`|
+|---|---|---|---|
+| `GRANT_VISIBLE_STAT` | Grants visible stats to unit at start of turn | **Granted/inflicted to unit**, even if it is a debuff. Positive values become visible buffs, negative values become visible debuffs. Feeds `CombatantState.visible_stat()` and the bonus/penalty counts. (only the stats being changed need be listed) | `{ stats: { atk: int, spd: int, defense: int, res: int } }` |
+| `GRANT_STATUS` | Grants a named status to unit at start of turn | **Granted/inflicted to unit**, even if it is a penalty. Status looked up by name in `BONUS_DATABASE` / `PENALTY_DATABASE` and appended to `granted_statuses`. Skipped if the target already has a status of that name (in `active_statuses` or `granted_statuses`), so statuses aren't duplicated. Ignored if status name isn't found in the databases .| `{ status: str }` |
 
 #### `effects_AoE`
 
-| Effect | Description | `params` |
-|---|---|---|
-| `TRIGGER_AOE` | Before combat foe takes damage | `{ coefficient: float }` |
-| `FLAT_DAMAGE_AOE` | Unit deals +X damage when dealing damage with a Special triggered before combat | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
-| `FLAT_DR_AOE` | Reduce damage by X when foe deals damage with a Special triggered before combat. Applied last: `damage = max(0, damage_after_PERC_DR_AOE − X)`. Never reduced by `DR_PIERCE_AOE` | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
-| `PERC_DR_AOE` | Reduce damage by X% when foe deals damage with a Special triggered before combat. Each source is weakened by the foe's `DR_PIERCE_AOE` before the sources stack multiplicatively | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
-| `DR_PIERCE_AOE` | Reduces the percentage of the foe's `PERC_DR_AOE` by X%. Has no effect on `FLAT_DR_AOE` | `{ value: int }` |
-| `HEXBLADE_AOE` | Calculates damage using the lower of foe's Def or Res when dealing damage with a Special triggered before combat | `{}` |
-| `PULSE_AOE` | Grants Special cooldown count -X to unit before Special triggers before combat | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
+| Effect | FEH accurate Description | Details | `params`|
+|---|---|---|---|
+| `TRIGGER_AOE` | Before combat foe takes damage | **When unit triggers an AoE special**, damage is inflicted to the foe and its base value is equal to the unit's attack minus foe's defensive's stat at that time of the combat multiplied by the coefficient. | `{ coefficient: float }` |
+| `FLAT_DAMAGE_AOE` | Unit deals +X damage when dealing damage with a Special triggered before combat | **When unit triggers an AoE special**, additional are damage added after base damage calculation. | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
+| `FLAT_DR_AOE` | Reduce damage by X when foe deals damage with a Special triggered before combat | **When foe triggers an AoE special**, damage are reduced after all AoE damage calculation. | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
+| `PERC_DR_AOE` | Reduce damage by X% when foe deals damage with a Special triggered before combat | **When foe triggers an AoE special**, each source is first weakened by the unit's `DR_PIERCE_AOE`, then the pierced sources stack multiplicatively. Applied after `FLAT_DAMAGE_AOE` and before `FLAT_DR_AOE`; the surviving damage rounds UP. | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
+| `DR_PIERCE_AOE` | Reduces the percentage of foe's "reduce damage by X%" against area-of-effect Specials | **Applied to foe**. Held by the unit triggering the AoE special. `value` is a percentage; several sources multiply together into a single piercing multiplier. Only weakens `PERC_DR_AOE`, never `FLAT_DR_AOE`. | `{ value: int }` |
+| `HEXBLADE_AOE` | Calculates damage using the lower of foe's Def or Res when dealing damage with a Special triggered before combat | **When unit triggers an AoE special**, calculation uses the foe's lower defensive stat at that time of the combat | `{}` |
+| `PULSE_AOE` | Grants Special cooldown count -X to unit before Special triggers before combat | **Applies to unit**. Unit's special cooldown is reduced right before checking if the unit triggers an AoE special | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
 
-#### `effects_start_of_combat`
+#### `effects_combat_stats`
 
-| Effect | Description | `params` |
-|---|---|---|
-| `STAT_BOOST` | Grants +X to specific stats to unit | `{ stats: list[str] } + { formula: str, multiplier: float, flat: int, min: int, max: int }` |
-| `STAT_DAUNT` | Inflicts -X to specific stats to unit | `{ stats: list[str] } + { formula: str, multiplier: float, flat: int, min: int, max: int }` |
-| `BONUS_NEUT` | Neutralizes bonuses to specific stats | `{}` |
-| `PENALTY_NEUT` | Neutralizes penalties to specific stats | `{}` |
-| `RANGE_EXTENSION` | Unit can attack foes within specific range | `{ min: int, max: int }` |
+| Effect | FEH accurate Description | Details | `params`|
+|---|---|---|---|
+| `STAT_BOOST` | Grants +X to specific stats to unit | **Granted to unit** during combat, on top of its visible stats. | `{ stats: list[str] } + { formula: str, multiplier: float, flat: int, min: int, max: int }` |
+| `STAT_DAUNT` | Inflicts -X to specific stats to unit | **Inflicted to unit**. The resolved magnitude is negated, so a positive `flat` still lowers the stat. | `{ stats: list[str] } + { formula: str, multiplier: float, flat: int, min: int, max: int }` |
+| `BONUS_NEUT` | Neutralizes foe's bonuses to specific stats | **Applied to foe** and read from the opposite state: it drops the foe's visible buffs. | `{}` |
+| `PENALTY_NEUT` | Neutralizes penalties to specific stats on unit | **Applied to unit** and read from its own state: it drops that unit's own visible penalties. | `{}` |
+| `PHANTOM_STAT` | If a skill compare unit's stat to a foe's or ally's, treats unit's stat as if granted +X | **Applied to unit**, after `STAT_BOOST` / `STAT_DAUNT`. Accumulates into `phantom_bonus` instead of `combat_stats`, so it is only visible through `CombatantState.cbt_stat_with_phantom()` By calling the right key in the formula used, Dodge-style Spd-difference DR sees it while follow-up eligibility and Potent checks do not. | `{ stats: list[str] } + { formula: str, multiplier: float, flat: int, min: int, max: int }` |
+| `RANGE_EXTENSION` | Unit can attack foes within specific range | **Applied to unit**. Only the initiator's is read, since the initiator's engagement range sets the distance for the whole combat. `min == max` forces the value, otherwise `Unit.chosen_range` (the user's pick) is used. | `{ min: int, max: int }` |
 
 #### `effects_strike_sequence`
 
-| Effect | Description | `params` |
-|---|---|---|
-| `FU_DENY` | Foe cannot make follow-up attack | `{}` |
-| `GFU` | Unit makes a guaranteed follow-up | `{}` |
-| `OFF_NFU` | Neutralizes effects that prevent unit's follow-up attacks | `{}` |
-| `DEF_NFU` | Neutralizes effects that guarantee foe's follow-up attacks | `{}` |
-| `BRAVE` | Unit attacks twice | `{}` |
-| `POTENT` | Triggers an additional follow-up attack immediately after unit's standard follow-up attack | `{}` |
-| `VANTAGE` | Unit can counterattack before foe's first attack | `{}` |
-| `VANTAGE_NEUT` | Neutralizes that allow unit to counterattack before foe's first attack | `{}` |
-| `DESPERATION` | Unit can make a follow-up attack before foe can counterattack / Unit can make a follow-up attack before foe's next attack | `{}` |
-| `DESPERATION_NEUT` | Neutralizes effects that allow unit to make a follow-up attack before foe's next attack  | `{}` |
-| `FLASH` | Unit cannot counterattack | `{}` |
-| `FLASH_NEUT` | Neutralizes effects that prevent unit's counterattacks | `{}` |
-| `OFF_FROZEN` | Decreases Spd difference necessary for unit to make a follow-up attack by X | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
-| `DEF_FROZEN` | Increases Spd difference necessary for unit to make a follow-up attack by X | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
+| Effect | FEH accurate Description | Details | `params`|
+|---|---|---|---|
+| `FU_DENY` | Foe cannot make follow-up attack | **Applied to foe**, and subtracted from the FOE's follow-up count. Counted, not boolean: several sources add up. | `{}` |
+| `GFU` | Unit makes a guaranteed follow-up | **Applied to unit**. Counted too, and cancels out against the foe's `FU_DENY` in `GFU - denials + spd_check`. | `{}` |
+| `OFF_NFU` | Neutralizes effects that prevent unit's follow-up attacks | **Applied to unit**. Boolean, wipes the foe's `FU_DENY` count entirely rather than decrementing it. | `{}` |
+| `DEF_NFU` | Neutralizes effects that guarantee foe's follow-up attacks | **Applied to foe**. Boolean, wipes the foe's `GFU` count entirely. | `{}` |
+| `BRAVE` | Unit attacks twice | **Applied to unit**. Doubles unit's attacks excepting `POTENT` ones. | `{}` |
+| `POTENT` | Triggers an additional follow-up attack immediately after unit's standard follow-up attack | **Applied to unit**. Appended after the standard follow-up. The Potent strike deals `damage_pct`% of normal damage; `damage_pct_if_fu` replaces it when the unit already made a follow-up or triggers Brave. Highest percentage among sources wins, they do not stack. | `{ damage_pct: int, damage_pct_if_fu: int }` |
+| `VANTAGE` | Unit can counterattack before foe's first attack | **Applied to unit**. Only the defender's is read, since the initiator already strikes first. Moves the defender's first strike to the front of the sequence. | `{}` |
+| `VANTAGE_NEUT` | Neutralizes effects that allow unit to counterattack before foe's first attack | **Applied to foe**. Held by the initiator, cancels the defender's Vantage. | `{}` |
+| `DESPERATION` | Unit can make a follow-up attack before foe can counterattack | **Applied to unit**. Only the initiator's is read. Moves the initiator's follow-ups ahead of the defender's counter. | `{}` |
+| `DESPERATION_NEUT` | Neutralizes effects that allow foe to make a follow-up attack before unit's next attack  | **Applied to foe**. Held by the defender, cancels the initiator's Desperation. | `{}` |
+| `COUNTERATTACK` | Unit can counterattack regardless of foe's range | **Applied to unit**. Only the defender's is read. Without it the defender only counters when the combat range matches its own weapon's base range. It does not bypass `FLASH`, which is checked separately. | `{}` |
+| `FLASH` | Unit cannot counterattack | **Applied to unit**. Only the defender's is read, since the initiator never counterattacks. Clears the defender's strikes, as does failing the range check. | `{}` |
+| `FLASH_NEUT` | Neutralizes effects that prevent unit's counterattacks | **Applied to unit**. Held by the defender, alongside the Flash it cancels. Does not bypass the range check. | `{}` |
+| `OFF_FROZEN` | Decreases Spd difference necessary for unit to make a follow-up attack by X | **Applied to unit**. Summed, then folded into that unit's own threshold: `spd_diff > 5 - OFF_FROZEN + DEF_FROZEN`. | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
+| `DEF_FROZEN` | Increases Spd difference necessary for unit to make a follow-up attack by X | **Applied to unit**. Held by the unit it hinders. Raises that same threshold. | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
 
 #### `effects_pre_combat`
 
-| Effect | Description | `params` |
-|---|---|---|
-| `PRE_CBT_DAMAGE` | Deals damage to unit as combat begins | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
-| `PRE_CBT_HEAL` | Restores HP to unit as combat begins | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
+| Effect | FEH accurate Description | Details | `params`|
+|---|---|---|---|
+| `PRE_CBT_DAMAGE` | Deals damage to unit as combat begins | **Applied to unit**. Sources add up, and HP is floored at 1. | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
+| `PRE_CBT_HEAL` | Restores HP to unit as combat begins | **Applied to unit**. Only the largest source applies, the heal caps at max HP. | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
 
 #### `effects_on_strike`
 
-| Effect | Description | `params` |
-|---|---|---|
-| `DR_PIERCE` | Reduces the percentage of unit's non-Special "reduces damage by X%" | `{ value: int, strike }` |
-| `HEXBLADE_STRIKE` | Calculates damage using the lower of foe's Def or Res | `{}` |
-| `EFFECTIVE` | Effective against specific unit type | `{ movement_types: list[str], weapon_types: list[str] }` |
-| `NEUT_EFFECTIVE` | Neutralizes 'effective against specific unit type' | `{ movement_types: list[str], weapon_types: list[str] }` |
-| `SPECIAL_TRIGGER_NEUT` | Unit cannot trigger Specials | `{ aoe: bool, off: bool, def: bool }` |
-| `FLAT_DR_STRIKE` | Reduce damage from specific foe's attacks by X during combat | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
-| `PERC_DR_STRIKE` | Reduce damage from specific foe's attacks during combat by X%. `piercable` (default `true`) sources stack in one product and are reduced by `DR_PIERCE`; `piercable: false` (Special-grade, e.g. Pavise/Aegis) sources stack in a separate, pierce-immune product | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str, piercable: bool }` |
-| `TWIN` | Any "reduces damage by X%" effect can be triggered a new max of times | `{ value: int }` |
-| `FLAT_DAMAGE_STRIKE` | Unit deals +X damage | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
-| `PULSE_STRIKE` | Grants Special count -X to unit before specific strikes | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str, cap_cd_start_of_cbt: bool }` |
-| `SCOWL_STRIKE` | Inflicts Special cooldown count + X on unit before unit's specific attacks | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
-| `HEAL_STRIKE` | When unit deals damage to foe , restores X HP to unit| `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
-| `OFF_BREATH` | Grants Special cooldown charge +1 per unit's attack | `{}` |
-| `DEF_BREATH` | Grants Special cooldown charge +1 per foe's attack | `{}` |
-| `BREATH_NEUT` | Neutralizes effects that grant "Special cooldown charge +X" on unit | `{}` |
-| `OFF_GUARD` | Inflicts Special cooldown charge -1 per foe's attack | `{}` |
-| `DEF_GUARD` | Inflicts Special cooldown charge -1 per unit's attack | `{}` |
-| `GUARD_NEUT` | Neutralizes effects that inflict "Special cooldown charge -X" on unit | `{}` |
-| `DR_FLOOR` | Reduces damage from specific unit's attack to a maximum of X during combat (X resolved via the formula block; "floor to 1" is `flat: 1`) | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
-
-| `DEEP_WOUNDS_IN_CBT` | Unit cannot be healed during combat (pre-combat and per-strike heals). Stored in the **afflicted** unit's list and checked against that unit's own heals. So for a skill like fatal smoke 4, it would check the `target: "foe"` (routed into the foe's list), while a carried status uses `target: "self"`. | `{}` |
-| `NEUT_DEEP_WOUNDS_IN_CBT` | Neutralizes \[Deep Wounds] for in-combat healing. Self-protective: lives in the protected unit's own list (`target: "self"`), checked alongside any Deep Wounds afflicting that same unit. | `{}` |
-| `REDUCE_DEEP_WOUNDS_IN_CBT` | Reduces \[Deep Wounds] for in-combat healing — lets a % of healing through. Multiple sources stack multiplicatively and the surviving heal rounds UP | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
-| `TRIANGLE_ADEPT` | Amplifies an existing Weapon Triangle advantage (on either combatant) to a larger magnitude. Never creates advantage where none exists | `{ flat: int }` (the advantage %, e.g. 40) |
-| `CANCEL_AFFINITY` | Neutralizes Triangle Adept amplification (on either side), reverting to the base ±20% Weapon Triangle | `{}` |
-| `STAFF_FULL_DAMAGE` | Cancels the staff-damage halving (Wrathful-type), so the staff user deals full damage. Presence flag. | (none) |
-| `MIRACLE` | Survive a lethal hit at 1 HP (if HP was >1). `strike: "on_unit_special"` = special miracle (needs special ready, unbypassable); otherwise skill miracle (once per combat, bypassed by FATAL_SMOKE). | `{ strike, piercable }` |
-| `FATAL_SMOKE` | On the attacker; bypasses the foe's *skill* miracle (not special miracle). Presence flag. | (none) |
+| Effect | FEH accurate Description | Details | `params`|
+|---|---|---|---|
+| `DR_PIERCE` | Reduces the percentage of foe's non-Special "reduces damage by X%" skill | **Applied to foe**. Held by the striking unit and strike-matched. `value` is a percentage; several sources multiply together into a single piercing multiplier. | `{ value: int, strike: str }` |
+| `HEXBLADE_STRIKE` | Calculates damage using the lower of foe's Def or Res | **Applied to unit**. Held by the striking unit. Presence flag, not strike-matched: `_determine_defensive_stat` targets the lower of the foe's two defensive stats for every strike. | `{}` |
+| `EFFECTIVE` | Effective against specific unit type | **Applied to unit**. Held by the striking unit and strike-matched. Multiplies raw Atk by 1.5 (truncated) before the Weapon Triangle. The type lists name the units the effect is meant for; the matching is expected to be resolved upstream, when the effect is built. | `{ movement_types: list[str], weapon_types: list[str] }` |
+| `NEUT_EFFECTIVE` | Neutralizes 'effective against specific unit type' | **Applied to unit**. Held by the unit being struck. Presence flag, not strike-matched; cancels the 1.5× outright. | `{ movement_types: list[str], weapon_types: list[str] }` |
+| `SPECIAL_TRIGGER_NEUT` | Unit cannot trigger Specials | **Applied to unit**, strike-matched. Only the flag matching that unit's `special_type` counts. The cooldown is held at 0 rather than spent, so the Special can still trigger on a later strike once the effect stops matching. | `{ aoe: bool, off: bool, def: bool, strike: str }` |
+| `FLAT_DR_STRIKE` | Reduce damage from foe's attacks by X during combat | **Applied to unit**. Held by the unit being struck and strike-matched. Sources add up and are subtracted after percentage DR; damage floors at 0. | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
+| `PERC_DR_STRIKE` | Reduce damage from foe's attacks during combat by X% | **Applied to unit**. Held by the unit being struck and strike-matched. Sources stack multiplicatively and the surviving damage rounds UP. `piercable: false` implies its special DR. It is potentially trigger-capped: `max_triggers` (`-1` = unlimited) counted per effect in `special_dr_count`, raised by `TWIN`. | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str, piercable: bool, max_triggers: int }` |
+| `TWIN` | Any "reduces damage by X%" effect can be triggered a new max of times | **Applied to unit**. Held by the unit being struck. Raises the `max_triggers` cap of that unit's non-piercable DR sources; `value: -1` means unlimited. Highest value wins, sources do not stack. | `{ value: int }` |
+| `FLAT_DAMAGE_STRIKE` | Unit deals +X damage | **Applied to unit**. Held by the striking unit and strike-matched. Sources add up and land before any damage reduction. | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
+| `PULSE_STRIKE` | Grants Special count -X to unit | **Applied to unit**, strike-matched from that unit's own side. Resolved for both combatants at the top of the strike, before the Special-ready check. `cap_cd_start_of_cbt` caps the reduction at `cd_start_of_cbt`, the cooldown the unit had entering combat. | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str, cap_cd_start_of_cbt: bool }` |
+| `SCOWL_STRIKE` | Inflicts Special cooldown count + X on unit | **Applied to unit**. Summed and netted against `PULSE_STRIKE` in a single clamp, floored at 0. | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
+| `HEAL_STRIKE` | When unit deals damage to foe , restores X HP to unit| **Applied to unit**. Held by the striking unit and strike-matched. Sources add up, the heal caps at max HP. Resolved on every matching strike, including one that deals 0 damage. | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
+| `OFF_BREATH` | Grants Special cooldown charge +1 per unit's attack | **Applied to unit**, read when that unit is the striker. Presence flag, not strike-matched: +1 on top of the standard +1. Skipped on a strike where that unit's Special actually triggers, since the cooldown resets instead. | `{}` |
+| `DEF_BREATH` | Grants Special cooldown charge +1 per foe's attack | **Applied to unit**, read when that unit is the target. Presence flag, not strike-matched: +1 on top of the standard +1. Skipped on a strike where that unit's Special actually triggers, since the cooldown resets instead. | `{}` |
+| `BREATH_NEUT` | Neutralizes effects that grant "Special cooldown charge +X" on unit | **Applied to unit**, and read from the same list as the `OFF_BREATH` or `DEF_BREATH` it cancels. Presence flag. | `{}` |
+| `OFF_GUARD` | Inflicts Special cooldown charge -1 per foe's attack | **Applied to unit**, read when that unit is the target. | `{}` |
+| `DEF_GUARD` | Inflicts Special cooldown charge -1 per unit's attack | **Applied to unit**, read when that unit is the striker. | `{}` |
+| `GUARD_NEUT` | Neutralizes effects that inflict "Special cooldown charge -X" on unit | **Applied to unit**. Presence flag, cancels both `OFF_GUARD` and `DEF_GUARD` on that unit. | `{}` |
+| `DR_FLOOR` | Reduces damage foe's attack to a maximum of X during combat | **Applied to unit**. Held by the unit being struck and strike-matched. X is resolved via the formula block ("floor to 1" is `flat: 1`). The lowest floor among sources wins, applied after flat DR. | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
+| `DEEP_WOUNDS_IN_CBT` | Unit cannot be healed during combat | **Applied to unit**. Covers pre-combat and per-strike heals, stored in the afflicted unit's list and checked against that unit's own heals. | `{}` |
+| `NEUT_DEEP_WOUNDS_IN_CBT` | Neutralizes effects that prevent unit from healing during combat | **Applied to unit**. Self-protective: lives in the protected unit's own list, checked alongside any Deep Wounds afflicting that same unit. | `{}` |
+| `REDUCE_DEEP_WOUNDS_IN_CBT` | Reduces effects that prevent unit from healing during combat by X% | **Applied to unit**. Lets a % of healing through. Multiple sources stack multiplicatively. | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
+| `TRIANGLE_ADEPT` | If unit has weapon-triangle advantage, boosts Atk by 20% through its next action, and if unit has weapon-triangle disadvantage, reduces Atk by20% through its next action | **Applied to unit**, though read from either combatant's list. Amplifies an existing Weapon Triangle advantage to a larger magnitude. Never creates advantage where none exists. Highest source wins; empty `params` default to 40%. | `{ flat: int }` |
+| `CANCEL_AFFINITY` | If unit has weapon-triangle disadvantage, reverses weapon-triangle advantage granted by foe's skills | **Applied to unit**, though read from either combatant's list. Reverts the Weapon Triangle to its base ±20%. Presence flag. | `{}` |
+| `STAFF_FULL_DAMAGE` | Calculates damage from staff like other weapons | **Applied to unit**. Presence flag, read from the striker's own list in `_staff_full_damage`. | `{}` |
+| `MIRACLE` | If unit's HP > 1 and foe would reduce unit's HP to 0 during combat, unit survives with 1 HP | **Applied to unit**. `strike: "on_unit_special"` = special miracle: needs the special ready, unbypassable. Otherwise skill miracle: once per combat (`miracle_used`), bypassed by `FATAL_SMOKE` on the striker. | `{ strike, piercable }` |
+| `FATAL_SMOKE` | Neutralizes foe's non-Special "If unit's HP > 1 and foe would reduce unit's HP to 0 during combat, unit survives with 1 HP" effects | **Applied to foe**. Held by the striking unit. Affects skill miracle only, not special miracle. Presence flag. | `{}` |
 
 #### `effects_after_combat`
 
-| Effect | Description | `params` |
-|---|---|---|
-| `HEAL_POST_CBT` | Restores X HP to unit after combat | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
-| `DAMAGE_POST_CBT` | After combat, deals X damage to unit | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
-| `DEEP_WOUNDS_POST_CBT` | Unit cannot be healed after combat | `{}` |
-| `NEUT_DEEP_WOUNDS_POST_CBT` | Neutralizes \[Deep Wounds] for post-combat healing | `{}` |
-| `REDUCE_DEEP_WOUNDS_POST_CBT` | Reduces \[Deep Wounds] for post-combat healing — lets a % through, stacks multiplicatively, rounds UP | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
-> **Deep Wounds is split by phase.** In-combat Deep Wounds (`*_IN_CBT`) lives in `effects_on_strike` and gates both pre-combat and per-strike healing; post-combat Deep Wounds (`*_POST_CBT`) lives in `effects_after_combat`. The block is checked per-phase by `_apply_healing(role, amount, phase)`, which selects the matching effect family from the matching list. Reduce effects let a fraction of healing through, stack multiplicatively across sources, and round the surviving heal up.
+| Effect | FEH accurate Description | Details | `params`|
+|---|---|---|---|
+| `HEAL_POST_CBT` | Restores X HP to unit after combat | **Applied to unit**. Sources add up, the heal goes through the post-combat \[Deep Wounds] check and caps at max HP. | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
+| `DAMAGE_POST_CBT` | After combat, deals X damage to unit | **Applied to unit**. | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
+| `DEEP_WOUNDS_POST_CBT` | Unit cannot be healed after combat | **Applied to unit**. Blocks post-combat healing only; `DEEP_WOUNDS_IN_CBT` is checked on its own list and neither gates the other. | `{}` |
+| `NEUT_DEEP_WOUNDS_POST_CBT` | Neutralizes effects that prevent unit from healing after combat | **Applied to unit**. Presence flag, lifts the post-combat block entirely. | `{}` |
+| `REDUCE_DEEP_WOUNDS_POST_CBT` | Reduces effects that prevent unit from healing after combat by X% | **Applied to unit**. Lets a % of healing through, stacks multiplicatively, rounds UP. Without it, post-combat healing stays fully blocked. | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
 
 ---
 
@@ -886,24 +918,25 @@ Formula names resolve to raw game quantities; skill-specific offsets and caps li
 
 ### D - Condition Type Reference
 
-| Condition | Phase | `params` |
+| Condition | Timing | `params` |
 |---|---|---|
-| `unit_initiates` | `pre_aoe` | `{}` |
-| `foe_initiates` | `pre_aoe` | `{}` |
-| `spaces_moved` | `pre_aoe` | `{ "target": "self"\|"foe"\|"either"\|"initiator", "min_spaces": int }` |
-| `ally_within_spaces` | `pre_aoe` | `{ "check": "1_space"\|"2_spaces"\|"3_spaces"\|"3_rows_cols", "min_allies": int, "target": "self"\|"foe" }` |
-| `foe_weapon_type` | `pre_aoe` | `{ "types": list[str] }` |
-| `bonus_penalty_total` | `pre_aoe` | `{ "min_count": int, "include_foe": bool }` |
-| `is_engaged` | `pre_aoe` | `{}` |
-| `first_combat_of_turn` | `pre_aoe` | `{ "target": "self"\|"foe" }` |
-| `hp_above_pct` | `start_of_combat` | `{ "unit": "self"\|"foe", "threshold": int }` |
-| `hp_below_pct` | `start_of_combat` | `{ "unit": "self"\|"foe", "threshold": int }` — true when HP% is strictly below threshold (exact complement of `hp_above_pct`) |
-| `triggers_brave` | `post_sequence` | `{ "target": "self"\|"foe" }` |
-| `cbt_stat_check` | `start_of_combat` | `{ "stat": str, "unit": "self"\|"foe", "margin": int, "comparison": "greater_or_equal"\|"lesser_than" }` | *`cbt_stat_check`'s `comparison` is optional and defaults to `greater_or_equal` (`unit_stat >= foe_stat + margin`). `lesser_than` evaluates `unit_stat < foe_stat + margin`. The two are exact complements at the same `margin`, so a pair of effects with opposite comparisons partitions every case (e.g. Breath of Life 4's 40%/20% heal split on Def).*
-| `potent_spd_check` | `start_of_combat` | `{ "spd_lower": int }` — triggers when `(unit_spd - foe_spd) >= 5 - spd_lower`; the base-5 natural-follow-up requirement is lowered by `spd_lower`. Excludes Phantom, includes frozen. |
-| `cbt_stat_sum_check` | `start_of_combat` | `{ "stats": list[str], "margin": int, "comparison": "greater_or_equal"\|"lesser_than" }` — compares the SUM of the unit's in-combat stats vs the foe's (e.g. Spd+Def Potent). |
-| `potent_patience` | `start_of_combat` | `{ "spd_threshold": int }` — guaranteed Potent, gated on the unit's BASE Spd (from `Unit`, excluding legendary/mythic/GT bonuses per FEH) >= threshold. |
-| `visible_stat_check` | `start_of_turn` | `{ "stat": str, "margin": int, "comparison": "greater_or_equal"\|"lesser_than" }` | Same semantics as `cbt_stat_check` but compares visible stats via `CombatantState.visible_stat()` (Ploy, Eldhrímnir). The `start_of_turn` phase is NOT part of the three-phase `_evaluate_conditions` system — it's evaluated eagerly by `_start_of_turn_conditions_pass`, which calls `cond.func` directly, so a conditional grant sees unconditional grants applied earlier in the same pass. |
+| `unit_initiates` | `static` | `{}` |
+| `foe_initiates` | `static` | `{}` |
+| `spaces_moved` | `static` | `{ "target": "self"\|"foe"\|"either"\|"initiator", "min_spaces": int }` |
+| `ally_within_spaces` | `static` | `{ "check": "1_space"\|"2_spaces"\|"3_spaces"\|"3_rows_cols", "min_allies": int, "target": "self"\|"foe" }` |
+| `foe_weapon_type` | `static` | `{ "types": list[str] }` |
+| `bonus_penalty_total` | `static` | `{ "min_count": int, "include_foe": bool }` |
+| `is_engaged` | `static` | `{}` |
+| `first_combat_of_turn` | `static` | `{ "target": "self"\|"foe" }` |
+| `style_enabled` | `static` | `{}` |
+| `potent_patience` | `static` | `{ "spd_threshold": int }` |
+| `visible_stat_check` | `static` | `{ "stat": str, "margin": int, "comparison": "greater_or_equal"\|"lesser_than" }` |
+| `hp_above_pct` | `post_aoe` | `{ "unit": "self"\|"foe", "threshold": int }` |
+| `hp_below_pct` | `post_aoe` | `{ "unit": "self"\|"foe", "threshold": int }` |
+| `cbt_stat_check` | `post_combat_stats` | `{ "stat": str, "unit": "self"\|"foe", "margin": int, "comparison": "greater_or_equal"\|"lesser_than" }` |
+| `cbt_stat_sum_check` | `post_combat_stats` | `{ "stats": list[str], "margin": int, "comparison": "greater_or_equal"\|"lesser_than" }` |
+| `potent_spd_check` | `post_combat_stats` | `{ "spd_lower": int }` |
+| `triggers_brave` | `post_strike_sequence` | `{ "target": "self"\|"foe" }` |
 
 
 

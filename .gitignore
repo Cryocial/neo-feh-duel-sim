@@ -22,6 +22,9 @@ htmlcov/
 .idea/
 .vscode/
 
+# WSL artifacts
+*:Zone.Identifier
+
 # Distribution / build
 *.egg-info/
 dist/
