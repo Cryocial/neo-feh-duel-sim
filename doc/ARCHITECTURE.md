@@ -743,7 +743,7 @@ Processed by `_phase_start_of_turn` before combat begins. These grant visible st
 |---|---|---|
 | `TRIGGER_AOE` | Before combat foe takes damage | `{ coefficient: float }` |
 | `FLAT_DAMAGE_AOE` | Unit deals +X damage when dealing damage with a Special triggered before combat | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
-| `FLAT_DR_AOE` | Reduce damage by X when foe deals damage with a Special triggered before combat. Applied after `PERC_DR_AOE` and never reduced by `DR_PIERCE_AOE` | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
+| `FLAT_DR_AOE` | Reduce damage by X when foe deals damage with a Special triggered before combat. Applied last: `damage = max(0, damage_after_PERC_DR_AOE − X)`. Never reduced by `DR_PIERCE_AOE` | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
 | `PERC_DR_AOE` | Reduce damage by X% when foe deals damage with a Special triggered before combat. Each source is weakened by the foe's `DR_PIERCE_AOE` before the sources stack multiplicatively | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
 | `DR_PIERCE_AOE` | Reduces the percentage of the foe's `PERC_DR_AOE` by X%. Has no effect on `FLAT_DR_AOE` | `{ value: int }` |
 | `HEXBLADE_AOE` | Calculates damage using the lower of foe's Def or Res when dealing damage with a Special triggered before combat | `{}` |
