@@ -15,17 +15,22 @@ so it always gets the follow-up, defender slower so it never does. A 100 HP
 defender survives the exchange so damage can be read off final HP.
 """
 
+import pytest
+
 from backend.build import Unit, Skill, Status, StatBlock
 from backend.constants import MovementType, WeaponType, Color
 from backend.combatcalculator import CombatEngine, CombatantState
 from backend.conditions import build_conditions, check_condition
 
 
-def make_unit(name, hp=50, atk=40, spd=10, defense=20, res=20, **kwargs):
+def make_unit(
+    name, hp=50, atk=40, spd=10, defense=20, res=20,
+    weapon_type=WeaponType.SWORD, movement_type=MovementType.INFANTRY, **kwargs,
+):
     return Unit(
         name=name,
-        movement_type=MovementType.INFANTRY,
-        weapon_type=WeaponType.SWORD,
+        movement_type=movement_type,
+        weapon_type=weapon_type,
         color=Color.RED,
         hp=hp,
         atk=atk,
@@ -36,12 +41,14 @@ def make_unit(name, hp=50, atk=40, spd=10, defense=20, res=20, **kwargs):
     )
 
 
-def skill(name, slot, effects):
-    return Skill(
+def skill(name, slot, effects=(), **overrides):
+    fields = dict(
         name=name, slot=slot, might=0, slaying=0, cooldown=0,
-        visible_stats=StatBlock(), effects=effects,
+        visible_stats=StatBlock(), effects=list(effects),
         allowed_movement_types=[], allowed_weapon_types=[],
     )
+    fields.update(overrides)
+    return Skill(**fields)
 
 
 def status(name, effects):
@@ -247,3 +254,200 @@ def test_dr_pierce_leaves_special_dr_alone():
     result = CombatEngine(attacker, defender).simulate()
 
     assert damage_dealt(result) == 24
+
+
+# ── Max HP includes equipped-skill HP ────────────────────────────────────────
+
+
+def hp_weapon(bonus):
+    return skill("HP Weapon", "weapon", visible_stats=StatBlock(hp=bonus))
+
+
+def test_current_hp_defaults_to_max_hp_with_skill_bonus():
+    unit = make_unit("A")
+    unit.weapon = hp_weapon(5)
+
+    assert unit.max_hp == 55
+    assert unit.current_hp == 55
+
+    unit.current_hp = 10
+    assert unit.current_hp == 10
+
+
+def test_healing_caps_at_max_hp_not_base_hp():
+    """45/55 + a 20 HP pre-combat heal reaches 55, then eats one 5-damage
+    counter: 50. A base-HP cap would have stopped the heal at 50."""
+    attacker = make_unit("A")
+    attacker.weapon = hp_weapon(5)
+    attacker.current_hp = 45
+    attacker.active_statuses.append(status("Heal", [{
+        "effect": "PRE_CBT_HEAL", "target": "self", "params": {"flat": 20}, "conditions": [],
+    }]))
+    defender = make_unit("D", hp=100, atk=25)
+
+    result = CombatEngine(attacker, defender).simulate()
+
+    assert result["attacker_final_hp"] == 50
+
+
+def test_hp_pct_condition_divides_by_max_hp():
+    """27/55 is 49%, so hp_below_pct 50 passes; against base HP 50 it would
+    be 54% and fail."""
+    brash = skill("Brash", "a", [{
+        "effect": "FLAT_DAMAGE_STRIKE",
+        "target": "self",
+        "params": {"flat": 10, "strike": "every_strike"},
+        "conditions": [{"type": "hp_below_pct", "params": {"threshold": 50}}],
+    }])
+    attacker = make_unit("A", spd=30)
+    attacker.weapon = hp_weapon(5)
+    attacker.a_slot = brash
+    attacker.current_hp = 27
+    defender = make_unit("D", hp=100, atk=25)
+
+    result = CombatEngine(attacker, defender).simulate()
+
+    # 2 x (40 - 20 + 10)
+    assert damage_dealt(result) == 60
+
+
+# ── max_cooldown derived from the Special ────────────────────────────────────
+
+
+def test_max_cooldown_is_special_cooldown_minus_slaying():
+    unit = make_unit("A")
+    assert unit.max_cooldown == 0
+
+    unit.special = skill("Special", "special", cooldown=3)
+    assert unit.max_cooldown == 3
+
+    unit.weapon = skill("Slaying", "weapon", slaying=1)
+    assert unit.max_cooldown == 2
+
+
+def test_max_cooldown_floors_at_one_and_honours_an_override():
+    unit = make_unit("A")
+    unit.special = skill("Special", "special", cooldown=2)
+    unit.weapon = skill("Slaying", "weapon", slaying=2)
+    assert unit.max_cooldown == 1
+
+    unit.max_cooldown = 5
+    assert unit.max_cooldown == 5
+
+
+# ── Engage stats ─────────────────────────────────────────────────────────────
+
+
+def test_engaged_unit_receives_ring_level_stats_capped_at_ten():
+    plain = make_unit("A")
+    engaged = make_unit("A", is_engaged=True, engage_ring_level=4)
+    capped = make_unit("A", is_engaged=True, engage_ring_level=15)
+
+    assert engaged.is_engaged is True
+    assert stat_total(engaged) - stat_total(plain) == 4
+    assert stat_total(capped) - stat_total(plain) == 10
+
+
+def test_unengaged_unit_ignores_ring_level():
+    plain = make_unit("A")
+    unit = make_unit("A", engage_ring_level=4)
+
+    assert stat_total(unit) == stat_total(plain)
+
+
+# ── ally_within_spaces 1_space ───────────────────────────────────────────────
+
+
+def test_ally_within_one_space_condition_evaluates():
+    cond = build_conditions([{
+        "type": "ally_within_spaces", "params": {"check": "1_space", "min_allies": 1},
+    }])[0]
+    unit = condition_state(make_unit("A"), is_initiator=True)
+    foe = condition_state(make_unit("F"), is_initiator=False)
+
+    assert check_condition(cond, "static", unit, foe) is False
+    unit.unit.allies_within_1_space = 1
+    assert check_condition(cond, "static", unit, foe) is True
+
+
+# ── Flexible style range needs chosen_range ──────────────────────────────────
+
+
+def style_range(min_range, max_range):
+    return Status(
+        name="Style Range", type="bonus", grants_style=True,
+        effects=[{
+            "effect": "RANGE_EXTENSION",
+            "target": "self",
+            "params": {"min": min_range, "max": max_range},
+            "conditions": [{"type": "style_enabled", "params": {}}],
+        }],
+    )
+
+
+def test_flexible_style_range_without_chosen_range_raises():
+    attacker = make_unit("A")
+    attacker.active_statuses.append(style_range(1, 6))
+    attacker.style_enabled = True
+    defender = make_unit("D")
+
+    with pytest.raises(ValueError, match="chosen_range"):
+        CombatEngine(attacker, defender).simulate()
+
+    attacker.chosen_range = 9
+    with pytest.raises(ValueError, match="chosen_range"):
+        CombatEngine(attacker, defender).simulate()
+
+
+# ── Armored foes counter on the attacker's original range ────────────────────
+
+
+def styled_sword_attacker(style_range_value):
+    attacker = make_unit("A", defense=20)
+    attacker.active_statuses.append(style_range(style_range_value, style_range_value))
+    attacker.style_enabled = True
+    return attacker
+
+
+def test_armored_melee_foe_counters_a_styled_melee_attacker():
+    """A sword attacking from 3 spaces is still a range-1 unit; an armored
+    sword foe counters on that original range."""
+    attacker = styled_sword_attacker(3)
+    defender = make_unit("D", atk=30, movement_type=MovementType.ARMOR)
+
+    result = CombatEngine(attacker, defender).simulate()
+
+    assert result["attacker_final_hp"] == 50 - 10
+
+
+def test_non_armored_melee_foe_still_cannot_counter_a_styled_melee_attacker():
+    attacker = styled_sword_attacker(3)
+    defender = make_unit("D", atk=30)
+
+    result = CombatEngine(attacker, defender).simulate()
+
+    assert result["attacker_final_hp"] == 50
+
+
+def test_armored_ranged_foe_cannot_counter_a_range_three_style():
+    """Neither the engagement distance (3) nor the attacker's original range
+    (1) matches a bow's range of 2."""
+    attacker = styled_sword_attacker(3)
+    defender = make_unit(
+        "D", atk=30, weapon_type=WeaponType.BOW, movement_type=MovementType.ARMOR
+    )
+
+    result = CombatEngine(attacker, defender).simulate()
+
+    assert result["attacker_final_hp"] == 50
+
+
+def test_armor_rule_is_not_a_free_distant_counter():
+    """A tome attacking an armored sword at its normal range 2: the original
+    range (2) doesn't match the armor's range (1) either, so no counter."""
+    attacker = make_unit("A", weapon_type=WeaponType.TOME, defense=20, res=20)
+    defender = make_unit("D", atk=30, movement_type=MovementType.ARMOR)
+
+    result = CombatEngine(attacker, defender).simulate()
+
+    assert result["attacker_final_hp"] == 50

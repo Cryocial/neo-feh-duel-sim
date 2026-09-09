@@ -3,7 +3,7 @@ from dataclasses import dataclass, field, replace
 from typing import Literal
 
 from .build import Unit, StatBlock, DivineVein
-from .constants import Color, StrikeType, EffectType, WeaponType, SpecialType
+from .constants import Color, StrikeType, EffectType, WeaponType, SpecialType, MovementType
 from .effects import Effect, build_effect, EFFECT_LIST_MAP
 from .conditions import Timing, Condition, check_condition
 from .jsonbootupstuff import BONUS_DATABASE, PENALTY_DATABASE
@@ -418,9 +418,16 @@ class CombatEngine:
                 continue
             min_range = effect.params["min"]
             max_range = effect.params["max"]
-            self.combat_range = (
-                min_range if min_range == max_range else self.attacker.chosen_range
-            )
+            chosen = self.attacker.chosen_range
+            if min_range == max_range:
+                self.combat_range = min_range
+            elif chosen is None or not min_range <= chosen <= max_range:
+                raise ValueError(
+                    f"{self.attacker.name}: style allows range {min_range}-{max_range}, "
+                    f"chosen_range must be set within it (got {chosen})"
+                )
+            else:
+                self.combat_range = chosen
             break
 
 # ── Area of effect specials ──────────────────────────────────────────────────
@@ -742,8 +749,15 @@ class CombatEngine:
                 )
             )
 
+        # Armored foes also counter when the attacker's own weapon range matches
+        # theirs, even if a style moved the engagement distance.
+        defender_range = _base_combat_range(def_state.unit.weapon_type)
         defender_counterattack = (
-            self.combat_range == _base_combat_range(def_state.unit.weapon_type)
+            self.combat_range == defender_range
+            or (
+                def_state.unit.movement_type is MovementType.ARMOR
+                and _base_combat_range(atk_state.unit.weapon_type) == defender_range
+            )
             or any(e.type == EffectType.COUNTERATTACK for e in def_state.effects_strike_sequence)
         )
                  
@@ -1303,7 +1317,7 @@ class CombatEngine:
         if amount <= 0:
             return
         new_hp = unit_state.current_hp + amount
-        unit_state.current_hp = min(unit_state.unit.base_stats.hp, new_hp)
+        unit_state.current_hp = min(unit_state.unit.max_hp, new_hp)
 
     def _get_wta_multiplier(
         self, striker_state: CombatantState, target_state: CombatantState
@@ -1482,7 +1496,7 @@ class CombatEngine:
                 case "mitigated_bucket":  # Reflex
                     variable = unit_state.damage_mitigated_bucket
                 case "unit_max_hp":
-                    variable = unit_state.unit.base_stats.hp
+                    variable = unit_state.unit.max_hp
                 case "phantom_spd_diff":
                     # Distinct from the follow-up/Potent spd_diff locals in
                     # _determine_strike_sequence and _evaluate_potent_spd_check —
