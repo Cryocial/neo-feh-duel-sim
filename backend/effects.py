@@ -8,6 +8,8 @@ EFFECT_LIST_MAP: dict[EffectType, str] = {
     EffectType.TRIGGER_AOE: "effects_AoE",
     EffectType.FLAT_DAMAGE_AOE: "effects_AoE",
     EffectType.FLAT_DR_AOE: "effects_AoE",
+    EffectType.PERC_DR_AOE: "effects_AoE",
+    EffectType.DR_PIERCE_AOE: "effects_AoE",
     EffectType.HEXBLADE_AOE: "effects_AoE",
     EffectType.PULSE_AOE: "effects_AoE",
     # ── Combat stats ─────────────────────────────────────────────────────

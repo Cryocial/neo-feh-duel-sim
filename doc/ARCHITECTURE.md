@@ -703,6 +703,23 @@ Percent DR (step 5) is applied AFTER fixed/true damage (step 2) and offensive
 Specials (step 3), matching the wiki. Flat DR (step 6) and the floor (step 7)
 come after percent DR.
 
+### AoE Damage Pipeline
+
+`_resolve_aoe` mirrors the same ordering with its own `*_AOE` effect types:
+
+1. **Base damage** — `max(0, floor(coefficient × (visible Atk − visible Def)))`,
+   using the foe's Res for magical units and `min(Def, Res)` under `HEXBLADE_AOE`.
+   Visible (stat-screen) values are used, since AoE resolves before in-combat
+   stats exist.
+2. **Fixed damage** — `FLAT_DAMAGE_AOE` added on.
+3. **Percent damage reduction** — each `PERC_DR_AOE` source on the foe is first
+   weakened by the attacker's `DR_PIERCE_AOE` (`value` as a percentage, stacking
+   multiplicatively), then the pierced sources stack multiplicatively into one
+   product. Result is `ceil`ed, matching the strike pipeline.
+4. **Flat damage reduction** — `FLAT_DR_AOE` subtracted, floored at 0.
+   `DR_PIERCE_AOE` never touches this step.
+5. **Survival** — AoE damage cannot kill: the foe's HP floors at 1.
+
 ## Simulation Timeline
 
 Resolution and evaluation alternate, so that each list is filtered before the
@@ -759,6 +776,8 @@ Processed by `_initialize` before combat begins. These grant visible stats and s
 | `TRIGGER_AOE` | Before combat foe takes damage | **When unit triggers an AoE special**, damage is inflicted to the foe and its base value is equal to the unit's attack minus foe's defensive's stat at that time of the combat multiplied by the coefficient. | `{ coefficient: float }` |
 | `FLAT_DAMAGE_AOE` | Unit deals +X damage when dealing damage with a Special triggered before combat | **When unit triggers an AoE special**, additional are damage added after base damage calculation. | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
 | `FLAT_DR_AOE` | Reduce damage by X when foe deals damage with a Special triggered before combat | **When foe triggers an AoE special**, damage are reduced after all AoE damage calculation. | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
+| `PERC_DR_AOE` | Reduce damage by X% when foe deals damage with a Special triggered before combat | **When foe triggers an AoE special**, each source is first weakened by the unit's `DR_PIERCE_AOE`, then the pierced sources stack multiplicatively. Applied after `FLAT_DAMAGE_AOE` and before `FLAT_DR_AOE`; the surviving damage rounds UP. | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
+| `DR_PIERCE_AOE` | Reduces the percentage of foe's "reduce damage by X%" against area-of-effect Specials | **Applied to foe**. Held by the unit triggering the AoE special. `value` is a percentage; several sources multiply together into a single piercing multiplier. Only weakens `PERC_DR_AOE`, never `FLAT_DR_AOE`. | `{ value: int }` |
 | `HEXBLADE_AOE` | Calculates damage using the lower of foe's Def or Res when dealing damage with a Special triggered before combat | **When unit triggers an AoE special**, calculation uses the foe's lower defensive stat at that time of the combat | `{}` |
 | `PULSE_AOE` | Grants Special cooldown count -X to unit before Special triggers before combat | **Applies to unit**. Unit's special cooldown is reduced right before checking if the unit triggers an AoE special | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
 
