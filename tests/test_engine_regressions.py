@@ -86,3 +86,44 @@ def test_simulation_does_not_write_back_to_the_unit():
         assert not hasattr(unit, "start_of_combat_hp")
         assert not hasattr(unit, "combat_stats")
         assert not hasattr(unit, "phantom_bonus")
+
+
+# ── Start-of-turn grants in combat ───────────────────────────────────────────
+
+
+def hone_atk(amount):
+    return skill("Hone", "c", [{
+        "effect": "GRANT_VISIBLE_STAT",
+        "target": "self",
+        "params": {"stats": {"atk": amount}},
+        "conditions": [],
+    }])
+
+
+def test_start_of_turn_grant_reaches_combat_stats():
+    """A Hone-style Atk+6 grant raises in-combat Atk, not just the stat screen."""
+    attacker = make_unit("A", spd=30)
+    attacker.c_slot = hone_atk(6)
+    defender = make_unit("D", hp=100, atk=25)
+
+    engine = CombatEngine(attacker, defender)
+    result = engine.simulate()
+
+    assert engine.combatant_states["attacker"].combat_stats.atk == 46
+    # 2 x (46 - 20)
+    assert damage_dealt(result) == 52
+
+
+def test_bonus_neut_still_strips_a_granted_buff():
+    """BONUS_NEUT on the foe neutralizes the grant like any other visible buff."""
+    attacker = make_unit("A", spd=30)
+    attacker.c_slot = hone_atk(6)
+    defender = make_unit("D", hp=100, atk=25)
+    defender.active_statuses.append(status("Neut", [{
+        "effect": "BONUS_NEUT", "target": "self", "params": {}, "conditions": [],
+    }]))
+
+    result = CombatEngine(attacker, defender).simulate()
+
+    # 2 x (40 - 20)
+    assert damage_dealt(result) == 40
