@@ -913,16 +913,22 @@ class CombatEngine:
         if atk_predmg > 0:
             atk_state.current_hp = max(1, atk_state.current_hp - atk_predmg)
 
-        # Process Pre-Combat Heal
-        atk_preheal = sum(
-            self._resolve_formula(e.params, atk_state, def_state)
-            for e in atk_state.effects_pre_combat
-            if e.type == EffectType.PRE_CBT_HEAL
+        # Pre-combat heals don't stack: only the highest source applies.
+        atk_preheal = max(
+            (
+                self._resolve_formula(e.params, atk_state, def_state)
+                for e in atk_state.effects_pre_combat
+                if e.type == EffectType.PRE_CBT_HEAL
+            ),
+            default=0,
         )
-        def_preheal = sum(
-            self._resolve_formula(e.params, def_state, atk_state)
-            for e in def_state.effects_pre_combat
-            if e.type == EffectType.PRE_CBT_HEAL
+        def_preheal = max(
+            (
+                self._resolve_formula(e.params, def_state, atk_state)
+                for e in def_state.effects_pre_combat
+                if e.type == EffectType.PRE_CBT_HEAL
+            ),
+            default=0,
         )
 
         self._apply_healing("attacker", atk_preheal, phase="in_combat")
