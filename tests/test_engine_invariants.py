@@ -88,7 +88,7 @@ def loaded_matchup():
         "conditions": [],
     }]))
     vein = DivineVein(name="Flame", effects=[{
-        "effect": "PRE_CBT_DAMAGE", "target": "foe",
+        "effect": "BURN_DAMAGE", "target": "foe",
         "params": {"flat": 7}, "conditions": [],
     }])
     return attacker, defender, vein

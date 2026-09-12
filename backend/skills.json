@@ -127,7 +127,7 @@
             "type": "cbt_stat_check",
             "params": {
               "stat": "defense",
-              "margin": -5,
+              "margin": 1,
               "comparison": "greater_or_equal"
             }
           }
@@ -145,8 +145,23 @@
             "type": "cbt_stat_check",
             "params": {
               "stat": "defense",
-              "margin": -5,
+              "margin": 1,
               "comparison": "lesser_than"
+            }
+          }
+        ]
+      },
+      {
+        "effect": "BURN_HEAL",
+        "target": "self",
+        "params": {},
+        "conditions": [
+          {
+            "type": "cbt_stat_check",
+            "params": {
+              "stat": "defense",
+              "margin": 1,
+              "comparison": "greater_or_equal"
             }
           }
         ]

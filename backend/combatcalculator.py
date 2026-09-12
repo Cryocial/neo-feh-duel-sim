@@ -1004,46 +1004,54 @@ class CombatEngine:
             self._process_strike(strike)
 
     def _resolve_pre_combat(self):
-        """Processes PRE_CBT_DAMAGE and PRE_CBT_HEAL."""
+        """Processes BURN_DAMAGE, PRE_CBT_HEAL and BURN_HEAL.
+
+        Burn damage and AoE damage are distinct: burn lands here, after every
+        condition pass, so it never moves an HP check, while AoE damage
+        (TRIGGER_AOE) landed back in _resolve_aoe, before the start-of-combat
+        snapshot, and does. That is why BURN_HEAL refunds only what this phase
+        took.
+        """
         atk_state = self.combatant_states["attacker"]
         def_state = self.combatant_states["defender"]
-
-        atk_predmg = sum(
-            self._resolve_formula(e.params, atk_state, def_state)
-            for e in atk_state.effects_pre_combat
-            if e.type == EffectType.PRE_CBT_DAMAGE
-        )
-        def_predmg = sum(
-            self._resolve_formula(e.params, def_state, atk_state)
-            for e in def_state.effects_pre_combat
-            if e.type == EffectType.PRE_CBT_DAMAGE
+        sides = (
+            ("attacker", atk_state, def_state),
+            ("defender", def_state, atk_state),
         )
 
-        if def_predmg > 0:
-            def_state.current_hp = max(1, def_state.current_hp - def_predmg)
-        if atk_predmg > 0:
-            atk_state.current_hp = max(1, atk_state.current_hp - atk_predmg)
+        # Both sums resolve before either lands, so neither sees the other's damage.
+        burn = {
+            role: sum(
+                self._resolve_formula(e.params, state, foe)
+                for e in state.effects_pre_combat
+                if e.type == EffectType.BURN_DAMAGE
+            )
+            for role, state, foe in sides
+        }
+        taken = {}
+        for role, state, _ in sides:
+            before = state.current_hp
+            if burn[role] > 0:
+                state.current_hp = max(1, state.current_hp - burn[role])
+            taken[role] = before - state.current_hp
 
-        # Pre-combat heals don't stack: only the highest source applies.
-        atk_preheal = max(
-            (
-                self._resolve_formula(e.params, atk_state, def_state)
-                for e in atk_state.effects_pre_combat
-                if e.type == EffectType.PRE_CBT_HEAL
-            ),
-            default=0,
-        )
-        def_preheal = max(
-            (
-                self._resolve_formula(e.params, def_state, atk_state)
-                for e in def_state.effects_pre_combat
-                if e.type == EffectType.PRE_CBT_HEAL
-            ),
-            default=0,
-        )
-
-        self._apply_healing("attacker", atk_preheal, phase="in_combat")
-        self._apply_healing("defender", def_preheal, phase="in_combat")
+        for role, state, foe in sides:
+            # Pre-combat heals don't stack: only the highest source applies...
+            heal = max(
+                (
+                    self._resolve_formula(e.params, state, foe)
+                    for e in state.effects_pre_combat
+                    if e.type == EffectType.PRE_CBT_HEAL
+                ),
+                default=0,
+            )
+            # ...but BURN_HEAL refunds the HP burn actually cost, on top of
+            # whichever heal won, and never more than was lost.
+            if taken[role] and any(
+                e.type == EffectType.BURN_HEAL for e in state.effects_pre_combat
+            ):
+                heal += taken[role]
+            self._apply_healing(role, heal, phase="in_combat")
 
     def _apply_twin_effects(self):
         """Apply twin effect if needed.

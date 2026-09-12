@@ -45,8 +45,9 @@ EFFECT_LIST_MAP: dict[EffectType, str] = {
     EffectType.GRANT_STATUS: "effects_start_of_turn",
     EffectType.GRANT_GREAT_TALENT: "effects_start_of_turn",
     # ── Pre-combat ───────────────────────────────────────────────────────
-    EffectType.PRE_CBT_DAMAGE: "effects_pre_combat",
+    EffectType.BURN_DAMAGE: "effects_pre_combat",
     EffectType.PRE_CBT_HEAL: "effects_pre_combat",
+    EffectType.BURN_HEAL: "effects_pre_combat",
     # ── On-strike ────────────────────────────────────────────────────────
     EffectType.TWIN: "effects_pre_combat",
     EffectType.DR_PIERCE: "effects_on_strike",

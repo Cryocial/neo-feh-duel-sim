@@ -5,7 +5,7 @@ In combat (PRE_CBT_HEAL, HEAL_STRIKE) DEEP_WOUNDS_IN_CBT blocks all healing,
 NEUT_DEEP_WOUNDS_IN_CBT switches that off, and REDUCE_DEEP_WOUNDS_IN_CBT lets a
 percentage through, rounded up. After combat the same three exist as
 *_POST_CBT and gate HEAL_POST_CBT. DAMAGE_POST_CBT sits on the unit that takes
-the damage, like PRE_CBT_DAMAGE, and floors at 1 HP.
+the damage, like BURN_DAMAGE, and floors at 1 HP.
 
 Setup: one strike each. The 40 Atk attacker deals 20 to the 20 Def foe; the
 25 Atk foe counters the 20 Def attacker for 5.

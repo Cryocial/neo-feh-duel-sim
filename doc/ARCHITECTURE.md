@@ -447,7 +447,7 @@ class CombatantState:
 
 `effects_strike_sequence` : for effects used to determine the strike sequence, for example effects of type `EffectType.FLASH`, `EffectType.GFU`, `EffectType.POTENT`, `EffectType.BRAVE`, `EffectType.VANTAGE`, `EffectType.DESPERATION_NEUT`, etc.
 
-`effects_pre_combat` : for pre-combat damage and healing effects, i.e. of type `EffectType.PRE_CBT_DAMAGE`, `EffectType.PRE_CBT_HEAL`.
+`effects_pre_combat` : for burn damage and start-of-combat healing, i.e. of type `EffectType.BURN_DAMAGE`, `EffectType.PRE_CBT_HEAL`, `EffectType.BURN_HEAL`.
 
 `effects_on_strike` : for per-strike effects, for example effects of type `EffectType.FLAT_DR_STRIKE`, `EffectType.PERC_DR_STRIKE`, `EffectType.FLAT_DAMAGE_STRIKE`, `EffectType.PULSE_STRIKE`, `EffectType.SCOWL_STRIKE`, `EffectType.HEAL_STRIKE`, `EffectType.OFF_BREATH`, `EffectType.GUARD_NEUT`, etc.
 
@@ -827,8 +827,9 @@ Processed by `_initialize` before combat begins. These grant visible stats and s
 
 | Effect | FEH accurate Description | Details | `params`|
 |---|---|---|---|
-| `PRE_CBT_DAMAGE` | Deals damage to unit as combat begins | **Applied to unit**. Sources add up, and HP is floored at 1. | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
+| `BURN_DAMAGE` | Deals damage to unit as combat begins | **Applied to unit**. Sources add up, and HP is floored at 1. Distinct from AoE damage (`TRIGGER_AOE`): burn lands after every condition pass, so it never moves an HP check, while AoE lands before the start-of-combat snapshot and does. | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
 | `PRE_CBT_HEAL` | Restores HP to unit as combat begins | **Applied to unit**. Only the largest source applies, the heal caps at max HP. | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
+| `BURN_HEAL` | Also restores HP equal to any damage dealt to unit as combat began | **Applied to unit**. Presence flag: refunds the HP `BURN_DAMAGE` actually cost this phase — never more, so burn floored at 1 HP refunds only what was lost. Added on top of whichever `PRE_CBT_HEAL` won rather than competing with it, and refunds burn only, never AoE damage (that landed earlier, in `_resolve_aoe`). | `{}` |
 
 #### `effects_on_strike`
 
@@ -871,7 +872,7 @@ Processed by `_initialize` before combat begins. These grant visible stats and s
 |---|---|---|---|
 | `HEAL_POST_CBT` | Restores X HP to unit after combat | **Applied to unit**. Sources add up, the heal goes through the post-combat \[Deep Wounds] check and caps at max HP. Like every after-combat effect it needs the unit alive, and an effect whose source died never fires. | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
 | `GRANT_GREAT_TALENT_POST_CBT` | Grants Great Talent+X to unit's stats after combat, up to a cap | **Granted to unit** once the fight is over, so it never affects this combat; it shows up in the `*_great_talent` result. Same per-stat cap rule as `GRANT_GREAT_TALENT`. | `{ stats: { atk: int, spd: int, defense: int, res: int }, max: int }` |
-| `DAMAGE_POST_CBT` | After combat, deals X damage to unit | **Applied to unit**: sits on the unit that takes the damage, so a Savage Blow-style skill uses `target: "foe"`, like `PRE_CBT_DAMAGE`. Sources add up; floors at 1 HP. | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
+| `DAMAGE_POST_CBT` | After combat, deals X damage to unit | **Applied to unit**: sits on the unit that takes the damage, so a Savage Blow-style skill uses `target: "foe"`, the same way `BURN_DAMAGE` does. Sources add up; floors at 1 HP. | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
 | `DEEP_WOUNDS_POST_CBT` | Unit cannot be healed after combat | **Applied to unit**. Blocks post-combat healing only; `DEEP_WOUNDS_IN_CBT` is checked on its own list and neither gates the other. | `{}` |
 | `NEUT_DEEP_WOUNDS_POST_CBT` | Neutralizes effects that prevent unit from healing after combat | **Applied to unit**. Presence flag, lifts the post-combat block entirely. | `{}` |
 | `REDUCE_DEEP_WOUNDS_POST_CBT` | Reduces effects that prevent unit from healing after combat by X% | **Applied to unit**. Lets a % of healing through, stacks multiplicatively, rounds UP. Without it, post-combat healing stays fully blocked. | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
