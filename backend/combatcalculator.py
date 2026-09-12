@@ -1069,7 +1069,10 @@ class CombatEngine:
         """
         for state in self.combatant_states.values():
             for effect in state.effects_pre_combat:
-                if effect.type != EffectType.SPECIAL_TRIGGER_NEUT:
+                # The AoE-time call can see conditions that only resolve later;
+                # those effects are skipped here and picked up by the call
+                # before the strike loop, once every pass has run.
+                if effect.type != EffectType.SPECIAL_TRIGGER_NEUT or effect.conditions:
                     continue
                 state.special_denied = (
                     state.special_denied
@@ -1580,27 +1583,36 @@ class CombatEngine:
 # ── After combat ─────────────────────────────────────────────────────────────
  
     def _resolve_after_combat(self):
-        """Processes effects_after_combat: post-combat healing/damage."""
+        """Processes effects_after_combat: post-combat healing, damage and
+        Great Talent. A unit that died gets nothing, and an effect whose
+        source died (a foe's Savage Blow) never fires."""
         for role, foe_role in (("attacker", "defender"), ("defender", "attacker")):
             state = self.combatant_states[role]
             foe_state = self.combatant_states[foe_role]
+            if state.current_hp <= 0:
+                continue
+
+            def live(effect):
+                return foe_state.current_hp > 0 or effect.applied_by not in ("foe", "enemy")
+
+            effects = [e for e in state.effects_after_combat if live(e)]
 
             heal = sum(
                 self._resolve_formula(e.params, state, foe_state)
-                for e in state.effects_after_combat
+                for e in effects
                 if e.type == EffectType.HEAL_POST_CBT
             )
             self._apply_healing(role, heal, phase="post_combat")
 
             dmg = sum(
                 self._resolve_formula(e.params, state, foe_state)
-                for e in state.effects_after_combat
+                for e in effects
                 if e.type == EffectType.DAMAGE_POST_CBT
             )
             if dmg > 0:
-                foe_state.current_hp = max(1, foe_state.current_hp - dmg)
+                state.current_hp = max(1, state.current_hp - dmg)
 
-            for e in state.effects_after_combat:
+            for e in effects:
                 if e.type == EffectType.GRANT_GREAT_TALENT_POST_CBT:
                     self._grant_great_talent(state, e.params)
 

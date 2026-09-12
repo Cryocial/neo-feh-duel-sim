@@ -118,6 +118,17 @@ def test_simulate_is_repeatable_and_leaves_units_untouched():
       "params": {"flat": 1, "strike": "on_foe_special"}}, "unknown strike"),
     ({"effect": "FLAT_DAMAGE_STRIKE", "target": "self",
       "params": {"formula": "bonus_count_plus_4"}}, "unknown formula"),
+    # Combat stats are computed right after the post_aoe pass: a stat boost
+    # can't wait for a post_combat_stats comparison.
+    ({"effect": "STAT_BOOST", "target": "self", "params": {"stats": ["atk"], "flat": 6},
+      "conditions": [{"type": "cbt_stat_check", "params": {}}]}, "cannot be gated"),
+    # ...even buried inside a composite.
+    ({"effect": "STAT_BOOST", "target": "self", "params": {"stats": ["atk"], "flat": 6},
+      "conditions": [{"any_of": [{"type": "unit_initiates"}, {"type": "triggers_brave"}]}]},
+     "cannot be gated"),
+    # RANGE_EXTENSION is read right after the static pass.
+    ({"effect": "RANGE_EXTENSION", "target": "self", "params": {"min": 2, "max": 2},
+      "conditions": [{"type": "hp_below_pct", "params": {"threshold": 50}}]}, "cannot be gated"),
 ])
 def test_build_effect_rejects_malformed_descriptions(desc, message):
     with pytest.raises(ValueError, match=message):

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Literal
 from .constants import COMBAT_STATS, Color, EffectType, STRIKE_VALUES, FORMULA_NAMES
-from .conditions import Condition, build_conditions
+from .conditions import CONDITION_REGISTRY, Condition, build_conditions
 
 EFFECT_LIST_MAP: dict[EffectType, str] = {
     # ── AoE ──────────────────────────────────────────────────────────────
@@ -116,6 +116,44 @@ REQUIRED_PARAMS: dict[EffectType, frozenset[str]] = {
     EffectType.GRANT_GREAT_TALENT_POST_CBT: frozenset({"stats"}),
 }
 
+TIMING_ORDER = ("static", "post_aoe", "post_combat_stats", "post_strike_sequence")
+
+# The last condition pass that runs before each list is consumed. A condition
+# with a later timing would still be pending when the effect is applied, and
+# the engine has no way to honour it then, so such effects are rejected at load.
+LATEST_TIMING_BY_LIST: dict[str, str] = {
+    "effects_start_of_turn": "static",
+    "effects_AoE": "static",
+    "effects_combat_stats": "post_aoe",
+    "effects_strike_sequence": "post_combat_stats",
+    "effects_pre_combat": "post_strike_sequence",
+    "effects_on_strike": "post_strike_sequence",
+    "effects_after_combat": "post_strike_sequence",
+}
+
+# Effects read earlier than the rest of their list.
+LATEST_TIMING_OVERRIDES: dict[EffectType, str] = {
+    EffectType.RANGE_EXTENSION: "static",   # _range_calculation, right after the static pass
+    EffectType.NEUT_HEXBLADE: "static",     # also read by _resolve_aoe
+}
+
+
+def latest_condition_timing(effect_type: EffectType) -> str:
+    return LATEST_TIMING_OVERRIDES.get(
+        effect_type, LATEST_TIMING_BY_LIST[EFFECT_LIST_MAP[effect_type]]
+    )
+
+
+def _condition_timings(conditions: list[dict]):
+    for cond in conditions:
+        if "any_of" in cond:
+            yield from _condition_timings(cond["any_of"])
+        elif "all_of" in cond:
+            yield from _condition_timings(cond["all_of"])
+        elif cond.get("type") in CONDITION_REGISTRY:
+            yield CONDITION_REGISTRY[cond["type"]][0]
+
+
 # One effect per phase Great Talent can be granted in; a new way of granting it
 # is a new member here, a list-map entry, and one call to _grant_great_talent.
 GREAT_TALENT_TYPES = frozenset({
@@ -133,6 +171,17 @@ def validate_effect_desc(desc: dict) -> list[str]:
         return [f"unknown effect type {desc.get('effect')!r}"]
     if effect_type not in EFFECT_LIST_MAP:
         problems.append(f"{effect_type.value} has no EFFECT_LIST_MAP entry")
+    else:
+        limit = latest_condition_timing(effect_type)
+        too_late = sorted({
+            t for t in _condition_timings(desc.get("conditions", []))
+            if TIMING_ORDER.index(t) > TIMING_ORDER.index(limit)
+        })
+        if too_late:
+            problems.append(
+                f"{effect_type.value} is applied right after the {limit!r} pass, "
+                f"so it cannot be gated on {too_late} conditions"
+            )
     if desc.get("target") not in ("self", "foe"):
         problems.append(f"target must be 'self' or 'foe', got {desc.get('target')!r}")
     params = desc.get("params", {})
