@@ -1,5 +1,5 @@
 """
-Regression tests for engine bugs found in the 2026-09 audit. Each test pins
+Regression tests for engine bugs. Each test pins
 one bug that the rest of the suite did not cover:
 
   - HP% conditions read a stale start_of_combat_hp (and leaked it between
