@@ -5,14 +5,14 @@ _apply_grant + the visible_stat accessor + _compute_counts).
 The headline scenario is Ploy: at start of turn, if the unit's visible Res
 beats the foe's, inflict a visible stat penalty on the foe. This exercises the
 whole chain:
-  - GRANT_VISIBLE_STAT effect with target "foe"
+  - INFLICT_VISIBLE_DEBUFF effect with target "foe"
   - a visible_stat_check condition gating it
   - the grant landing in the foe's granted_visible_debuffs (per-combat)
   - CombatantState.visible_stat() reflecting the debuff
   - _compute_counts tallying it as a penalty on the foe
 
 Requires (must be present in source):
-  - EffectType.GRANT_VISIBLE_STAT
+  - EffectType.GRANT_VISIBLE_BUFF / EffectType.INFLICT_VISIBLE_DEBUFF
   - "visible_stat_check" condition registered under the "start_of_turn" phase
   - _apply_grant / _initialize wired into simulate()
 """
@@ -46,9 +46,9 @@ def atk_ploy_skill():
         visible_stats=StatBlock(),
         effects=[
             {
-                "effect": "GRANT_VISIBLE_STAT",
+                "effect": "INFLICT_VISIBLE_DEBUFF",
                 "target": "foe",
-                "params": {"stats": {"atk": -5}},
+                "params": {"stats": {"atk": 5}},
                 "conditions": [
                     {
                         "type": "visible_stat_check",
@@ -143,7 +143,7 @@ def test_self_visible_grant():
         visible_stats=StatBlock(),
         effects=[
             {
-                "effect": "GRANT_VISIBLE_STAT",
+                "effect": "GRANT_VISIBLE_BUFF",
                 "target": "self",
                 "params": {"stats": {"atk": 6, "spd": 6}},
                 "conditions": [],

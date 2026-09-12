@@ -1,6 +1,18 @@
 from dataclasses import dataclass, replace
 from typing import Literal
-from .constants import MovementType, WeaponType, Color, SpecialType
+from .constants import (
+    COMBAT_STATS,
+    VISIBLE_STAT_CAP,
+    Color,
+    MovementType,
+    SpecialType,
+    WeaponType,
+)
+
+
+def cap_visible_stat(name: str, value: int) -> int:
+    """Visible Atk/Spd/Def/Res never display above VISIBLE_STAT_CAP."""
+    return min(VISIBLE_STAT_CAP, value) if name in COMBAT_STATS else value
 
 
 @dataclass(frozen=True)
@@ -104,6 +116,7 @@ class Unit:
         res: int,
         dragonflower: int = 0,
         merges: int = 0,
+        great_talent: dict[str, int] | None = None,
         engage_ring_level: int = 0,
         superboon: list[str] | None = None,
         superbane: list[str] | None = None,
@@ -128,6 +141,10 @@ class Unit:
         )
         self.base_stats = StatBlock(hp, atk, spd, defense, res)
         self.dragonflower, self.merges = dragonflower, merges
+        # Accumulated over the game, entered per stat like dragonflowers. A
+        # permanent stat layer, not a bonus: nothing that neutralizes bonuses
+        # can see it.
+        self.great_talent = StatBlock.from_dict(great_talent or {})
         self.engage_ring_level = engage_ring_level
         self.is_engaged = is_engaged
         self.boon, self.bane, self.floret = boon, bane, floret
@@ -284,8 +301,18 @@ class Unit:
     def get_visible_stat(
         self, name: str, ignore_buffs: bool = False, ignore_debuffs: bool = False
     ) -> int:
-        """Calculates the 'stat-screen' value including buffs, debuffs, and visible skill stats."""
-        val = getattr(self.base_stats, name)
+        """The stat-screen value: base + Great Talent + skill stats, plus visible
+        buffs and debuffs, capped at VISIBLE_STAT_CAP."""
+        return cap_visible_stat(
+            name, self.visible_stat_uncapped(name, ignore_buffs, ignore_debuffs)
+        )
+
+    def visible_stat_uncapped(
+        self, name: str, ignore_buffs: bool = False, ignore_debuffs: bool = False
+    ) -> int:
+        """get_visible_stat before the cap, so per-combat layers can be added
+        on top and capped once."""
+        val = getattr(self.base_stats, name) + getattr(self.great_talent, name)
         if not ignore_buffs:
             val += getattr(self.visible_buffs, name)
         if not ignore_debuffs:

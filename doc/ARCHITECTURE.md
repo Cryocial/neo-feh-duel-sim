@@ -386,6 +386,7 @@ class Unit:
     base_stats:       StatBlock
     dragonflower:     int
     merges:           int
+    great_talent:     StatBlock   # accumulated over the game, entered per stat like dragonflowers
     boon:             str | None
     bane:             str | None
     floret:           str | None
@@ -437,7 +438,7 @@ class CombatantState:
     effects_on_strike:       list[Effect] = field(default_factory=list)
     effects_after_combat:    list[Effect] = field(default_factory=list)
 ```
-`effects_start_of_turn` : for effects that grant visible stats or statuses at the start of the turn, i.e. of type `EffectType.GRANT_VISIBLE_STAT` and `EffectType.GRANT_STATUS`.
+`effects_start_of_turn` : for effects that grant visible stats or statuses at the start of the turn, i.e. of type `EffectType.GRANT_VISIBLE_BUFF`, `EffectType.INFLICT_VISIBLE_DEBUFF` and `EffectType.GRANT_STATUS`.
 `effects_AoE` : for effects related to AoE, for example effects of type `EffectType.TRIGGER_AOE`, `EffectType.HEXBLADE_AOE`, `EffectType.PULSE_AOE`, `EffectType.FLAT_DR_AOE`, etc.
 
 `effects_combat_stats` : for effects that impact in-combat stats, i.e. of type `EffectType.STAT_BOOST` and `EffectType.STAT_DAUNT`.
@@ -667,7 +668,7 @@ At startup, three JSON files are parsed to build the in-memory databases.
 
 **Conditions**: conditions are not compiled when `Skill` and `Status` objects are loaded. They are compiled into `AtomicCondition` objects (with `timing` and `func`) when `Effect` instances are created at the start of each simulation. At that point, `CONDITION_REGISTRY` provides both the timing and the function to produce `func`.
 
-**Validation**: `build_effect` checks each raw effect dict as it is compiled. The `effect` name must be an `EffectType` with an `EFFECT_LIST_MAP` entry, `target` must be `"self"` or `"foe"`, the keys listed for that type in `REQUIRED_PARAMS` (`effects.py`) must be present, and any `strike` / `formula` value must appear in `STRIKE_VALUES` / `FORMULA_NAMES` (`constants.py`) — except where `EXTRA_STRIKE_VALUES` (`effects.py`) allows an effect to overload `strike` as a mode flag, currently only `MIRACLE`'s `on_unit_special`. A malformed entry raises a `ValueError` naming the effect rather than silently doing nothing. `tests/test_data_integrity.py` runs the same checks over every entry of every JSON file, so a broken skill fails CI before it is ever equipped.
+**Validation**: `build_effect` checks each raw effect dict as it is compiled. The `effect` name must be an `EffectType` with an `EFFECT_LIST_MAP` entry, `target` must be `"self"` or `"foe"`, the keys listed for that type in `REQUIRED_PARAMS` (`effects.py`) must be present, and any `strike` / `formula` value must appear in `STRIKE_VALUES` / `FORMULA_NAMES` (`constants.py`; `STRIKE_VALUES` is derived from the `StrikeMatch` enum that `_strike_matches` switches on). A malformed entry raises a `ValueError` naming the effect rather than silently doing nothing. `tests/test_data_integrity.py` runs the same checks over every entry of every JSON file, so a broken skill fails CI before it is ever equipped.
 
 ---
 
@@ -762,12 +763,16 @@ step that consumes it reads it.
 ---
 #### `effects_start_of_turn`
 
-Processed by `_initialize` before combat begins. These grant visible stats and statuses to a unit (or foe) at the start of the turn. Grants are written per-combat onto the `CombatantState` (`granted_visible_buffs` / `granted_visible_debuffs` / `granted_statuses`), never mutating the `Unit`, so repeated simulations stay isolated. Evaluated in two passes: unconditional grants first, then conditional grants (e.g. Ploy) so their conditions see the results of the earlier grants.
+Processed by `_initialize` before combat begins. These grant visible stats and statuses to a unit (or foe) at the start of the turn. Grants are written per-combat onto the `CombatantState` (`granted_visible_buffs` / `granted_visible_debuffs` / `granted_great_talent` / `granted_statuses`), never mutating the `Unit`, so repeated simulations stay isolated.
+
+**Visible stats and the 99 cap.** A visible stat is `base + Great Talent + skill stats ± visible buffs/debuffs (unit's and granted)`, and Atk/Spd/Def/Res never display above `VISIBLE_STAT_CAP` (99). The cap is applied once, on that final sum, which gives the in-game behaviour for free: a buff that would push past 99 is "useless" for the stat but still exists as a bonus value (so Bonus Doubler-type effects still read it), and a Lull only removes the part of a buff actually in use — a unit at 99 before bonuses loses nothing, one at 96 with +6 drops to 96. Debuffs work the same way: 99 with +6/−5 shows 99, not 94, and Neutralize Penalties (`PENALTY_NEUT`) only gives back the part of a debuff that was actually lowering the stat, so that unit gains nothing from it. Raw buff and debuff values stay readable for Doubler-type effects (Bonus Doubler, Penalty Doubler / Sabotage), which read the bonus itself rather than its effect on the stat. HP is not capped in the engine (the game caps it at 99 too) so test fixtures can use large round numbers. Great Talent is a permanent stat layer, not a bonus, so nothing that neutralizes bonuses can touch it. `simulate()` returns each side's Great Talent total after the fight (`attacker_great_talent` / `defender_great_talent`), which is the value to carry into the next combat. Evaluated in two passes: unconditional grants first, then conditional grants (e.g. Ploy) so their conditions see the results of the earlier grants.
 
 | Effect | FEH accurate Description | Details | `params`|
 |---|---|---|---|
-| `GRANT_VISIBLE_STAT` | Grants visible stats to unit at start of turn | **Granted/inflicted to unit**, even if it is a debuff. Positive values become visible buffs, negative values become visible debuffs. Feeds `CombatantState.visible_stat()` and the bonus/penalty counts. (only the stats being changed need be listed) | `{ stats: { atk: int, spd: int, defense: int, res: int } }` |
+| `GRANT_VISIBLE_BUFF` | Grants visible stat bonuses to unit at start of turn | **Granted to unit**. Magnitudes (must be ≥ 0; a negative value fails at load) added to that unit's `granted_visible_buffs`. Feeds `CombatantState.visible_stat()` and the bonus count. Only the stats being changed need be listed. | `{ stats: { atk: int, spd: int, defense: int, res: int } }` |
+| `INFLICT_VISIBLE_DEBUFF` | Inflicts visible stat penalties on unit at start of turn | **Inflicted on unit**. Magnitudes (must be ≥ 0) added to that unit's `granted_visible_debuffs`. Feeds `CombatantState.visible_stat()` and the penalty count. A Ploy is `target: "foe"` with this effect. | `{ stats: { atk: int, spd: int, defense: int, res: int } }` |
 | `GRANT_STATUS` | Grants a named status to unit at start of turn | **Granted/inflicted to unit**, even if it is a penalty. Status looked up by name in `BONUS_DATABASE` / `PENALTY_DATABASE` and appended to `granted_statuses`. Skipped if the target already has a status of that name (in `active_statuses` or `granted_statuses`), so statuses aren't duplicated. Ignored if status name isn't found in the databases .| `{ status: str }` |
+| `GRANT_GREAT_TALENT` | Grants Great Talent+X to unit's stats at start of turn, up to a cap | **Granted to unit**, before this combat's stats are read. Each listed stat is raised separately toward `max`: never lowered, never pushed past `max` by this effect, so a unit already above it from a more generous source is left alone. No `max` = uncapped. Stats must be among Atk/Spd/Def/Res. Grants that happen outside combat (Instruct-style assists) are entered directly in `Unit.great_talent`. | `{ stats: { atk: int, spd: int, defense: int, res: int }, max: int }` |
 
 #### `effects_AoE`
 
@@ -851,14 +856,15 @@ Processed by `_initialize` before combat begins. These grant visible stats and s
 | `TRIANGLE_ADEPT` | If unit has weapon-triangle advantage, boosts Atk by 20% through its next action, and if unit has weapon-triangle disadvantage, reduces Atk by20% through its next action | **Applied to unit**, though read from either combatant's list. Amplifies an existing Weapon Triangle advantage to a larger magnitude. Never creates advantage where none exists. Highest source wins; empty `params` default to 40%. | `{ flat: int }` |
 | `CANCEL_AFFINITY` | If unit has weapon-triangle disadvantage, reverses weapon-triangle advantage granted by foe's skills | **Applied to unit**, though read from either combatant's list. Reverts the Weapon Triangle to its base ±20%. Presence flag. | `{}` |
 | `STAFF_FULL_DAMAGE` | Calculates damage from staff like other weapons | **Applied to unit**. Presence flag, read from the striker's own list in `_staff_full_damage`. | `{}` |
-| `MIRACLE` | If unit's HP > 1 and foe would reduce unit's HP to 0 during combat, unit survives with 1 HP | **Applied to unit**. `strike: "on_unit_special"` = special miracle: needs the special ready, unbypassable. Otherwise skill miracle: once per combat (`miracle_used`), bypassed by `FATAL_SMOKE` on the striker. | `{ strike, piercable }` |
-| `FATAL_SMOKE` | Neutralizes foe's non-Special "If unit's HP > 1 and foe would reduce unit's HP to 0 during combat, unit survives with 1 HP" effects | **Applied to foe**. Held by the striking unit. Affects skill miracle only, not special miracle. Presence flag. | `{}` |
+| `MIRACLE` | If unit's HP > 1 and foe would reduce unit's HP to 0 during combat, unit survives with 1 HP | **Applied to unit**. `special: true` = Special-grade miracle: needs the Special ready, cannot be neutralized. Otherwise skill miracle: once per combat (`miracle_used`), neutralized by `MIRACLE_NEUT` on the striker. | `{ special: bool }` |
+| `MIRACLE_NEUT` | Neutralizes foe's non-Special "If unit's HP > 1 and foe would reduce unit's HP to 0 during combat, unit survives with 1 HP" effects (Fatal Smoke) | **Applied to foe**. Held by the striking unit. Affects skill miracle only, not special miracle. Presence flag. | `{}` |
 
 #### `effects_after_combat`
 
 | Effect | FEH accurate Description | Details | `params`|
 |---|---|---|---|
 | `HEAL_POST_CBT` | Restores X HP to unit after combat | **Applied to unit**. Sources add up, the heal goes through the post-combat \[Deep Wounds] check and caps at max HP. | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
+| `GRANT_GREAT_TALENT_POST_CBT` | Grants Great Talent+X to unit's stats after combat, up to a cap | **Granted to unit** once the fight is over, so it never affects this combat; it shows up in the `*_great_talent` result. Same per-stat cap rule as `GRANT_GREAT_TALENT`. | `{ stats: { atk: int, spd: int, defense: int, res: int }, max: int }` |
 | `DAMAGE_POST_CBT` | After combat, deals X damage to unit | **Applied to unit**. | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
 | `DEEP_WOUNDS_POST_CBT` | Unit cannot be healed after combat | **Applied to unit**. Blocks post-combat healing only; `DEEP_WOUNDS_IN_CBT` is checked on its own list and neither gates the other. | `{}` |
 | `NEUT_DEEP_WOUNDS_POST_CBT` | Neutralizes effects that prevent unit from healing after combat | **Applied to unit**. Presence flag, lifts the post-combat block entirely. | `{}` |

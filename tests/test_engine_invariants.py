@@ -71,7 +71,7 @@ def loaded_matchup():
     }], cooldown=2, special_type=SpecialType.AOE)
     attacker.pre_charge = 2
     attacker.c_slot = _skill("Hone", "c", [{
-        "effect": "GRANT_VISIBLE_STAT", "target": "self",
+        "effect": "GRANT_VISIBLE_BUFF", "target": "self",
         "params": {"stats": {"atk": 6}}, "conditions": [],
     }])
     attacker.a_slot = _skill("Brash", "a", [{

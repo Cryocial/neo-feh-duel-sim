@@ -23,7 +23,6 @@ THIS_FILE = Path(__file__).resolve()
 UNTESTED_EFFECT_TYPES = frozenset({
     "FLAT_DAMAGE_AOE",
     "PULSE_AOE",
-    "PENALTY_NEUT",
     "PHANTOM_STAT",
     "POTENT",
     "EFFECTIVE",

@@ -190,7 +190,7 @@
       {
         "effects": [
           {
-            "effect": "GRANT_VISIBLE_STAT",
+            "effect": "GRANT_VISIBLE_BUFF",
             "target": "self",
             "params": {
               "stats": {
@@ -205,7 +205,7 @@
       {
         "effects": [
           {
-            "effect": "GRANT_VISIBLE_STAT",
+            "effect": "GRANT_VISIBLE_BUFF",
             "target": "self",
             "params": {
               "stats": {

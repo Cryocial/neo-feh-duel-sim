@@ -2,8 +2,17 @@ import math
 from dataclasses import dataclass, field, replace
 from typing import Literal
 
-from .build import Unit, StatBlock, DivineVein
-from .constants import Color, StrikeType, EffectType, WeaponType, SpecialType, MovementType
+from .build import Unit, StatBlock, DivineVein, cap_visible_stat
+from .constants import (
+    COMBAT_STATS,
+    Color,
+    EffectType,
+    MovementType,
+    SpecialType,
+    StrikeMatch,
+    StrikeType,
+    WeaponType,
+)
 from .effects import Effect, build_effect, EFFECT_LIST_MAP
 from .conditions import Timing, Condition, check_condition
 from .jsonbootupstuff import BONUS_DATABASE, PENALTY_DATABASE
@@ -50,6 +59,7 @@ class CombatantState:
     active_ally_divine_vein: DivineVein | None = None
     granted_visible_buffs: StatBlock = field(default_factory=StatBlock)
     granted_visible_debuffs: StatBlock = field(default_factory=StatBlock)
+    granted_great_talent: StatBlock = field(default_factory=StatBlock)
     effects_start_of_turn: list[Effect] = field(default_factory=list)
     granted_statuses: list = field(default_factory=list)
     effects_AoE: list[Effect] = field(default_factory=list)
@@ -69,14 +79,18 @@ class CombatantState:
         stats during/after start-of-turn must go through here, not
         unit.get_visible_stat directly, or it won't see the grants.
         """
-        base = self.unit.get_visible_stat(
-            name, ignore_buffs=ignore_buffs, ignore_debuffs=ignore_debuffs
-        )
+        value = self.unit.visible_stat_uncapped(name, ignore_buffs, ignore_debuffs)
+        value += getattr(self.granted_great_talent, name)
         if not ignore_buffs:
-            base += getattr(self.granted_visible_buffs, name)
+            value += getattr(self.granted_visible_buffs, name)
         if not ignore_debuffs:
-            base -= getattr(self.granted_visible_debuffs, name)
-        return base
+            value -= getattr(self.granted_visible_debuffs, name)
+        return cap_visible_stat(name, value)
+
+    @property
+    def great_talent_total(self) -> StatBlock:
+        """What the unit brought into this combat plus what it gained here."""
+        return self.unit.great_talent + self.granted_great_talent
 
     def cbt_stat_with_phantom(self, name: str) -> int:
             """Combat stat plus Phantom (Spd/Res/Def) bonuses, for checks that are
@@ -143,6 +157,10 @@ def _owner_and_opponent(effect: Effect, holder: CombatantState, foe: CombatantSt
     if effect.applied_by in ("foe", "enemy"):
         return foe, holder
     return holder, foe
+
+
+def _great_talent_dict(total: StatBlock) -> dict[str, int]:
+    return {stat: getattr(total, stat) for stat in COMBAT_STATS}
 
 
 def _add_to_bucket(state: CombatantState, effect: Effect) -> None:
@@ -244,9 +262,13 @@ class CombatEngine:
 
         self._resolve_after_combat()
 
+        attacker = self.combatant_states["attacker"]
+        defender = self.combatant_states["defender"]
         return {
-            "attacker_final_hp": self.combatant_states["attacker"].current_hp,
-            "defender_final_hp": self.combatant_states["defender"].current_hp,
+            "attacker_final_hp": attacker.current_hp,
+            "defender_final_hp": defender.current_hp,
+            "attacker_great_talent": _great_talent_dict(attacker.great_talent_total),
+            "defender_great_talent": _great_talent_dict(defender.great_talent_total),
         }
 
 # ── Start of turn ────────────────────────────────────────────────────────────
@@ -264,7 +286,12 @@ class CombatEngine:
             foe = self.combatant_states[foe_role]
             for skill in state.unit.equipped_items:
                 for desc in skill.effects:
-                    if desc.get("effect") not in ("GRANT_VISIBLE_STAT", "GRANT_STATUS"):
+                    if desc.get("effect") not in (
+                        "GRANT_VISIBLE_BUFF",
+                        "INFLICT_VISIBLE_DEBUFF",
+                        "GRANT_STATUS",
+                        "GRANT_GREAT_TALENT",
+                    ):
                         continue
                     target = desc["target"]
                     applied_by = "self" if target == "self" else "foe"
@@ -293,27 +320,25 @@ class CombatEngine:
         return True
 
     def _apply_grant(self, effect, target_state):
-        """Applies a single GRANT_* effect to the target's per-combat layers."""
-        if effect.type == EffectType.GRANT_VISIBLE_STAT:
-            stats = effect.params["stats"]
-            buff_updates, debuff_updates = {}, {}
-            for stat, amount in stats.items():
-                if amount >= 0:
-                    buff_updates[stat] = (
-                        getattr(target_state.granted_visible_buffs, stat) + amount
-                    )
-                else:
-                    debuff_updates[stat] = getattr(
-                        target_state.granted_visible_debuffs, stat
-                    ) + abs(amount)
-            if buff_updates:
-                target_state.granted_visible_buffs = replace(
-                    target_state.granted_visible_buffs, **buff_updates
-                )
-            if debuff_updates:
-                target_state.granted_visible_debuffs = replace(
-                    target_state.granted_visible_debuffs, **debuff_updates
-                )
+        """Applies a single start-of-turn effect to the target's per-combat layers."""
+        if effect.type == EffectType.GRANT_VISIBLE_BUFF:
+            target_state.granted_visible_buffs = replace(
+                target_state.granted_visible_buffs,
+                **{
+                    stat: getattr(target_state.granted_visible_buffs, stat) + amount
+                    for stat, amount in effect.params["stats"].items()
+                },
+            )
+        elif effect.type == EffectType.INFLICT_VISIBLE_DEBUFF:
+            target_state.granted_visible_debuffs = replace(
+                target_state.granted_visible_debuffs,
+                **{
+                    stat: getattr(target_state.granted_visible_debuffs, stat) + amount
+                    for stat, amount in effect.params["stats"].items()
+                },
+            )
+        elif effect.type == EffectType.GRANT_GREAT_TALENT:
+            self._grant_great_talent(target_state, effect.params)
         elif effect.type == EffectType.GRANT_STATUS:
             name = effect.params["status"]
             status = BONUS_DATABASE.get(name) or PENALTY_DATABASE.get(name)
@@ -328,6 +353,23 @@ class CombatEngine:
             )
             if not already_have:
                 target_state.granted_statuses.append(status)
+
+    def _grant_great_talent(self, state: CombatantState, params: dict) -> None:
+        """Raises the unit's Great Talent per stat toward the effect's `max`.
+        Never lowers it and never pushes past the cap, so a unit already above
+        this skill's cap (from a more generous source) is left alone. No `max`
+        means uncapped; the visible cap still applies to the stat itself.
+        """
+        cap = params.get("max")
+        total = state.great_talent_total
+        updates = {}
+        for stat, amount in params["stats"].items():
+            have = getattr(total, stat)
+            target = have + amount if cap is None else min(have + amount, cap)
+            if target > have:
+                updates[stat] = getattr(state.granted_great_talent, stat) + (target - have)
+        if updates:
+            state.granted_great_talent = replace(state.granted_great_talent, **updates)
 
     def _compute_counts(self):
         """Tallies bonus_count / penalty_count from final visible buffs/debuffs and
@@ -1198,8 +1240,7 @@ class CombatEngine:
             # Skill miracle is once-per-combat; special miracle is gated by
             # cooldown instead, so only burn the flag for skill miracle.
             special_miracle = any(
-                e.type == EffectType.MIRACLE
-                and e.params.get("strike") == "on_unit_special"
+                e.type == EffectType.MIRACLE and e.params.get("special", False)
                 for e in target_state.effects_on_strike
             )
             if not special_miracle:
@@ -1441,29 +1482,28 @@ class CombatEngine:
         """True if a Miracle lets the target survive this lethal hit at 1 HP.
 
         Distinguished by the MIRACLE effect's params:
-          - Special miracle: strike == "on_unit_special" (requires the target's
-            special charged/ready) and cannot be bypassed by Fatal Smoke.
+          - Special miracle: special == True (requires the target's Special
+            charged/ready) and cannot be neutralized.
           - Skill miracle: otherwise. Once per combat (target_state.miracle_used),
-            and bypassed by FATAL_SMOKE on the attacker.
+            and neutralized by MIRACLE_NEUT (Fatal Smoke) on the attacker.
 
         Only checks; caller sets miracle_used for the skill-miracle case.
         """
         striker_state = self.combatant_states[strike.striker]
         target_state = self.combatant_states[strike.target]
-        fatal_smoke = any(
-            e.type == EffectType.FATAL_SMOKE for e in striker_state.effects_on_strike
+        miracle_neut = any(
+            e.type == EffectType.MIRACLE_NEUT for e in striker_state.effects_on_strike
         )
         for e in target_state.effects_on_strike:
             if e.type != EffectType.MIRACLE:
                 continue
-            is_special = e.params.get("strike") == "on_unit_special"
-            if is_special:
+            if e.params.get("special", False):
                 if target_miracle_triggers:
                     target_state.special_use_count += 1
                     target_state.current_cooldown = target_state.unit.max_cooldown
                     return True
             else:
-                if not target_state.miracle_used and not fatal_smoke:
+                if not target_state.miracle_used and not miracle_neut:
                     return True
         return False
 
@@ -1489,6 +1529,10 @@ class CombatEngine:
             )
             if dmg > 0:
                 foe_state.current_hp = max(1, foe_state.current_hp - dmg)
+
+            for e in state.effects_after_combat:
+                if e.type == EffectType.GRANT_GREAT_TALENT_POST_CBT:
+                    self._grant_great_talent(state, e.params)
 
 # ── Utils ──────────────────────────────────────────────────────────────────
 
@@ -1581,42 +1625,54 @@ class CombatEngine:
         The four flags are absolute: `_ready` means the Special could trigger,
         `_triggers` means it actually does on this strike.
         """
-        strike_value = params.get("strike", "every_strike")
-        match strike_value:
-            case "every_strike":
+        raw = params.get("strike", StrikeMatch.EVERY_STRIKE)
+        try:
+            strike_match = StrikeMatch(raw)
+        except ValueError:
+            raise ValueError(f"Unknown strike value {raw!r} in _strike_matches") from None
+
+        is_first = strike.strike_type is StrikeType.FIRST
+        is_follow_up = strike.strike_type is StrikeType.FOLLOW_UP
+        unit_triggers = striker_special_triggers if role == "striker" else target_special_triggers
+        foe_triggers = target_special_triggers if role == "striker" else striker_special_triggers
+        unit_ready = striker_special_ready if role == "striker" else target_special_ready
+        foe_ready = target_special_ready if role == "striker" else striker_special_ready
+
+        match strike_match:
+            case StrikeMatch.EVERY_STRIKE:
                 return True
-            case "first_strike":
-                return strike.strike_type is StrikeType.FIRST and not strike.brave_second_hit
-            case "first_attack":
-                return strike.strike_type is StrikeType.FIRST
-            case "first_attack_brave":
-                return strike.strike_type is StrikeType.FIRST and strike.brave_second_hit
-            case "first_follow_up":
-                return strike.strike_type is StrikeType.FOLLOW_UP and not strike.brave_second_hit
-            case "follow_up":
-                return strike.strike_type is StrikeType.FOLLOW_UP
-            case "follow_up_brave":
-                return strike.strike_type is StrikeType.FOLLOW_UP and strike.brave_second_hit
-            case "both_first_strikes":
+            case StrikeMatch.FIRST_STRIKE:
+                return is_first and not strike.brave_second_hit
+            case StrikeMatch.FIRST_ATTACK:
+                return is_first
+            case StrikeMatch.FIRST_ATTACK_BRAVE:
+                return is_first and strike.brave_second_hit
+            case StrikeMatch.FIRST_FOLLOW_UP:
+                return is_follow_up and not strike.brave_second_hit
+            case StrikeMatch.FOLLOW_UP:
+                return is_follow_up
+            case StrikeMatch.FOLLOW_UP_BRAVE:
+                return is_follow_up and strike.brave_second_hit
+            case StrikeMatch.BOTH_FIRST_STRIKES:
                 return not strike.brave_second_hit
-            case "both_second_strikes":
+            case StrikeMatch.BOTH_SECOND_STRIKES:
                 return strike.brave_second_hit
-            case "consecutive":
+            case StrikeMatch.CONSECUTIVE:
                 return strike.consecutive
-            case "unit_special_triggers":
-                return (role == "striker" and striker_special_triggers) or (role == "target" and target_special_triggers)
-            case "foe_special_triggers":
-                return (role == "striker" and target_special_triggers) or (role == "target" and striker_special_triggers)
-            case "unit_special_ready":
-                return (role == "striker" and striker_special_ready) or (role == "target" and target_special_ready)
-            case "foe_special_ready":
-                return (role == "striker" and target_special_ready) or (role == "target" and striker_special_ready)
-            case "any_special_ready":
+            case StrikeMatch.UNIT_SPECIAL_TRIGGERS:
+                return unit_triggers
+            case StrikeMatch.FOE_SPECIAL_TRIGGERS:
+                return foe_triggers
+            case StrikeMatch.UNIT_SPECIAL_READY:
+                return unit_ready
+            case StrikeMatch.FOE_SPECIAL_READY:
+                return foe_ready
+            case StrikeMatch.ANY_SPECIAL_READY:
                 return striker_special_ready or target_special_ready
-            case "any_special_ready_or_triggered":
+            case StrikeMatch.ANY_SPECIAL_READY_OR_TRIGGERED:
                 return (
                     striker_special_ready or target_special_ready
                     or striker_special_used or target_special_used
                 )
             case _:
-                raise ValueError(f"Unknown strike value {strike_value!r} in _strike_matches")
+                raise ValueError(f"{strike_match!r} has no rule in _strike_matches")

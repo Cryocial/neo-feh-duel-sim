@@ -101,7 +101,7 @@ def test_simulation_does_not_write_back_to_the_unit():
 
 def hone_atk(amount):
     return skill("Hone", "c", [{
-        "effect": "GRANT_VISIBLE_STAT",
+        "effect": "GRANT_VISIBLE_BUFF",
         "target": "self",
         "params": {"stats": {"atk": amount}},
         "conditions": [],

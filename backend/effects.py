@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import Literal
-from .constants import Color, EffectType, STRIKE_VALUES, FORMULA_NAMES
+from .constants import COMBAT_STATS, Color, EffectType, STRIKE_VALUES, FORMULA_NAMES
 from .conditions import Condition, build_conditions
 
 EFFECT_LIST_MAP: dict[EffectType, str] = {
@@ -36,8 +36,10 @@ EFFECT_LIST_MAP: dict[EffectType, str] = {
     EffectType.OFF_FROZEN: "effects_strike_sequence",
     EffectType.DEF_FROZEN: "effects_strike_sequence",
     # ── Start of turn ────────────────────────────────────────────────────
-    EffectType.GRANT_VISIBLE_STAT: "effects_start_of_turn",
+    EffectType.GRANT_VISIBLE_BUFF: "effects_start_of_turn",
+    EffectType.INFLICT_VISIBLE_DEBUFF: "effects_start_of_turn",
     EffectType.GRANT_STATUS: "effects_start_of_turn",
+    EffectType.GRANT_GREAT_TALENT: "effects_start_of_turn",
     # ── Pre-combat ───────────────────────────────────────────────────────
     EffectType.PRE_CBT_DAMAGE: "effects_pre_combat",
     EffectType.PRE_CBT_HEAL: "effects_pre_combat",
@@ -71,9 +73,10 @@ EFFECT_LIST_MAP: dict[EffectType, str] = {
     EffectType.CANCEL_AFFINITY: "effects_on_strike",
     EffectType.STAFF_FULL_DAMAGE: "effects_on_strike",
     EffectType.MIRACLE: "effects_on_strike",
-    EffectType.FATAL_SMOKE: "effects_on_strike",
+    EffectType.MIRACLE_NEUT: "effects_on_strike",
     # ── Post-combat ──────────────────────────────────────────────────────
     EffectType.HEAL_POST_CBT: "effects_after_combat",
+    EffectType.GRANT_GREAT_TALENT_POST_CBT: "effects_after_combat",
     EffectType.DAMAGE_POST_CBT: "effects_after_combat",
     EffectType.DEEP_WOUNDS_POST_CBT: "effects_after_combat",
     EffectType.NEUT_DEEP_WOUNDS_POST_CBT: "effects_after_combat",
@@ -102,17 +105,19 @@ REQUIRED_PARAMS: dict[EffectType, frozenset[str]] = {
     EffectType.STAT_BOOST: frozenset({"stats"}),
     EffectType.STAT_DAUNT: frozenset({"stats"}),
     EffectType.PHANTOM_STAT: frozenset({"stats"}),
-    EffectType.GRANT_VISIBLE_STAT: frozenset({"stats"}),
+    EffectType.GRANT_VISIBLE_BUFF: frozenset({"stats"}),
+    EffectType.INFLICT_VISIBLE_DEBUFF: frozenset({"stats"}),
     EffectType.GRANT_STATUS: frozenset({"status"}),
+    EffectType.GRANT_GREAT_TALENT: frozenset({"stats"}),
+    EffectType.GRANT_GREAT_TALENT_POST_CBT: frozenset({"stats"}),
 }
 
-# Effects that overload "strike" as a mode flag instead of a strike matcher.
-# MIRACLE's "on_unit_special" means Special-grade miracle and is read directly
-# by _miracle_survives; it never reaches _strike_matches.
-EXTRA_STRIKE_VALUES: dict[EffectType, frozenset[str]] = {
-    EffectType.MIRACLE: frozenset({"on_unit_special"}),
-}
-
+# One effect per phase Great Talent can be granted in; a new way of granting it
+# is a new member here, a list-map entry, and one call to _grant_great_talent.
+GREAT_TALENT_TYPES = frozenset({
+    EffectType.GRANT_GREAT_TALENT,
+    EffectType.GRANT_GREAT_TALENT_POST_CBT,
+})
 
 def validate_effect_desc(desc: dict) -> list[str]:
     """Returns every problem with a raw effect dict, empty if it is well-formed.
@@ -130,11 +135,21 @@ def validate_effect_desc(desc: dict) -> list[str]:
     missing = REQUIRED_PARAMS.get(effect_type, frozenset()) - params.keys()
     if missing:
         problems.append(f"{effect_type.value} missing params {sorted(missing)}")
-    allowed_strikes = STRIKE_VALUES | EXTRA_STRIKE_VALUES.get(effect_type, frozenset())
-    if "strike" in params and params["strike"] not in allowed_strikes:
+    if "strike" in params and params["strike"] not in STRIKE_VALUES:
         problems.append(f"unknown strike value {params['strike']!r}")
     if "formula" in params and params["formula"] not in FORMULA_NAMES:
         problems.append(f"unknown formula {params['formula']!r}")
+    magnitude_types = {EffectType.GRANT_VISIBLE_BUFF, EffectType.INFLICT_VISIBLE_DEBUFF}
+    if effect_type in magnitude_types | GREAT_TALENT_TYPES:
+        negative = {k: v for k, v in params.get("stats", {}).items() if v < 0}
+        if negative:
+            problems.append(
+                f"{effect_type.value} stats are magnitudes and must be >= 0, got {negative}"
+            )
+    if effect_type in GREAT_TALENT_TYPES:
+        unknown = sorted(set(params.get("stats", {})) - set(COMBAT_STATS))
+        if unknown:
+            problems.append(f"{effect_type.value} stats must be among {COMBAT_STATS}, got {unknown}")
     if effect_type is EffectType.FEUD:
         unknown = [c for c in params.get("colors", []) if c not in Color.__members__]
         if unknown:
