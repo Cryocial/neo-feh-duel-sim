@@ -784,9 +784,6 @@ class CombatEngine:
             defender_first = []
             defender_followups = []
 
-        attacker_package = attacker_first + attacker_followups
-        defender_package = defender_first + defender_followups
-
         defender_vantage = any(
             e.type == EffectType.VANTAGE for e in def_state.effects_strike_sequence
         )
@@ -796,38 +793,31 @@ class CombatEngine:
                 for e in atk_state.effects_strike_sequence
             )
 
-        attacker_desperation = any(
-            e.type == EffectType.DESPERATION for e in atk_state.effects_strike_sequence
-        )
-        if attacker_desperation:
-            attacker_desperation = not any(
-                e.type == EffectType.DESPERATION_NEUT
-                for e in def_state.effects_strike_sequence
+        def has_desperation(own, foe):
+            return any(
+                e.type == EffectType.DESPERATION for e in own.effects_strike_sequence
+            ) and not any(
+                e.type == EffectType.DESPERATION_NEUT for e in foe.effects_strike_sequence
             )
 
-        if defender_vantage and attacker_desperation:
-            strike_sequence = (
-                defender_first
-                + attacker_first
-                + attacker_followups
-                + defender_followups
-            )
-        elif defender_vantage:
-            strike_sequence = (
-                defender_first
-                + attacker_first
-                + defender_followups
-                + attacker_followups
-            )
-        elif attacker_desperation:
-            strike_sequence = attacker_package + defender_package
-        else:
-            strike_sequence = (
-                attacker_first
-                + defender_first
-                + attacker_followups
-                + defender_followups
-            )
+        # Desperation lands a side's follow-ups right after its own first strikes;
+        # otherwise follow-ups queue after both sides' first strikes, same order.
+        # Vantage only decides which side goes first.
+        sides = [
+            (defender_first, defender_followups, has_desperation(def_state, atk_state)),
+            (attacker_first, attacker_followups, has_desperation(atk_state, def_state)),
+        ]
+        if not defender_vantage:
+            sides.reverse()
+
+        strike_sequence, deferred = [], []
+        for first, followups, desperation in sides:
+            strike_sequence += first
+            if desperation:
+                strike_sequence += followups
+            else:
+                deferred += followups
+        strike_sequence += deferred
 
         for i in range(1, len(strike_sequence)):
             strike_sequence[i].consecutive = (
