@@ -164,12 +164,22 @@ class Unit:
 
         self._initialize_stats()
         self.first_combat_of_turn = True
+        # Scenario facts the user sets; the engine never counts turns or
+        # tracks transformation itself, it just reads these.
+        self.is_transformed = False
+        self.is_savior = False
+        self.turn_window_active = False
         self.style_enabled = False
         self.chosen_range: int | None = None
         self.allies_within_1_space = 0
         self.allies_within_2_spaces = 0
         self.allies_within_3_spaces = 0
         self.allies_within_3_rows_cols = 0
+        # Highest visible bonus / penalty per stat among allies within 2 spaces,
+        # entered by the user for Fringe Bonus / Sabotage. Only read while
+        # allies_within_2_spaces > 0.
+        self.ally_bonuses_within_2_spaces = StatBlock()
+        self.ally_penalties_within_2_spaces = StatBlock()
         # APPLY PROGRESSION STATS
 
         temp_max_flower_cap = 30
@@ -298,29 +308,27 @@ class Unit:
             if s
         ]
 
+    def stat_before_bonuses(self, name: str) -> int:
+        """base + Great Talent + skill stats: everything that isn't a buff or a
+        debuff. Per-combat layers are added on top of this and capped once."""
+        return (
+            getattr(self.base_stats, name)
+            + getattr(self.great_talent, name)
+            + sum(getattr(item.visible_stats, name) for item in self.equipped_items)
+        )
+
     def get_visible_stat(
         self, name: str, ignore_buffs: bool = False, ignore_debuffs: bool = False
     ) -> int:
-        """The stat-screen value: base + Great Talent + skill stats, plus visible
-        buffs and debuffs, capped at VISIBLE_STAT_CAP."""
-        return cap_visible_stat(
-            name, self.visible_stat_uncapped(name, ignore_buffs, ignore_debuffs)
-        )
-
-    def visible_stat_uncapped(
-        self, name: str, ignore_buffs: bool = False, ignore_debuffs: bool = False
-    ) -> int:
-        """get_visible_stat before the cap, so per-combat layers can be added
-        on top and capped once."""
-        val = getattr(self.base_stats, name) + getattr(self.great_talent, name)
+        """The stat-screen value with the unit's own visible buffs and debuffs,
+        capped at VISIBLE_STAT_CAP. Inside a simulation read
+        CombatantState.visible_stat instead: it also sees the granted layers."""
+        val = self.stat_before_bonuses(name)
         if not ignore_buffs:
             val += getattr(self.visible_buffs, name)
         if not ignore_debuffs:
             val -= getattr(self.visible_debuffs, name)
-
-        for item in self.equipped_items:
-            val += getattr(item.visible_stats, name)
-        return val
+        return cap_visible_stat(name, val)
 
     def is_physical(self) -> bool:
         """Returns True if the unit's weapon type is physical (not magic/staff/beast)."""

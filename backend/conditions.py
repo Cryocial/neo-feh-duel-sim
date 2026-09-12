@@ -79,6 +79,28 @@ def _evaluate_first_combat_of_turn(params: dict) -> Callable:
     return evaluate
 
 
+def _make_unit_flag_evaluator(attr: str) -> Callable[[dict], Callable]:
+    """Factory for conditions that read a boolean the user set on the Unit
+    (is_transformed, is_savior, turn_window_active): scenario facts the
+    engine doesn't compute, only checks. `target` picks whose flag."""
+
+    def builder(params: dict) -> Callable:
+        target_str = params.get("target", "self")
+
+        def evaluate(unit: "CombatantState", foe: "CombatantState") -> bool:
+            target = unit if target_str == "self" else foe
+            return getattr(target.unit, attr)
+
+        return evaluate
+
+    return builder
+
+
+_evaluate_is_transformed = _make_unit_flag_evaluator("is_transformed")
+_evaluate_savior = _make_unit_flag_evaluator("is_savior")
+_evaluate_turn_window = _make_unit_flag_evaluator("turn_window_active")
+
+
 def _evaluate_foe_weapon_type(params: dict) -> Callable:
     """Checks if the foe's weapon matches a specific list."""
     valid_types = params.get("types", [])
@@ -284,6 +306,9 @@ CONDITION_REGISTRY: dict[str, tuple[Timing, Callable[[dict], Callable]]] = {
     "spaces_moved": ("static", _evaluate_spaces_moved),
     "ally_within_spaces": ("static", _evaluate_ally_within_spaces),
     "first_combat_of_turn": ("static", _evaluate_first_combat_of_turn),
+    "is_transformed": ("static", _evaluate_is_transformed),
+    "savior": ("static", _evaluate_savior),
+    "turn_window": ("static", _evaluate_turn_window),
     "foe_weapon_type": ("static", _evaluate_foe_weapon_type),
     "foe_color": ("static", _evaluate_foe_color),
     "is_engaged": ("static", _evaluate_is_engaged),

@@ -378,5 +378,49 @@
         "conditions": []
       }
     ]
+  },
+  "Bonus Doubler": {
+    "type": "bonus",
+    "effects": [
+      {
+        "effect": "BONUS_DOUBLER",
+        "target": "self",
+        "params": {},
+        "conditions": []
+      }
+    ]
+  },
+  "Fringe Bonus": {
+    "type": "bonus",
+    "effects": [
+      {
+        "effect": "FRINGE_BONUS",
+        "target": "self",
+        "params": {},
+        "conditions": []
+      }
+    ]
+  },
+  "Foe Penalty Doubler": {
+    "type": "penalty",
+    "effects": [
+      {
+        "effect": "PENALTY_DOUBLER",
+        "target": "self",
+        "params": {},
+        "conditions": []
+      }
+    ]
+  },
+  "Sabotage": {
+    "type": "penalty",
+    "effects": [
+      {
+        "effect": "SABOTAGE",
+        "target": "self",
+        "params": {},
+        "conditions": []
+      }
+    ]
   }
 }
