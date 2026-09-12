@@ -74,13 +74,16 @@ At simulation start, the `effects` lists of the equipped `Skill` and `Status` ob
 ```python
 @dataclass
 class Effect:
-    type:       EffectType
-    applied_by: Literal["bonus", "penalty", "self", "foe", "ally", "enemy"]
-    params:     dict
-    conditions: list[Condition]
+    type:         EffectType
+    applied_by:   Literal["self", "foe", "ally", "enemy"]
+    params:       dict
+    conditions:   list[Condition]
+    source_color: Color | None = None
 ```
 
-`applied_by` tracks the **source** of the effect, not its target: `"bonus"` if the effect comes from a bonus status, `"penalty"` from a penalty status, `"self"` from the unit's own skill, `"foe"` from the opponent's skill, `"ally"` from an ally, `"enemy"` from an enemy. This information is useful for example in bonus or penalty neutralization effects.
+`applied_by` tracks the **source** of the effect, not its target: `"self"` if it comes from the holder's own skills or statuses, `"foe"` from the opponent's, `"ally"` from a skill one of the holder's allies has equipped, `"enemy"` from a skill one of the opponent's allies has equipped. Conditions and formulas are always evaluated from the source's point of view (`_owner_and_opponent`), so a `"foe"` or `"enemy"` effect sitting in a unit's list still reads "unit" as the side that produced it.
+
+Ally skills enter through `Unit.ally_supports`, a list of `AllySupport(skill, color)` records: the support (a Drive, a Crux, ...) and the colour of the ally providing it. Their effects distribute like any other skill's — `target: "self"` onto the supported unit as `"ally"`, `target: "foe"` onto its opponent as `"enemy"` — and carry the giver's colour in `source_color`, which is what `FEUD`'s "disables skills of all blue foes" clause filters on.
 
 ---
 
@@ -417,7 +420,7 @@ class CombatantState:
     current_cooldown:        int                        # initialized to max_cooldown - pre_charge
     combat_stats:            StatBlock | None = None
     defensive_stat:          Literal["defense", "res"] | None = None
-    damage_mitigated_bucket: int = 0                   # cumulated mitigated damage (for reflex, etc.)
+    reflect_bucket: int = 0                            # damage REFLEX / BRIAR add to the unit's next strike
     bonus_count:             int = 0                   # number of active bonuses
     penalty_count:           int = 0                   # number of active penalties
     special_use_count:       int = 0                   # times the Special was used this combat
@@ -785,6 +788,7 @@ Processed by `_initialize` before combat begins. These grant visible stats and s
 | `STAT_DAUNT` | Inflicts -X to specific stats to unit | **Inflicted to unit**. The resolved magnitude is negated, so a positive `flat` still lowers the stat. | `{ stats: list[str] } + { formula: str, multiplier: float, flat: int, min: int, max: int }` |
 | `BONUS_NEUT` | Neutralizes foe's bonuses to specific stats | **Applied to foe** and read from the opposite state: it drops the foe's visible buffs. | `{}` |
 | `PENALTY_NEUT` | Neutralizes penalties to specific stats on unit | **Applied to unit** and read from its own state: it drops that unit's own visible penalties. | `{}` |
+| `FEUD` | Disables skills of unit's allies during combat | **Applied to unit**: sits on the unit whose allies are disabled, so Red Feud 3 uses `target: "foe"` and the [Feud] debuff `target: "self"`. Strips `"ally"` effects on the unit and the `"enemy"` effects those allies put on the foe. Mirrors Blue Feud 3 — *"disables skills of all blue foes, excluding foe in combat. If in combat against a blue foe, disables skills of all foes, excluding foe in combat"* — so with `colors` an ally is disabled if its own colour is listed, or every ally is if the unit itself is of a listed colour; without `colors`, every ally. The skill's "inflicts −4" half is not part of this effect: it lives in the skill's JSON as a `STAT_DAUNT` gated on the `foe_color` condition. Applied after the `static` and `post_aoe` condition passes, so a Feud gated on a later timing never fires. Statuses and Divine Veins are not skills and are never stripped. | `{ colors: list[str] }` (optional, `Color` names) |
 | `PHANTOM_STAT` | If a skill compare unit's stat to a foe's or ally's, treats unit's stat as if granted +X | **Applied to unit**, after `STAT_BOOST` / `STAT_DAUNT`. Accumulates into `phantom_bonus` instead of `combat_stats`, so it is only visible through `CombatantState.cbt_stat_with_phantom()` By calling the right key in the formula used, Dodge-style Spd-difference DR sees it while follow-up eligibility and Potent checks do not. | `{ stats: list[str] } + { formula: str, multiplier: float, flat: int, min: int, max: int }` |
 | `RANGE_EXTENSION` | Unit can attack foes within specific range | **Applied to unit**. Only the initiator's is read, since the initiator's engagement range sets the distance for the whole combat. `min == max` forces the value, otherwise `Unit.chosen_range` (the user's pick) is used. | `{ min: int, max: int }` |
 
@@ -821,6 +825,7 @@ Processed by `_initialize` before combat begins. These grant visible stats and s
 |---|---|---|---|
 | `DR_PIERCE` | Reduces the percentage of foe's non-Special "reduces damage by X%" skill | **Applied to foe**. Held by the striking unit and strike-matched. `value` is a percentage; several sources multiply together into a single piercing multiplier. | `{ value: int, strike: str }` |
 | `HEXBLADE_STRIKE` | Calculates damage using the lower of foe's Def or Res | **Applied to unit**. Held by the striking unit. Presence flag, not strike-matched: `_determine_defensive_stat` targets the lower of the foe's two defensive stats for every strike. | `{}` |
+| `NEUT_HEXBLADE` | Neutralizes "calculates damage using the lower of Def or Res" | **Applied to unit**. Held by the unit being struck. Presence flag: cancels the foe's `HEXBLADE_STRIKE` and `HEXBLADE_AOE`, restoring the stat the foe's weapon normally targets. | `{}` |
 | `EFFECTIVE` | Effective against specific unit type | **Applied to unit**. Held by the striking unit and strike-matched. Multiplies raw Atk by 1.5 (truncated) before the Weapon Triangle. The type lists name the units the effect is meant for; the matching is expected to be resolved upstream, when the effect is built. | `{ movement_types: list[str], weapon_types: list[str] }` |
 | `NEUT_EFFECTIVE` | Neutralizes 'effective against specific unit type' | **Applied to unit**. Held by the unit being struck. Presence flag, not strike-matched; cancels the 1.5× outright. | `{ movement_types: list[str], weapon_types: list[str] }` |
 | `SPECIAL_TRIGGER_NEUT` | Unit cannot trigger Specials | **Applied to unit**, strike-matched. Only the flag matching that unit's `special_type` counts. The cooldown is held at 0 rather than spent, so the Special can still trigger on a later strike once the effect stops matching. | `{ aoe: bool, off: bool, def: bool, strike: str }` |
@@ -828,6 +833,8 @@ Processed by `_initialize` before combat begins. These grant visible stats and s
 | `PERC_DR_STRIKE` | Reduce damage from foe's attacks during combat by X% | **Applied to unit**. Held by the unit being struck and strike-matched. Sources stack multiplicatively and the surviving damage rounds UP. `piercable: false` implies its special DR. It is potentially trigger-capped: `max_triggers` (`-1` = unlimited) counted per effect in `special_dr_count`, raised by `TWIN`. | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str, piercable: bool, max_triggers: int }` |
 | `TWIN` | Any "reduces damage by X%" effect can be triggered a new max of times | **Applied to unit**. Held by the unit being struck. Raises the `max_triggers` cap of that unit's non-piercable DR sources; `value: -1` means unlimited. Highest value wins, sources do not stack. | `{ value: int }` |
 | `FLAT_DAMAGE_STRIKE` | Unit deals +X damage | **Applied to unit**. Held by the striking unit and strike-matched. Sources add up and land before any damage reduction. | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
+| `REFLEX` | Unit's next attack deals damage = total damage reduced on this hit | **Applied to unit**. Held by the unit being struck and strike-matched. Adds the damage negated on a matching hit (percent and flat DR, after the staff halving) to `reflect_bucket`; the unit's very next strike spends the whole bucket as true damage. Sources stack: each matching Reflex adds the full amount. | `{ strike: str }` |
+| `BRIAR` | Unit's next attack deals damage = X% of foe's attack damage prior to reduction | **Applied to unit**. Held by the unit being struck and strike-matched. Adds `floor(pre-reduction damage × X / 100)` to `reflect_bucket`, spent the same way as `REFLEX`. X is the resolved formula block (`flat` for a fixed percent); only the highest X among matching sources applies. | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
 | `PULSE_STRIKE` | Grants Special count -X to unit | **Applied to unit**, strike-matched from that unit's own side. Resolved for both combatants at the top of the strike, before the Special-ready check. `cap_cd_start_of_cbt` caps the reduction at `cd_start_of_cbt`, the cooldown the unit had entering combat. | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str, cap_cd_start_of_cbt: bool }` |
 | `SCOWL_STRIKE` | Inflicts Special cooldown count + X on unit | **Applied to unit**. Summed and netted against `PULSE_STRIKE` in a single clamp, floored at 0. | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
 | `HEAL_STRIKE` | When unit deals damage to foe , restores X HP to unit| **Applied to unit**. Held by the striking unit and strike-matched. Sources add up, the heal caps at max HP. Resolved on every matching strike, including one that deals 0 damage. | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
@@ -899,7 +906,6 @@ Formula names resolve to raw game quantities; skill-specific offsets and caps li
 | `spaces_moved` | Spaces the unit moved before combat (Incited / Truly Incited) | — |
 | `sum_visible_buffs` | Sum of unit's visible stat bonuses, each floored at 0 (Treachery) | — |
 | `sum_foe_visible_debuffs` | Sum of foe's visible stat penalties, each floored at 0 (Dominance) | — |
-| `mitigated_bucket` | Unit's accumulated mitigated-damage total (Reflex) | — |
 | `unit_max_hp` | Unit's max HP (percent heals: pair with `multiplier`) | — |
 | `phantom_spd_diff` | `unit_spd - foe_spd`, in-combat, **including Phantom Spd**, floored at 0 (Dodge: pair with `multiplier`/`max` for the cap). Distinct from the plain `spd_diff` locals used by the follow-up check and `potent_spd_check`, which deliberately exclude Phantom. | — |
 | `foe_penalty_count` | Foe's active penalty count (Creation Pulse: pair with `max` for the cap) | — |
@@ -921,6 +927,7 @@ Formula names resolve to raw game quantities; skill-specific offsets and caps li
 | `spaces_moved` | `static` | `{ "target": "self"\|"foe"\|"either"\|"initiator", "min_spaces": int }` |
 | `ally_within_spaces` | `static` | `{ "check": "1_space"\|"2_spaces"\|"3_spaces"\|"3_rows_cols", "min_allies": int, "target": "self"\|"foe" }` |
 | `foe_weapon_type` | `static` | `{ "types": list[str] }` |
+| `foe_color` | `static` | `{ "colors": list[str] }` (`Color` names) |
 | `bonus_penalty_total` | `static` | `{ "min_count": int, "include_foe": bool }` |
 | `is_engaged` | `static` | `{}` |
 | `first_combat_of_turn` | `static` | `{ "target": "self"\|"foe" }` |

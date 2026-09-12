@@ -11,6 +11,15 @@ from .jsonbootupstuff import BONUS_DATABASE, PENALTY_DATABASE
 UnitRole = Literal["attacker", "defender"]
 StrikeRole = Literal["striker", "target"]
 
+EFFECT_LISTS = (
+    "effects_AoE",
+    "effects_combat_stats",
+    "effects_strike_sequence",
+    "effects_pre_combat",
+    "effects_on_strike",
+    "effects_after_combat",
+)
+
 
 @dataclass
 class CombatantState:
@@ -22,7 +31,7 @@ class CombatantState:
     defensive_stat: Literal["defense", "res"] | None = None
     cd_start_of_cbt: int = 0
     start_of_combat_hp: int = 0
-    damage_mitigated_bucket: int = 0
+    reflect_bucket: int = 0
     bonus_count: int = 0
     penalty_count: int = 0
     special_type: SpecialType = SpecialType.NONE
@@ -102,73 +111,39 @@ def _base_combat_range(weapon_type: WeaponType) -> int:
 
 
 def _distribute_effects(attacker: CombatantState, defender: CombatantState) -> None:
-    attacker_skills = filter(
-        None,
-        [
-            attacker.unit.weapon,
-            attacker.unit.special,
-            attacker.unit.a_slot,
-            attacker.unit.b_slot,
-            attacker.unit.c_slot,
-            attacker.unit.s_slot,
-            attacker.unit.x_slot,
-        ],
-    )
-    for skill in attacker_skills:
-        for desc in skill.effects:
-            is_self = desc["target"] == "self"
-            effect = build_effect(desc, applied_by="self" if is_self else "foe")
-            target = attacker if is_self else defender
-            _add_to_bucket(target, effect)
-        attacker.nb_styles += skill.grants_style
+    for own, other in ((attacker, defender), (defender, attacker)):
+        _distribute_from(own.unit.equipped_items, own, other, "self", "foe")
+        _distribute_from(own.unit.active_statuses, own, other, "self", "foe")
+        if own.active_ally_divine_vein:
+            _distribute_from([own.active_ally_divine_vein], own, other, "self", "foe")
+        for support in own.unit.ally_supports:
+            _distribute_from([support.skill], own, other, "ally", "enemy", support.color)
+        # Styles are a player-phase action: only the initiator's count.
+        if own.is_initiator:
+            own.nb_styles += sum(s.grants_style for s in own.unit.equipped_items)
+            own.nb_styles += sum(s.grants_style for s in own.unit.active_statuses)
 
-    for status in attacker.unit.active_statuses:
-        for desc in status.effects:
-            is_self = desc["target"] == "self"
-            effect = build_effect(desc, applied_by="self" if is_self else "foe")
-            target = attacker if is_self else defender
-            _add_to_bucket(target, effect)
-        attacker.nb_styles += status.grants_style
 
-    if attacker.active_ally_divine_vein:
-        for desc in attacker.active_ally_divine_vein.effects:
+def _distribute_from(sources, own, other, self_tag, foe_tag, source_color=None):
+    """Routes each source's effects: target "self" into `own`'s lists tagged
+    self_tag, target "foe" into `other`'s tagged foe_tag."""
+    for source in sources:
+        for desc in source.effects:
             is_self = desc["target"] == "self"
-            effect = build_effect(desc, applied_by="self" if is_self else "foe")
-            target = attacker if is_self else defender
-            _add_to_bucket(target, effect)
+            effect = build_effect(
+                desc, applied_by=self_tag if is_self else foe_tag, source_color=source_color
+            )
+            _add_to_bucket(own if is_self else other, effect)
 
-    defender_skills = filter(
-        None,
-        [
-            defender.unit.weapon,
-            defender.unit.special,
-            defender.unit.a_slot,
-            defender.unit.b_slot,
-            defender.unit.c_slot,
-            defender.unit.s_slot,
-            defender.unit.x_slot,
-        ],
-    )
-    for skill in defender_skills:
-        for desc in skill.effects:
-            is_self = desc["target"] == "self"
-            effect = build_effect(desc, applied_by="self" if is_self else "foe")
-            target = defender if is_self else attacker
-            _add_to_bucket(target, effect)
 
-    for status in defender.unit.active_statuses:
-        for desc in status.effects:
-            is_self = desc["target"] == "self"
-            effect = build_effect(desc, applied_by="self" if is_self else "foe")
-            target = defender if is_self else attacker
-            _add_to_bucket(target, effect)
+def _owner_and_opponent(effect: Effect, holder: CombatantState, foe: CombatantState):
+    """The side whose skill produced `effect`, then the other. Conditions and
+    formulas evaluate from the owner's view; "foe" / "enemy" effects were put
+    in the holder's list by the opposing side."""
+    if effect.applied_by in ("foe", "enemy"):
+        return foe, holder
+    return holder, foe
 
-    if defender.active_ally_divine_vein:
-        for desc in defender.active_ally_divine_vein.effects:
-            is_self = desc["target"] == "self"
-            effect = build_effect(desc, applied_by="self" if is_self else "foe")
-            target = defender if is_self else attacker
-            _add_to_bucket(target, effect)
 
 def _add_to_bucket(state: CombatantState, effect: Effect) -> None:
     list_name = EFFECT_LIST_MAP.get(effect.type)
@@ -185,10 +160,7 @@ def _evaluate_conditions_for_effect(
     foe_state: CombatantState,
     timing: Timing,
 ) -> tuple[bool, list[Condition]]:
-    if effect.applied_by == "foe":
-        owner, opponent = foe_state, unit_state
-    else:
-        owner, opponent = unit_state, foe_state
+    owner, opponent = _owner_and_opponent(effect, unit_state, foe_state)
     remaining = []
     for cond in effect.conditions:
         result = check_condition(cond, timing, owner, opponent)
@@ -247,6 +219,8 @@ class CombatEngine:
 
         self._evaluate_conditions("static")
 
+        self._apply_feud()
+
         self._range_calculation()
 
         self._resolve_aoe()
@@ -255,6 +229,8 @@ class CombatEngine:
             state.start_of_combat_hp = state.current_hp
 
         self._evaluate_conditions("post_aoe")
+
+        self._apply_feud()
 
         self._combat_stat_calculations()
 
@@ -303,8 +279,7 @@ class CombatEngine:
                 for effect in state.effects_start_of_turn:
                     if bool(effect.conditions) != conditional:
                         continue
-                    owner = foe if effect.applied_by == "foe" else state
-                    opponent = state if effect.applied_by == "foe" else foe
+                    owner, opponent = _owner_and_opponent(effect, state, foe)
                     if not self._start_of_turn_conditions_pass(effect, owner, opponent):
                         continue
                     self._apply_grant(effect, state)
@@ -385,14 +360,7 @@ class CombatEngine:
         for role, foe_role in (("attacker", "defender"), ("defender", "attacker")):
             state = self.combatant_states[role]
             foe_state = self.combatant_states[foe_role]
-            for list_name in (
-                "effects_AoE",
-                "effects_combat_stats",
-                "effects_strike_sequence",
-                "effects_pre_combat",
-                "effects_on_strike",
-                "effects_after_combat",
-            ):
+            for list_name in EFFECT_LISTS:
                 updated_conditions = []
                 for effect in getattr(state, list_name):
                     keep, remaining_conditions = _evaluate_conditions_for_effect(
@@ -402,6 +370,53 @@ class CombatEngine:
                         effect.conditions = remaining_conditions
                         updated_conditions.append(effect)
                 setattr(state, list_name, updated_conditions)
+
+    def _apply_feud(self):
+        """FEUD sits on the unit whose allies' skills are disabled, the way
+        FU_DENY sits on the unit that can't follow up. It strips "ally" effects
+        on that unit and the "enemy" effects those allies put on the foe.
+
+        Blue Feud 3: "disables skills of all blue foes, excluding foe in
+        combat. If in combat against a blue foe, disables skills of all foes,
+        excluding foe in combat." So with `colors` an ally is disabled if its
+        own colour is listed, or every ally is if the unit itself is of a
+        listed colour. Without `colors`, every ally. A Feud whose conditions
+        haven't resolved yet does nothing, which is why this runs after each
+        early condition pass.
+        """
+        for role, foe_role in (("attacker", "defender"), ("defender", "attacker")):
+            state = self.combatant_states[role]
+            foe = self.combatant_states[foe_role]
+            feuds = [
+                e for e in state.effects_combat_stats
+                if e.type is EffectType.FEUD and not e.conditions
+            ]
+            if not feuds:
+                continue
+
+            every_ally = False
+            listed: set[str] = set()
+            for feud in feuds:
+                colors = feud.params.get("colors")
+                if colors is None or state.unit.color.name in colors:
+                    every_ally = True
+                    break
+                listed.update(colors)
+
+            def disabled(effect):
+                return every_ally or (
+                    effect.source_color is not None and effect.source_color.name in listed
+                )
+
+            for name in EFFECT_LISTS:
+                setattr(state, name, [
+                    e for e in getattr(state, name)
+                    if not (e.applied_by == "ally" and disabled(e))
+                ])
+                setattr(foe, name, [
+                    e for e in getattr(foe, name)
+                    if not (e.applied_by == "enemy" and disabled(e))
+                ])
 
 # ── Combat Range calculation ─────────────────────────────────────────────────
 
@@ -454,6 +469,8 @@ class CombatEngine:
 
         has_hexblade_aoe = any(
             e.type == EffectType.HEXBLADE_AOE for e in state.effects_AoE
+        ) and not any(
+            e.type == EffectType.NEUT_HEXBLADE for e in foe_state.effects_pre_combat
         )
         if has_hexblade_aoe:
             visible_def = min(
@@ -540,12 +557,7 @@ class CombatEngine:
                 if effect.type not in (EffectType.STAT_BOOST, EffectType.STAT_DAUNT):
                     continue
 
-                # applied_by == "foe" means the foe inflicted this effect, so the
-                # foe's state is the formula's "unit" (matches the healing/DW crossover).
-                if effect.applied_by == "foe":
-                    owner, opponent = foe, state
-                else:
-                    owner, opponent = state, foe
+                owner, opponent = _owner_and_opponent(effect, state, foe)
 
                 magnitude = self._resolve_formula(effect.params, owner, opponent)
                 if effect.type == EffectType.STAT_DAUNT:
@@ -561,10 +573,7 @@ class CombatEngine:
                 if effect.type != EffectType.PHANTOM_STAT:
                     continue
 
-                if effect.applied_by == "foe":
-                    owner, opponent = foe, state
-                else:
-                    owner, opponent = state, foe
+                owner, opponent = _owner_and_opponent(effect, state, foe)
 
                 magnitude = self._resolve_formula(effect.params, owner, opponent)
                 stats = effect.params["stats"]
@@ -966,6 +975,9 @@ class CombatEngine:
         has_hexblade = any(
             e.type == EffectType.HEXBLADE_STRIKE
             for e in striker_state.effects_pre_combat
+        ) and not any(
+            e.type == EffectType.NEUT_HEXBLADE
+            for e in target_state.effects_pre_combat
         )
 
         if has_hexblade:
@@ -1052,7 +1064,9 @@ class CombatEngine:
         modified_atk = math.trunc(raw_atk * wta)
         base_damage = max(0, modified_atk - defensive_stat)
 
-        true_damage = 0
+        # Reflected damage (REFLEX / BRIAR) is spent on the unit's next strike.
+        true_damage = striker_state.reflect_bucket
+        striker_state.reflect_bucket = 0
         for effect in striker_state.effects_on_strike:
             if effect.type == EffectType.FLAT_DAMAGE_STRIKE and self._strike_matches(
                 strike,
@@ -1070,10 +1084,10 @@ class CombatEngine:
                 )
 
         final_damage = base_damage + true_damage
-        pre_mitigation_damage = final_damage
         if striker_state.unit.weapon_type is WeaponType.STAFF:
             if not self._staff_full_damage(striker_state):
                 final_damage = math.trunc(final_damage * 0.5)
+        pre_mitigation_damage = final_damage
 
         pierce_mult = 1.0
         for effect in striker_state.effects_on_strike:
@@ -1191,8 +1205,31 @@ class CombatEngine:
             if not special_miracle:
                 target_state.miracle_used = True
 
+        # Reflex sources stack; Briar applies only its highest percent.
         mitigated_amount = pre_mitigation_damage - final_damage
-        target_state.damage_mitigated_bucket += mitigated_amount
+        briar_pct = 0
+        for effect in target_state.effects_on_strike:
+            if effect.type not in (EffectType.REFLEX, EffectType.BRIAR):
+                continue
+            if not self._strike_matches(
+                strike,
+                "target",
+                effect.params,
+                striker_special_ready=striker_special_ready,
+                target_special_ready=target_special_ready,
+                striker_special_triggers=striker_special_triggers,
+                target_special_triggers=target_special_triggers,
+                striker_special_used=striker_special_used,
+                target_special_used=target_special_used,
+            ):
+                continue
+            if effect.type is EffectType.REFLEX:
+                target_state.reflect_bucket += mitigated_amount
+            else:
+                pct = self._resolve_formula(effect.params, target_state, striker_state)
+                briar_pct = max(briar_pct, pct)
+        if briar_pct:
+            target_state.reflect_bucket += math.floor(pre_mitigation_damage * briar_pct / 100)
         target_state.current_hp -= final_damage
 
         hit_heal = 0
@@ -1305,13 +1342,7 @@ class CombatEngine:
                 for e in effects:
                     if e.type != reduce_type:
                         continue
-                    # The effect sits in unit_state's list, but its formula may
-                    # scale off whoever OWNS it. applied_by == "foe" means the foe
-                    # inflicted it, so the foe's state is the formula's "unit".
-                    if e.applied_by == "foe":
-                        owner, opponent = foe_state, unit_state
-                    else:
-                        owner, opponent = unit_state, foe_state
+                    owner, opponent = _owner_and_opponent(e, unit_state, foe_state)
                     pct = self._resolve_formula(e.params, owner, opponent)
                     survive *= (100 - pct) / 100
                     found = True
@@ -1496,8 +1527,6 @@ class CombatEngine:
                     variable = sum(
                         max(0, getattr(vd, s)) for s in ("atk", "spd", "defense", "res")
                     )
-                case "mitigated_bucket":  # Reflex
-                    variable = unit_state.damage_mitigated_bucket
                 case "unit_max_hp":
                     variable = unit_state.unit.max_hp
                 case "phantom_spd_diff":
