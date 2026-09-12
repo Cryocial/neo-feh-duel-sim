@@ -664,6 +664,8 @@ At startup, three JSON files are parsed to build the in-memory databases.
 
 **Conditions**: conditions are not compiled when `Skill` and `Status` objects are loaded. They are compiled into `AtomicCondition` objects (with `timing` and `func`) when `Effect` instances are created at the start of each simulation. At that point, `CONDITION_REGISTRY` provides both the timing and the function to produce `func`.
 
+**Validation**: `build_effect` checks each raw effect dict as it is compiled. The `effect` name must be an `EffectType` with an `EFFECT_LIST_MAP` entry, `target` must be `"self"` or `"foe"`, the keys listed for that type in `REQUIRED_PARAMS` (`effects.py`) must be present, and any `strike` / `formula` value must appear in `STRIKE_VALUES` / `FORMULA_NAMES` (`constants.py`) — except where `EXTRA_STRIKE_VALUES` (`effects.py`) allows an effect to overload `strike` as a mode flag, currently only `MIRACLE`'s `on_unit_special`. A malformed entry raises a `ValueError` naming the effect rather than silently doing nothing. `tests/test_data_integrity.py` runs the same checks over every entry of every JSON file, so a broken skill fails CI before it is ever equipped.
+
 ---
 
 ## User Flow
@@ -712,13 +714,8 @@ come after percent DR.
    Visible (stat-screen) values are used, since AoE resolves before in-combat
    stats exist.
 2. **Fixed damage** — `FLAT_DAMAGE_AOE` added on.
-3. **Percent damage reduction** — each `PERC_DR_AOE` source on the foe is first
-   weakened by the attacker's `DR_PIERCE_AOE` (`value` as a percentage, stacking
-   multiplicatively), then the pierced sources stack multiplicatively into one
-   product. Result is `ceil`ed, matching the strike pipeline.
-4. **Flat damage reduction** — `FLAT_DR_AOE` subtracted, floored at 0.
-   `DR_PIERCE_AOE` never touches this step.
-5. **Survival** — AoE damage cannot kill: the foe's HP floors at 1.
+3. **Flat damage reduction** — `FLAT_DR_AOE` subtracted, floored at 0.
+4. **Survival** — AoE damage cannot kill: the foe's HP floors at 1.
 
 ## Simulation Timeline
 
@@ -776,8 +773,7 @@ Processed by `_initialize` before combat begins. These grant visible stats and s
 | `TRIGGER_AOE` | Before combat foe takes damage | **When unit triggers an AoE special**, damage is inflicted to the foe and its base value is equal to the unit's attack minus foe's defensive's stat at that time of the combat multiplied by the coefficient. | `{ coefficient: float }` |
 | `FLAT_DAMAGE_AOE` | Unit deals +X damage when dealing damage with a Special triggered before combat | **When unit triggers an AoE special**, additional are damage added after base damage calculation. | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
 | `FLAT_DR_AOE` | Reduce damage by X when foe deals damage with a Special triggered before combat | **When foe triggers an AoE special**, damage are reduced after all AoE damage calculation. | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
-| `PERC_DR_AOE` | Reduce damage by X% when foe deals damage with a Special triggered before combat | **When foe triggers an AoE special**, each source is first weakened by the unit's `DR_PIERCE_AOE`, then the pierced sources stack multiplicatively. Applied after `FLAT_DAMAGE_AOE` and before `FLAT_DR_AOE`; the surviving damage rounds UP. | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
-| `DR_PIERCE_AOE` | Reduces the percentage of foe's "reduce damage by X%" against area-of-effect Specials | **Applied to foe**. Held by the unit triggering the AoE special. `value` is a percentage; several sources multiply together into a single piercing multiplier. Only weakens `PERC_DR_AOE`, never `FLAT_DR_AOE`. | `{ value: int }` |
+| `PERC_DR_AOE` | Reduce damage by X% when foe deals damage with a Special triggered before combat | **When foe triggers an AoE special**, then the pierced sources stack multiplicatively. Applied after `FLAT_DAMAGE_AOE` and before `FLAT_DR_AOE`; the surviving damage rounds UP. | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
 | `HEXBLADE_AOE` | Calculates damage using the lower of foe's Def or Res when dealing damage with a Special triggered before combat | **When unit triggers an AoE special**, calculation uses the foe's lower defensive stat at that time of the combat | `{}` |
 | `PULSE_AOE` | Grants Special cooldown count -X to unit before Special triggers before combat | **Applies to unit**. Unit's special cooldown is reduced right before checking if the unit triggers an AoE special | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
 
