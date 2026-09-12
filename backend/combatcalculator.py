@@ -622,9 +622,9 @@ class CombatEngine:
 
         # Doublers read the raw visible bonus / penalty per stat, including any
         # part the visible cap wasted, and add it to the uncapped combat stats.
-        # Every source stacks. The family is inert when the layer it reads is
-        # neutralized: the foe's Lull for the bonus side, the unit's own
-        # PENALTY_NEUT for the penalty side.
+        # Every source stacks. Neutralization (the foe's Lull for the bonus
+        # side, the unit's own PENALTY_NEUT for the penalty side) zeroes the
+        # unit's own half; see _doubler_deltas for what that leaves.
         for state, buffs_neutralized, penalties_neutralized in (
             (atk_state, atk_ignore_buffs, atk_ignore_debuffs),
             (def_state, def_ignore_buffs, def_ignore_debuffs),
@@ -664,6 +664,11 @@ class CombatEngine:
                              allies within 2 spaces (user-entered on the Unit)
           PENALTY_DOUBLER  - the unit's raw visible debuff
           SABOTAGE         - the higher of that debuff and the allies' highest
+
+        Neutralization (the foe's Lull for bonuses, the unit's own PENALTY_NEUT
+        for penalties) zeroes the unit's OWN half only. The plain doublers have
+        nothing else to read and go inert; Fringe and Sabotage keep working as
+        long as an ally within 2 spaces supplies the value.
         """
         unit = state.unit
         has_allies = unit.allies_within_2_spaces > 0
@@ -673,17 +678,19 @@ class CombatEngine:
             if effect.type is EffectType.BONUS_DOUBLER and not buffs_neutralized:
                 for s in stats:
                     deltas[s] += state.visible_buff(s)
-            elif effect.type is EffectType.FRINGE_BONUS and not buffs_neutralized:
+            elif effect.type is EffectType.FRINGE_BONUS:
                 for s in stats:
+                    own = 0 if buffs_neutralized else state.visible_buff(s)
                     ally = getattr(unit.ally_bonuses_within_2_spaces, s) if has_allies else 0
-                    deltas[s] += max(state.visible_buff(s), ally)
+                    deltas[s] += max(own, ally)
             elif effect.type is EffectType.PENALTY_DOUBLER and not penalties_neutralized:
                 for s in stats:
                     deltas[s] -= state.visible_debuff(s)
-            elif effect.type is EffectType.SABOTAGE and not penalties_neutralized:
+            elif effect.type is EffectType.SABOTAGE:
                 for s in stats:
+                    own = 0 if penalties_neutralized else state.visible_debuff(s)
                     ally = getattr(unit.ally_penalties_within_2_spaces, s) if has_allies else 0
-                    deltas[s] -= max(state.visible_debuff(s), ally)
+                    deltas[s] -= max(own, ally)
         return deltas
 
     def _determine_strike_sequence(self) -> list[Strike]:
