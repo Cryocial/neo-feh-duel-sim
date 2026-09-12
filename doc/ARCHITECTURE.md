@@ -899,7 +899,6 @@ Formula names resolve to raw game quantities; skill-specific offsets and caps li
 |---|---|---|
 | `""` (empty) | `0` — only the `flat` component applies | — |
 | `bonus_count` | Unit's active bonus count | — |
-| `penalty_count` | Unit's active penalty count | — |
 | `all_bonus_penalty_both` | Sum of bonus + penalty counts on **both** unit and foe (Empathy) | — |
 | `spaces_moved` | Spaces the unit moved before combat (Incited / Truly Incited) | — |
 | `sum_visible_buffs` | Sum of unit's visible stat bonuses, each floored at 0 (Treachery) | — |
@@ -913,6 +912,7 @@ Formula names resolve to raw game quantities; skill-specific offsets and caps li
 | `unit_cbt_def` | Unit's in-combat Def | — |
 | `unit_cbt_res` | Unit's in-combat Res | — |
 | `max_cooldown` | Unit's max Special cooldown count value | — |
+| `num_bonus_and_penalties_on_unit` | Sum of the unit's own bonus and penalty counts | — |
 
 ---
 
