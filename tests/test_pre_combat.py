@@ -185,6 +185,58 @@ def test_burn_heal_does_not_refund_aoe_damage():
     assert result["defender_final_hp"] == 100 - 20 - 20
 
 
+# ── burn damage is not reduced by anything ───────────────────────────────────
+
+
+def dr(effect, params):
+    return Status(name=effect, type="bonus", effects=[{
+        "effect": effect, "target": "self", "params": params, "conditions": [],
+    }])
+
+
+FLAT_DR_STRIKE = ("FLAT_DR_STRIKE", {"flat": 10, "strike": "every_strike"})
+PERC_DR_STRIKE = ("PERC_DR_STRIKE", {"flat": 50, "strike": "every_strike", "piercable": True})
+FLAT_DR_AOE = ("FLAT_DR_AOE", {"flat": 10})
+PERC_DR_AOE = ("PERC_DR_AOE", {"flat": 50})
+EVERY_DR = (FLAT_DR_STRIKE, PERC_DR_STRIKE, FLAT_DR_AOE, PERC_DR_AOE)
+
+
+def taken_by_defender(attacker, *statuses):
+    """Defender has 0 Atk, so its counter never kills the attacker early."""
+    defender = make_unit("D", hp=100, atk=0)
+    defender.active_statuses.extend(statuses)
+    return 100 - CombatEngine(attacker, defender).simulate()["defender_final_hp"]
+
+
+def test_the_damage_reductions_used_below_actually_reduce_damage():
+    """Guards the two tests under it: if any of these stopped working, their
+    'burn ignores it' assertions would pass for the wrong reason."""
+    assert taken_by_defender(make_unit("A")) == 20
+    assert taken_by_defender(make_unit("A"), dr(*FLAT_DR_STRIKE)) == 10
+    assert taken_by_defender(make_unit("A"), dr(*PERC_DR_STRIKE)) == 10
+    assert taken_by_defender(aoe_attacker()) == 20 + 20
+    assert taken_by_defender(aoe_attacker(), dr(*FLAT_DR_AOE)) == 10 + 20
+    assert taken_by_defender(aoe_attacker(), dr(*PERC_DR_AOE)) == 10 + 20
+
+
+def test_burn_damage_ignores_every_damage_reduction():
+    """Flat and percent strike DR, flat and percent AoE DR, all at once: the
+    attacker has 0 Atk so its strike deals nothing and all 20 taken is burn."""
+    attacker = make_unit("A", atk=0)
+    attacker.active_statuses.append(damage_foe(20))
+
+    assert taken_by_defender(attacker, *(dr(*d) for d in EVERY_DR)) == 20
+
+
+def test_aoe_dr_reduces_the_aoe_and_leaves_the_burn_alone():
+    """One attacker doing both, against 50% AoE DR: the 20 AoE is halved to
+    10, the 20 burn is untouched, and the strike adds its usual 20."""
+    attacker = aoe_attacker()
+    attacker.active_statuses.append(damage_foe(20))
+
+    assert taken_by_defender(attacker, dr(*PERC_DR_AOE)) == 10 + 20 + 20
+
+
 # ── the two phases are not interchangeable ───────────────────────────────────
 
 
