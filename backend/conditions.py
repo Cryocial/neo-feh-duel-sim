@@ -79,12 +79,45 @@ def _evaluate_first_combat_of_turn(params: dict) -> Callable:
     return evaluate
 
 
+def _make_unit_flag_evaluator(attr: str) -> Callable[[dict], Callable]:
+    """Factory for conditions that read a boolean the user set on the Unit
+    (is_transformed, is_savior, turn_window_active): scenario facts the
+    engine doesn't compute, only checks. `target` picks whose flag."""
+
+    def builder(params: dict) -> Callable:
+        target_str = params.get("target", "self")
+
+        def evaluate(unit: "CombatantState", foe: "CombatantState") -> bool:
+            target = unit if target_str == "self" else foe
+            return getattr(target.unit, attr)
+
+        return evaluate
+
+    return builder
+
+
+_evaluate_is_transformed = _make_unit_flag_evaluator("is_transformed")
+_evaluate_savior = _make_unit_flag_evaluator("is_savior")
+_evaluate_turn_window = _make_unit_flag_evaluator("turn_window_active")
+
+
 def _evaluate_foe_weapon_type(params: dict) -> Callable:
     """Checks if the foe's weapon matches a specific list."""
     valid_types = params.get("types", [])
 
     def evaluate(unit: "CombatantState", foe: "CombatantState") -> bool:
         return foe.unit.weapon_type.name in valid_types
+
+    return evaluate
+
+
+def _evaluate_foe_color(params: dict) -> Callable:
+    """Checks if the foe's colour is in a list (the colour-gated half of a
+    Feud skill: "if in combat against a blue foe, inflicts -4")."""
+    colors = params["colors"]
+
+    def evaluate(unit: "CombatantState", foe: "CombatantState") -> bool:
+        return foe.unit.color.name in colors
 
     return evaluate
 
@@ -100,7 +133,7 @@ def _make_hp_pct_evaluator(
 
         def evaluate(unit: "CombatantState", foe: "CombatantState") -> bool:
             target = unit if target_str == "self" else foe
-            pct = (target.unit.start_of_combat_hp / target.unit.base_stats.hp) * 100
+            pct = (target.current_hp / target.unit.max_hp) * 100
             return compare(pct, threshold)
 
         return evaluate
@@ -273,7 +306,11 @@ CONDITION_REGISTRY: dict[str, tuple[Timing, Callable[[dict], Callable]]] = {
     "spaces_moved": ("static", _evaluate_spaces_moved),
     "ally_within_spaces": ("static", _evaluate_ally_within_spaces),
     "first_combat_of_turn": ("static", _evaluate_first_combat_of_turn),
+    "is_transformed": ("static", _evaluate_is_transformed),
+    "savior": ("static", _evaluate_savior),
+    "turn_window": ("static", _evaluate_turn_window),
     "foe_weapon_type": ("static", _evaluate_foe_weapon_type),
+    "foe_color": ("static", _evaluate_foe_color),
     "is_engaged": ("static", _evaluate_is_engaged),
     "style_enabled": ("static", _evaluate_style_enabled),
     "potent_patience": ("static", _evaluate_potent_patience),
@@ -331,11 +368,19 @@ def _check_anyof(
     unit: CombatantState,
     foe: CombatantState,
 ) -> bool | None:
-    results = [check_condition(c, timing, unit, foe) for c in anyof.conditions]
-    timing_results = [r for r in results if r is not None]
-    if not timing_results:
-        return None
-    return any(timing_results)
+    # Branches resolve at different timings, so prune as we go: a failed branch
+    # is forgotten, a passed one decides, and the node stays pending while any
+    # branch is still unevaluated. Mutation is safe because build_effect
+    # constructs a fresh condition tree for every simulation.
+    pending = []
+    for c in anyof.conditions:
+        result = check_condition(c, timing, unit, foe)
+        if result is True:
+            return True
+        if result is None:
+            pending.append(c)
+    anyof.conditions = pending
+    return None if pending else False
 
 
 def _check_allof(
@@ -344,11 +389,15 @@ def _check_allof(
     unit: CombatantState,
     foe: CombatantState,
 ) -> bool | None:
-    results = [check_condition(c, timing, unit, foe) for c in allof.conditions]
-    timing_results = [r for r in results if r is not None]
-    if not timing_results:
-        return None
-    return all(timing_results)
+    pending = []
+    for c in allof.conditions:
+        result = check_condition(c, timing, unit, foe)
+        if result is False:
+            return False
+        if result is None:
+            pending.append(c)
+    allof.conditions = pending
+    return None if pending else True
 
 
 # ── builders ─────────────────────────────────────────────────────────────────

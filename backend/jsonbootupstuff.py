@@ -6,7 +6,7 @@ from .constants import MovementType, WeaponType, SpecialType
 SKILL_DATABASE: dict[str, Skill] = {}
 BONUS_DATABASE: dict[str, Status] = {}
 PENALTY_DATABASE: dict[str, Status] = {}
-DIVINE_VEINS_DATABASE: dict[str, Status] = {}
+DIVINE_VEINS_DATABASE: dict[str, DivineVein] = {}
 UNIT_DATABASE: dict[str, dict] = {}
 
 

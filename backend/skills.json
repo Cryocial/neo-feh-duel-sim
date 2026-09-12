@@ -113,7 +113,7 @@
     ]
   },
   "Breath of Life 4": {
-    "type": "bonus",
+    "type": "passive_c",
     "effects": [
       {
         "effect": "PRE_CBT_HEAL",
@@ -127,7 +127,7 @@
             "type": "cbt_stat_check",
             "params": {
               "stat": "defense",
-              "margin": -5,
+              "margin": 1,
               "comparison": "greater_or_equal"
             }
           }
@@ -145,8 +145,23 @@
             "type": "cbt_stat_check",
             "params": {
               "stat": "defense",
-              "margin": -5,
+              "margin": 1,
               "comparison": "lesser_than"
+            }
+          }
+        ]
+      },
+      {
+        "effect": "BURN_HEAL",
+        "target": "self",
+        "params": {},
+        "conditions": [
+          {
+            "type": "cbt_stat_check",
+            "params": {
+              "stat": "defense",
+              "margin": 1,
+              "comparison": "greater_or_equal"
             }
           }
         ]
@@ -190,7 +205,7 @@
       {
         "effects": [
           {
-            "effect": "GRANT_VISIBLE_STAT",
+            "effect": "GRANT_VISIBLE_BUFF",
             "target": "self",
             "params": {
               "stats": {
@@ -205,7 +220,7 @@
       {
         "effects": [
           {
-            "effect": "GRANT_VISIBLE_STAT",
+            "effect": "GRANT_VISIBLE_BUFF",
             "target": "self",
             "params": {
               "stats": {
@@ -302,6 +317,50 @@
             ]
           }
         ]
+      }
+    ]
+  },
+  "Bonus Doubler 3": {
+    "type": "passive_a",
+    "visible": {
+      "might": 0,
+      "range": 0,
+      "slaying": 0,
+      "cooldown": 0,
+      "grants": {}
+    },
+    "allowed_movement_types": [],
+    "allowed_weapon_types": [],
+    "is_arcane": false,
+    "is_prf": false,
+    "effects": [
+      {
+        "effect": "BONUS_DOUBLER",
+        "target": "self",
+        "params": {},
+        "conditions": []
+      }
+    ]
+  },
+  "Bonus Doubler 4": {
+    "type": "passive_a",
+    "visible": {
+      "might": 0,
+      "range": 0,
+      "slaying": 0,
+      "cooldown": 0,
+      "grants": {}
+    },
+    "allowed_movement_types": [],
+    "allowed_weapon_types": [],
+    "is_arcane": false,
+    "is_prf": false,
+    "effects": [
+      {
+        "effect": "FRINGE_BONUS",
+        "target": "self",
+        "params": {},
+        "conditions": []
       }
     ]
   }

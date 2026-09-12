@@ -262,11 +262,9 @@
     "type": "bonus",
     "effects": [
       {
-        "effect": "FLAT_DAMAGE_STRIKE",
+        "effect": "REFLEX",
         "target": "self",
         "params": {
-          "formula": "mitigated_bucket",
-          "multiplier": 1,
           "strike": "every_strike"
         },
         "conditions": []
@@ -375,6 +373,50 @@
       },
       {
         "effect": "DEF_BREATH",
+        "target": "self",
+        "params": {},
+        "conditions": []
+      }
+    ]
+  },
+  "Bonus Doubler": {
+    "type": "bonus",
+    "effects": [
+      {
+        "effect": "BONUS_DOUBLER",
+        "target": "self",
+        "params": {},
+        "conditions": []
+      }
+    ]
+  },
+  "Fringe Bonus": {
+    "type": "bonus",
+    "effects": [
+      {
+        "effect": "FRINGE_BONUS",
+        "target": "self",
+        "params": {},
+        "conditions": []
+      }
+    ]
+  },
+  "Foe Penalty Doubler": {
+    "type": "penalty",
+    "effects": [
+      {
+        "effect": "PENALTY_DOUBLER",
+        "target": "self",
+        "params": {},
+        "conditions": []
+      }
+    ]
+  },
+  "Sabotage": {
+    "type": "penalty",
+    "effects": [
+      {
+        "effect": "SABOTAGE",
         "target": "self",
         "params": {},
         "conditions": []
