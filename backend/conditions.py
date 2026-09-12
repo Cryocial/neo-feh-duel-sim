@@ -100,7 +100,7 @@ def _make_hp_pct_evaluator(
 
         def evaluate(unit: "CombatantState", foe: "CombatantState") -> bool:
             target = unit if target_str == "self" else foe
-            pct = (target.unit.start_of_combat_hp / target.unit.base_stats.hp) * 100
+            pct = (target.start_of_combat_hp / target.unit.max_hp) * 100
             return compare(pct, threshold)
 
         return evaluate
@@ -331,11 +331,19 @@ def _check_anyof(
     unit: CombatantState,
     foe: CombatantState,
 ) -> bool | None:
-    results = [check_condition(c, timing, unit, foe) for c in anyof.conditions]
-    timing_results = [r for r in results if r is not None]
-    if not timing_results:
-        return None
-    return any(timing_results)
+    # Branches resolve at different timings, so prune as we go: a failed branch
+    # is forgotten, a passed one decides, and the node stays pending while any
+    # branch is still unevaluated. Mutation is safe because build_effect
+    # constructs a fresh condition tree for every simulation.
+    pending = []
+    for c in anyof.conditions:
+        result = check_condition(c, timing, unit, foe)
+        if result is True:
+            return True
+        if result is None:
+            pending.append(c)
+    anyof.conditions = pending
+    return None if pending else False
 
 
 def _check_allof(
@@ -344,11 +352,15 @@ def _check_allof(
     unit: CombatantState,
     foe: CombatantState,
 ) -> bool | None:
-    results = [check_condition(c, timing, unit, foe) for c in allof.conditions]
-    timing_results = [r for r in results if r is not None]
-    if not timing_results:
-        return None
-    return all(timing_results)
+    pending = []
+    for c in allof.conditions:
+        result = check_condition(c, timing, unit, foe)
+        if result is False:
+            return False
+        if result is None:
+            pending.append(c)
+    allof.conditions = pending
+    return None if pending else True
 
 
 # ── builders ─────────────────────────────────────────────────────────────────
