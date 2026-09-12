@@ -916,8 +916,8 @@ Formula names resolve to raw game quantities; skill-specific offsets and caps li
 | `bonus_count` | Unit's active bonus count | — |
 | `all_bonus_penalty_both` | Sum of bonus + penalty counts on **both** unit and foe (Empathy) | — |
 | `spaces_moved` | Spaces the unit moved before combat (Incited / Truly Incited) | — |
-| `sum_visible_buffs` | Sum of unit's visible stat bonuses, each floored at 0 (Treachery) | — |
-| `sum_foe_visible_debuffs` | Sum of foe's visible stat penalties, each floored at 0 (Dominance) | — |
+| `sum_visible_buffs` | Sum of unit's raw visible bonuses per stat (highest of own and granted, including any part the 99 cap wasted); 0 while the foe's `BONUS_NEUT` neutralizes the unit's bonuses (Treachery) | — |
+| `sum_foe_visible_debuffs` | Sum of foe's raw visible penalties per stat, cap-independent; 0 if the foe's own `PENALTY_NEUT` neutralizes them (Dominance) | — |
 | `unit_max_hp` | Unit's max HP (percent heals: pair with `multiplier`) | — |
 | `phantom_spd_diff` | `unit_spd - foe_spd`, in-combat, **including Phantom Spd**, floored at 0 (Dodge: pair with `multiplier`/`max` for the cap). Distinct from the plain `spd_diff` locals used by the follow-up check and `potent_spd_check`, which deliberately exclude Phantom. | — |
 | `foe_penalty_count` | Foe's active penalty count (Creation Pulse: pair with `max` for the cap) | — |

@@ -173,6 +173,17 @@ def _owner_and_opponent(effect: Effect, holder: CombatantState, foe: CombatantSt
     return holder, foe
 
 
+def _bonuses_neutralized(state: CombatantState, foe: CombatantState) -> bool:
+    """The foe's Lull (BONUS_NEUT) neutralizes this unit's visible bonuses:
+    they count as absent for stats, doublers, Treachery and the like."""
+    return any(e.type is EffectType.BONUS_NEUT for e in foe.effects_combat_stats)
+
+
+def _penalties_neutralized(state: CombatantState) -> bool:
+    """The unit's own PENALTY_NEUT: its visible penalties count as absent."""
+    return any(e.type is EffectType.PENALTY_NEUT for e in state.effects_combat_stats)
+
+
 def _great_talent_dict(total: StatBlock) -> dict[str, int]:
     return {stat: getattr(total, stat) for stat in COMBAT_STATS}
 
@@ -574,18 +585,10 @@ class CombatEngine:
         atk_state = self.combatant_states["attacker"]
         def_state = self.combatant_states["defender"]
 
-        atk_ignore_debuffs = any(
-            e.type == EffectType.PENALTY_NEUT for e in atk_state.effects_combat_stats
-        )
-        def_ignore_debuffs = any(
-            e.type == EffectType.PENALTY_NEUT for e in def_state.effects_combat_stats
-        )
-        atk_ignore_buffs = any(
-            e.type == EffectType.BONUS_NEUT for e in def_state.effects_combat_stats
-        )
-        def_ignore_buffs = any(
-            e.type == EffectType.BONUS_NEUT for e in atk_state.effects_combat_stats
-        )
+        atk_ignore_debuffs = _penalties_neutralized(atk_state)
+        def_ignore_debuffs = _penalties_neutralized(def_state)
+        atk_ignore_buffs = _bonuses_neutralized(atk_state, def_state)
+        def_ignore_buffs = _bonuses_neutralized(def_state, atk_state)
 
         atk_vals = {
             stat: atk_state.visible_stat(
@@ -1629,9 +1632,21 @@ class CombatEngine:
                 case "spaces_moved":
                     variable = unit_state.spaces_moved
                 case "sum_visible_buffs":
-                    variable = sum(unit_state.visible_buff(s) for s in COMBAT_STATS)
+                    # Treachery: nothing while the foe's Lull neutralizes the
+                    # unit's bonuses; otherwise the raw buffs, even any part
+                    # the visible cap wasted.
+                    variable = (
+                        0
+                        if _bonuses_neutralized(unit_state, foe_state)
+                        else sum(unit_state.visible_buff(s) for s in COMBAT_STATS)
+                    )
                 case "sum_foe_visible_debuffs":
-                    variable = sum(foe_state.visible_debuff(s) for s in COMBAT_STATS)
+                    # Dominance: nothing if the foe neutralizes its own penalties.
+                    variable = (
+                        0
+                        if _penalties_neutralized(foe_state)
+                        else sum(foe_state.visible_debuff(s) for s in COMBAT_STATS)
+                    )
                 case "unit_max_hp":
                     variable = unit_state.unit.max_hp
                 case "phantom_spd_diff":
