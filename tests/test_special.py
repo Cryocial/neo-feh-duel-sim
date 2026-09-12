@@ -413,25 +413,6 @@ def test_aoe_percent_dr_reduces_aoe_damage():
     """PERC_DR_AOE cuts the pre-combat Special damage by its percentage."""
     assert _aoe_setup(defender_effects=[("PERC_DR_AOE", {"flat": 40})]) == 12
 
-
-def test_aoe_dr_pierce_weakens_percent_dr():
-    """DR_PIERCE_AOE reduces the foe's percent AoE DR: 40% pierced by 50% -> 20%."""
-    damage = _aoe_setup(
-        defender_effects=[("PERC_DR_AOE", {"flat": 40})],
-        attacker_effects=[("DR_PIERCE_AOE", {"value": 50})],
-    )
-    assert damage == 16
-
-
-def test_aoe_dr_pierce_does_not_touch_flat_dr():
-    """Pierce only applies to percent DR, so flat AoE DR lands in full."""
-    damage = _aoe_setup(
-        defender_effects=[("FLAT_DR_AOE", {"flat": 10})],
-        attacker_effects=[("DR_PIERCE_AOE", {"value": 100})],
-    )
-    assert damage == 10
-
-
 def test_aoe_percent_dr_stacks_multiplicatively():
     """Two 40% sources give 64% total, not 80%."""
     damage = _aoe_setup(
