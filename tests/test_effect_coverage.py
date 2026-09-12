@@ -5,7 +5,7 @@ The engine can't prove that from the inside, so this scans the other test
 files for each name. It is a coarse check (a name in a docstring counts), but
 it guarantees a new effect type cannot land with zero tests.
 
-UNTESTED_* are strict ledgers of the gaps found in the 2026-09 audit. An entry
+UNTESTED_* are strict ledgers of the gaps. An entry
 there is expected to have no test; the check FAILS if it gains one (delete it
 from the ledger) or if a name outside the ledger has none (write the test).
 The ledgers can only shrink.
