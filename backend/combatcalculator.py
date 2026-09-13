@@ -755,6 +755,12 @@ class CombatEngine:
                     potent_mult=defender_potent_mult,
                 )
             )
+
+        defender_range = _base_combat_range(def_state.unit.weapon_type)
+        defender_counterattack = (
+            self.combat_range == defender_range
+            or any(e.type == EffectType.COUNTERATTACK for e in def_state.effects_strike_sequence)
+        )
                  
         defender_flash = any(
             e.type == EffectType.FLASH for e in def_state.effects_strike_sequence
