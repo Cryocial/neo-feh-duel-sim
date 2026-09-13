@@ -19,7 +19,13 @@ from backend.combatcalculator import CombatEngine
 
 
 def make_unit(
-    name, color=Color.RED, hp=50, atk=40, spd=10, defense=20, res=20,
+    name,
+    color=Color.RED,
+    hp=50,
+    atk=40,
+    spd=10,
+    defense=20,
+    res=20,
     weapon_type=WeaponType.SWORD,
 ):
     return Unit(
@@ -41,7 +47,12 @@ def counterattack_status():
         name="Test Counterattack",
         type="bonus",
         effects=[
-            {"effect": "COUNTERATTACK", "target": "self", "params": {}, "conditions": []}
+            {
+                "effect": "COUNTERATTACK",
+                "target": "self",
+                "params": {},
+                "conditions": [],
+            }
         ],
     )
 
@@ -50,9 +61,7 @@ def flash_status():
     return Status(
         name="Test Flash",
         type="penalty",
-        effects=[
-            {"effect": "FLASH", "target": "self", "params": {}, "conditions": []}
-        ],
+        effects=[{"effect": "FLASH", "target": "self", "params": {}, "conditions": []}],
     )
 
 

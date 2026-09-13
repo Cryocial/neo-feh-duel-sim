@@ -6,7 +6,7 @@ from .constants import MovementType, WeaponType, SpecialType
 SKILL_DATABASE: dict[str, Skill] = {}
 BONUS_DATABASE: dict[str, Status] = {}
 PENALTY_DATABASE: dict[str, Status] = {}
-DIVINE_VEINS_DATABASE: dict[str, Status] = {}
+DIVINE_VEINS_DATABASE: dict[str, DivineVein] = {}
 UNIT_DATABASE: dict[str, dict] = {}
 
 
@@ -18,7 +18,7 @@ def _load_statuses(path: str) -> None:
             name=name,
             type=entry["type"],
             effects=entry.get("effects", []),
-            grants_style=entry.get("grants_style", False)
+            grants_style=entry.get("grants_style", False),
         )
         if status.type == "bonus":
             BONUS_DATABASE[name] = status
@@ -48,7 +48,7 @@ def _load_skills(path: str) -> None:
             is_arcane=entry.get("is_arcane", False),
             is_prf=entry.get("is_prf", False),
             grants_style=entry.get("grants_style", False),
-            special_type=SpecialType[entry.get("special_type", "NONE")]
+            special_type=SpecialType[entry.get("special_type", "NONE")],
         )
 
 
@@ -57,9 +57,9 @@ def _load_divine_veins(path: str) -> None:
         data = json.load(f)
     for name, entry in data.items():
         DIVINE_VEINS_DATABASE[name] = DivineVein(
-            name=name,
-            effects=entry.get("effects", [])
+            name=name, effects=entry.get("effects", [])
         )
+
 
 def _load_units(path: str) -> None:
     with open(path, encoding="utf-8") as f:
@@ -74,7 +74,7 @@ def _initialize_databases() -> None:
         (_load_statuses, "statuses.json"),
         (_load_skills, "skills.json"),
         (_load_units, "units.json"),
-        (_load_divine_veins, "divine_veins.json")
+        (_load_divine_veins, "divine_veins.json"),
     ]
     for loader, filename in loaders:
         path = os.path.join(base, filename)
