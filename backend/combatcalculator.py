@@ -755,18 +755,6 @@ class CombatEngine:
                     potent_mult=defender_potent_mult,
                 )
             )
-
-        # Armored foes also counter when the attacker's own weapon range matches
-        # theirs, even if a style moved the engagement distance.
-        defender_range = _base_combat_range(def_state.unit.weapon_type)
-        defender_counterattack = (
-            self.combat_range == defender_range
-            or (
-                def_state.unit.movement_type is MovementType.ARMOR
-                and _base_combat_range(atk_state.unit.weapon_type) == defender_range
-            )
-            or any(e.type == EffectType.COUNTERATTACK for e in def_state.effects_strike_sequence)
-        )
                  
         defender_flash = any(
             e.type == EffectType.FLASH for e in def_state.effects_strike_sequence

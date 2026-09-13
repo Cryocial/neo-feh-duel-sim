@@ -7,7 +7,7 @@ Each entry is one parametrized case. The checks mirror build_effect exactly
 things build_effect can't see: condition types inside any_of / all_of, and a
 Special slot that never declared its special_type.
 
-KNOWN_BROKEN is a strict ledger of entries that fail today (audit bugs #7-11).
+KNOWN_BROKEN is a strict ledger of entries that fail today.
 They are marked xfail(strict=True): the moment one of them validates cleanly
 the test FAILS, telling you to delete it from the ledger. The ledger can only
 shrink.
