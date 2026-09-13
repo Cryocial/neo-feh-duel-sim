@@ -46,16 +46,25 @@ def _unit(name, **stats):
     base = dict(hp=50, atk=40, spd=10, defense=20, res=20)
     base.update(stats)
     return Unit(
-        name=name, movement_type=MovementType.INFANTRY,
-        weapon_type=WeaponType.SWORD, color=Color.RED, **base,
+        name=name,
+        movement_type=MovementType.INFANTRY,
+        weapon_type=WeaponType.SWORD,
+        color=Color.RED,
+        **base,
     )
 
 
 def _skill(name, slot, effects, **overrides):
     fields = dict(
-        name=name, slot=slot, might=0, slaying=0, cooldown=0,
-        visible_stats=StatBlock(), effects=effects,
-        allowed_movement_types=[], allowed_weapon_types=[],
+        name=name,
+        slot=slot,
+        might=0,
+        slaying=0,
+        cooldown=0,
+        visible_stats=StatBlock(),
+        effects=effects,
+        allowed_movement_types=[],
+        allowed_weapon_types=[],
     )
     fields.update(overrides)
     return Skill(**fields)
@@ -65,32 +74,73 @@ def loaded_matchup():
     """Touches every phase: start-of-turn grant, AoE special, a post_aoe HP%
     condition, a pre-combat vein, per-strike DR, and a pre-damaged attacker."""
     attacker = _unit("A", spd=30)
-    attacker.special = _skill("AoE", "special", [{
-        "effect": "TRIGGER_AOE", "target": "self",
-        "params": {"coefficient": 1.0}, "conditions": [],
-    }], cooldown=2, special_type=SpecialType.AOE)
+    attacker.special = _skill(
+        "AoE",
+        "special",
+        [
+            {
+                "effect": "TRIGGER_AOE",
+                "target": "self",
+                "params": {"coefficient": 1.0},
+                "conditions": [],
+            }
+        ],
+        cooldown=2,
+        special_type=SpecialType.AOE,
+    )
     attacker.pre_charge = 2
-    attacker.c_slot = _skill("Hone", "c", [{
-        "effect": "GRANT_VISIBLE_STAT", "target": "self",
-        "params": {"stats": {"atk": 6}}, "conditions": [],
-    }])
-    attacker.a_slot = _skill("Brash", "a", [{
-        "effect": "FLAT_DAMAGE_STRIKE", "target": "self",
-        "params": {"flat": 10, "strike": "every_strike"},
-        "conditions": [{"type": "hp_below_pct", "params": {"threshold": 100}}],
-    }])
+    attacker.c_slot = _skill(
+        "Hone",
+        "c",
+        [
+            {
+                "effect": "GRANT_VISIBLE_STAT",
+                "target": "self",
+                "params": {"stats": {"atk": 6}},
+                "conditions": [],
+            }
+        ],
+    )
+    attacker.a_slot = _skill(
+        "Brash",
+        "a",
+        [
+            {
+                "effect": "FLAT_DAMAGE_STRIKE",
+                "target": "self",
+                "params": {"flat": 10, "strike": "every_strike"},
+                "conditions": [{"type": "hp_below_pct", "params": {"threshold": 100}}],
+            }
+        ],
+    )
     attacker.current_hp = 40
 
     defender = _unit("D", hp=100, atk=30)
-    defender.active_statuses.append(Status(name="Dodge", type="bonus", effects=[{
-        "effect": "PERC_DR_STRIKE", "target": "self",
-        "params": {"flat": 30, "strike": "every_strike", "piercable": True},
-        "conditions": [],
-    }]))
-    vein = DivineVein(name="Flame", effects=[{
-        "effect": "PRE_CBT_DAMAGE", "target": "foe",
-        "params": {"flat": 7}, "conditions": [],
-    }])
+    defender.active_statuses.append(
+        Status(
+            name="Dodge",
+            type="bonus",
+            effects=[
+                {
+                    "effect": "PERC_DR_STRIKE",
+                    "target": "self",
+                    "params": {"flat": 30, "strike": "every_strike", "piercable": True},
+                    "conditions": [],
+                }
+            ],
+        )
+    )
+    vein = DivineVein(
+        name="Flame",
+        effects=[
+            {
+                "effect": "PRE_CBT_DAMAGE",
+                "target": "foe",
+                "params": {"flat": 7},
+                "conditions": [],
+            }
+        ],
+    )
     return attacker, defender, vein
 
 
@@ -109,16 +159,33 @@ def test_simulate_is_repeatable_and_leaves_units_untouched():
 # ── build_effect is the validation boundary ──────────────────────────────────
 
 
-@pytest.mark.parametrize("desc,message", [
-    ({"effect": "NOPE", "target": "self"}, "unknown effect type"),
-    ({"effect": "FLAT_DAMAGE_STRIKE", "target": "sefl", "params": {"flat": 1}},
-     "target must be"),
-    ({"effect": "TRIGGER_AOE", "target": "self", "params": {}}, "missing params"),
-    ({"effect": "FLAT_DAMAGE_STRIKE", "target": "self",
-      "params": {"flat": 1, "strike": "on_foe_special"}}, "unknown strike"),
-    ({"effect": "FLAT_DAMAGE_STRIKE", "target": "self",
-      "params": {"formula": "bonus_count_plus_4"}}, "unknown formula"),
-])
+@pytest.mark.parametrize(
+    "desc,message",
+    [
+        ({"effect": "NOPE", "target": "self"}, "unknown effect type"),
+        (
+            {"effect": "FLAT_DAMAGE_STRIKE", "target": "sefl", "params": {"flat": 1}},
+            "target must be",
+        ),
+        ({"effect": "TRIGGER_AOE", "target": "self", "params": {}}, "missing params"),
+        (
+            {
+                "effect": "FLAT_DAMAGE_STRIKE",
+                "target": "self",
+                "params": {"flat": 1, "strike": "on_foe_special"},
+            },
+            "unknown strike",
+        ),
+        (
+            {
+                "effect": "FLAT_DAMAGE_STRIKE",
+                "target": "self",
+                "params": {"formula": "bonus_count_plus_4"},
+            },
+            "unknown formula",
+        ),
+    ],
+)
 def test_build_effect_rejects_malformed_descriptions(desc, message):
     with pytest.raises(ValueError, match=message):
         build_effect(desc, applied_by="self")
@@ -168,7 +235,7 @@ def test_every_formula_name_resolves(engine, plain_unit, plain_foe, name):
 def _doc_section(start, end=None):
     text = DOC.read_text(encoding="utf-8")
     begin = text.index(start)
-    return text[begin:text.index(end, begin)] if end else text[begin:]
+    return text[begin : text.index(end, begin)] if end else text[begin:]
 
 
 def _first_column(section):
@@ -181,12 +248,16 @@ def test_doc_effect_tables_match_effect_type():
 
 
 def test_doc_strike_table_matches_strike_values():
-    documented = _first_column(_doc_section("### B - `strike` Value Reference", "### C -"))
+    documented = _first_column(
+        _doc_section("### B - `strike` Value Reference", "### C -")
+    )
     assert documented == set(STRIKE_VALUES)
 
 
 def test_doc_formula_table_matches_formula_names():
-    documented = _first_column(_doc_section("### C - `formula` Value Reference", "### D -"))
+    documented = _first_column(
+        _doc_section("### C - `formula` Value Reference", "### D -")
+    )
     assert documented - {'""'} == FORMULA_NAMES - {""}
 
 

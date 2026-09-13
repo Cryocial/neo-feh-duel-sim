@@ -72,10 +72,12 @@ class Status:
     effects: list[dict]  # raw effect definitions from the JSON
     grants_style: bool = False
 
+
 @dataclass(frozen=True)
 class DivineVein:
     name: str
     effects: list[dict]
+
 
 class Unit:
     """
@@ -211,11 +213,14 @@ class Unit:
         for i in range(total_points):
             updates[sorted_stats[i % 5]] += 1
 
-        self.base_stats = replace(self.base_stats, **{
-            stat: getattr(self.base_stats, stat) + delta
-            for stat, delta in updates.items()
-            if delta > 0
-        })
+        self.base_stats = replace(
+            self.base_stats,
+            **{
+                stat: getattr(self.base_stats, stat) + delta
+                for stat, delta in updates.items()
+                if delta > 0
+            },
+        )
 
     def _initialize_stats(self):
         """
@@ -294,4 +299,3 @@ class Unit:
             WeaponType.DRAGON,
             WeaponType.BEAST,
         }
-

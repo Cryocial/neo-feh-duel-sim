@@ -37,9 +37,15 @@ def make_unit(name, color=Color.RED, hp=50, atk=40, spd=10, defense=20, res=20):
 
 def give_special(unit, special_type, effects, max_cooldown=1):
     unit.special = Skill(
-        name="Test Special", slot="special", might=0, slaying=0, cooldown=max_cooldown,
-        visible_stats=StatBlock(), effects=effects,
-        allowed_movement_types=[], allowed_weapon_types=[],
+        name="Test Special",
+        slot="special",
+        might=0,
+        slaying=0,
+        cooldown=max_cooldown,
+        visible_stats=StatBlock(),
+        effects=effects,
+        allowed_movement_types=[],
+        allowed_weapon_types=[],
         special_type=special_type,
     )
     unit.max_cooldown = max_cooldown
@@ -70,12 +76,14 @@ def denial_status(types):
     return Status(
         name="Test Denial",
         type="bonus",
-        effects=[{
-            "effect": "SPECIAL_TRIGGER_NEUT",
-            "target": "foe",
-            "params": types,
-            "conditions": [],
-        }],
+        effects=[
+            {
+                "effect": "SPECIAL_TRIGGER_NEUT",
+                "target": "foe",
+                "params": types,
+                "conditions": [],
+            }
+        ],
     )
 
 
@@ -135,7 +143,9 @@ def fatal_smoke_status():
     return Status(
         name="Test Fatal Smoke",
         type="bonus",
-        effects=[{"effect": "FATAL_SMOKE", "target": "self", "params": {}, "conditions": []}],
+        effects=[
+            {"effect": "FATAL_SMOKE", "target": "self", "params": {}, "conditions": []}
+        ],
     )
 
 
@@ -183,10 +193,14 @@ def test_off_special_with_capped_special_dr():
     readiness (Ice Wall shape): the DR is capped by max_triggers, the damage
     bonus still needs an actual trigger."""
     attacker = make_unit("A", atk=30, spd=30, defense=20)
-    give_special(attacker, SpecialType.OFF, [
-        flat_damage(10, "unit_special_triggers"),
-        perc_dr(50, "unit_special_ready", piercable=False, max_triggers=1),
-    ])
+    give_special(
+        attacker,
+        SpecialType.OFF,
+        [
+            flat_damage(10, "unit_special_triggers"),
+            perc_dr(50, "unit_special_ready", piercable=False, max_triggers=1),
+        ],
+    )
     defender = make_unit("D", atk=40, spd=10, defense=20)
 
     engine = CombatEngine(attacker, defender)
@@ -206,9 +220,13 @@ def test_off_special_with_piercable_dr_is_uncapped():
     """Same idea but the DR is piercable, so max_triggers does not apply and it
     reduces both of the defender's strikes."""
     attacker = make_unit("A", atk=30, spd=10, defense=20)
-    give_special(attacker, SpecialType.OFF, [
-        perc_dr(50, "every_strike", piercable=True),
-    ])
+    give_special(
+        attacker,
+        SpecialType.OFF,
+        [
+            perc_dr(50, "every_strike", piercable=True),
+        ],
+    )
     defender = make_unit("D", atk=40, spd=30, defense=20)
 
     engine = CombatEngine(attacker, defender)
@@ -228,9 +246,13 @@ def test_def_special_triggers_when_struck():
     unit's own counterattack."""
     attacker = make_unit("A", atk=40, spd=30, defense=20)
     defender = make_unit("D", atk=25, spd=10, defense=20)
-    give_special(defender, SpecialType.DEF, [
-        perc_dr(50, "unit_special_triggers", piercable=False, max_triggers=1),
-    ])
+    give_special(
+        defender,
+        SpecialType.DEF,
+        [
+            perc_dr(50, "unit_special_triggers", piercable=False, max_triggers=1),
+        ],
+    )
 
     engine = CombatEngine(attacker, defender)
     result = engine.simulate()
@@ -250,11 +272,15 @@ def test_def_special_also_granting_damage_on_readiness():
     on triggering, so it applies on the unit's own counterattack."""
     attacker = make_unit("A", atk=40, spd=10, defense=20)
     defender = make_unit("D", atk=25, spd=20, defense=20)
-    give_special(defender, SpecialType.DEF, [
-        perc_dr(50, "unit_special_triggers", piercable=False, max_triggers=1),
-        flat_damage(10, "any_special_ready_or_triggered"),
-    ],
-    max_cooldown=2)
+    give_special(
+        defender,
+        SpecialType.DEF,
+        [
+            perc_dr(50, "unit_special_triggers", piercable=False, max_triggers=1),
+            flat_damage(10, "any_special_ready_or_triggered"),
+        ],
+        max_cooldown=2,
+    )
 
     engine = CombatEngine(attacker, defender)
     result = engine.simulate()
@@ -353,8 +379,11 @@ def test_no_special_at_all_is_never_ready():
     effects never apply."""
     attacker = make_unit("A", atk=30, spd=30, defense=20)
     attacker.active_statuses.append(
-        Status(name="Readiness bonus", type="bonus",
-               effects=[flat_damage(10, "unit_special_ready")])
+        Status(
+            name="Readiness bonus",
+            type="bonus",
+            effects=[flat_damage(10, "unit_special_ready")],
+        )
     )
     defender = make_unit("D", atk=25, spd=10, defense=20)
 
@@ -413,6 +442,7 @@ def test_aoe_percent_dr_reduces_aoe_damage():
     """PERC_DR_AOE cuts the pre-combat Special damage by its percentage."""
     assert _aoe_setup(defender_effects=[("PERC_DR_AOE", {"flat": 40})]) == 12
 
+
 def test_aoe_percent_dr_stacks_multiplicatively():
     """Two 40% sources give 64% total, not 80%."""
     damage = _aoe_setup(
@@ -439,10 +469,14 @@ def test_other_special_is_ready_but_never_triggers():
     """A special resolved outside combat (staff heals, etc.) counts as ready,
     but never triggers during a fight."""
     attacker = make_unit("A", atk=30, spd=30, defense=20)
-    give_special(attacker, SpecialType.OTHER, [
-        flat_damage(10, "unit_special_triggers"),
-        flat_damage(5, "unit_special_ready"),
-    ])
+    give_special(
+        attacker,
+        SpecialType.OTHER,
+        [
+            flat_damage(10, "unit_special_triggers"),
+            flat_damage(5, "unit_special_ready"),
+        ],
+    )
     defender = make_unit("D", atk=25, spd=10, defense=20)
 
     engine = CombatEngine(attacker, defender)
@@ -465,8 +499,13 @@ def test_special_triggering_twice_is_counted_twice():
     attacker = make_unit("A", atk=25, spd=30, defense=20)
     give_special(attacker, SpecialType.OFF, [flat_damage(5, "unit_special_triggers")])
     attacker.active_statuses.append(
-        Status(name="Test Brave", type="bonus",
-               effects=[{"effect": "BRAVE", "target": "self", "params": {}, "conditions": []}])
+        Status(
+            name="Test Brave",
+            type="bonus",
+            effects=[
+                {"effect": "BRAVE", "target": "self", "params": {}, "conditions": []}
+            ],
+        )
     )
     defender = make_unit("D", atk=25, spd=10, defense=20)
 
@@ -492,10 +531,14 @@ def test_miracle_special_can_trigger_twice_in_one_combat():
     attacker = make_unit("A", atk=40, spd=30, defense=20)
     attacker.active_statuses.append(brave_status())
     defender = make_unit("D", hp=50, atk=25, spd=10, defense=0)
-    give_special(defender, SpecialType.MIRACLE, [
-        special_miracle(),
-        heal(20, "every_strike"),
-    ])
+    give_special(
+        defender,
+        SpecialType.MIRACLE,
+        [
+            special_miracle(),
+            heal(20, "every_strike"),
+        ],
+    )
 
     engine = CombatEngine(attacker, defender)
     result = engine.simulate()
@@ -536,9 +579,13 @@ def test_denied_def_special_does_not_trigger():
     attacker = make_unit("A", atk=40, spd=30, defense=20)
     attacker.active_statuses.append(denial_status({"def": True}))
     defender = make_unit("D", atk=25, spd=10, defense=20)
-    give_special(defender, SpecialType.DEF, [
-        perc_dr(50, "unit_special_triggers", piercable=False, max_triggers=1),
-    ])
+    give_special(
+        defender,
+        SpecialType.DEF,
+        [
+            perc_dr(50, "unit_special_triggers", piercable=False, max_triggers=1),
+        ],
+    )
 
     engine = CombatEngine(attacker, defender)
     result = engine.simulate()
@@ -600,10 +647,14 @@ def test_denial_does_not_affect_readiness():
     """Denial blocks the trigger only: the special still counts as ready, so
     readiness gated effects keep applying."""
     attacker = make_unit("A", atk=30, spd=30, defense=20)
-    give_special(attacker, SpecialType.OFF, [
-        flat_damage(10, "unit_special_triggers"),
-        flat_damage(5, "unit_special_ready"),
-    ])
+    give_special(
+        attacker,
+        SpecialType.OFF,
+        [
+            flat_damage(10, "unit_special_triggers"),
+            flat_damage(5, "unit_special_ready"),
+        ],
+    )
     defender = make_unit("D", atk=25, spd=10, defense=20)
     defender.active_statuses.append(denial_status({"off": True}))
 
@@ -628,10 +679,14 @@ def test_denied_special_does_not_satisfy_foe_special_triggers():
     attacker = make_unit("A", atk=30, spd=30, defense=20)
     give_special(attacker, SpecialType.OFF, [flat_damage(10, "unit_special_triggers")])
     defender = make_unit("D", atk=25, spd=10, defense=20)
-    give_special(defender, SpecialType.OFF, [
-        flat_damage(5, "unit_special_triggers"),
-        perc_dr(50, "foe_special_triggers", piercable=False, max_triggers=1),
-    ])
+    give_special(
+        defender,
+        SpecialType.OFF,
+        [
+            flat_damage(5, "unit_special_triggers"),
+            perc_dr(50, "foe_special_triggers", piercable=False, max_triggers=1),
+        ],
+    )
     # target "foe" lands the denial in the attacker's list only
     defender.active_statuses.append(denial_status({"off": True}))
 

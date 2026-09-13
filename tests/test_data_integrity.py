@@ -28,20 +28,20 @@ from backend.jsonbootupstuff import (
 KNOWN_BROKEN = {
     "Arcane Cake": "strike 'on_foe_special' is not a STRIKE_VALUES entry (audit #9)",
     "Chosen Sword": "effects [1]-[3] are nested {'effects': [...]} wrappers, "
-                    "and strike 'on_foe_special' (audit #7, #9)",
+    "and strike 'on_foe_special' (audit #7, #9)",
     "Dragon Fang": "slot=special with no special_type, and strike "
-                   "'on_unit_special' (audit #8, #9)",
+    "'on_unit_special' (audit #8, #9)",
     "Atk Liberate": "formula 'bonus_count_plus_4' does not exist (audit #10)",
     "Spd Liberate": "formula 'bonus_count_plus_4' does not exist (audit #10)",
     "Def Liberate": "formula 'bonus_count_plus_4' does not exist (audit #10)",
     "Res Liberate": "formula 'bonus_count_plus_4' does not exist (audit #10)",
     "Divine Nectar": "strike 'first_sequence', and effect "
-                     "'NEUT_DEEP_WOUNDS_STRIKE' (audit #9, #11)",
+    "'NEUT_DEEP_WOUNDS_STRIKE' (audit #9, #11)",
     "Stone": "strike 'on_foe_special' (audit #9); its PERC_DR_AOE effect "
-             "only exists once PR #36 lands",
+    "only exists once PR #36 lands",
     "Water": "DR_PIERCE written with the formula block (flat: 50) instead of "
-             "value: 50, which is the key the engine reads; the pierce was "
-             "silently 0% (found by REQUIRED_PARAMS, post-audit)",
+    "value: 50, which is the key the engine reads; the pierce was "
+    "silently 0% (found by REQUIRED_PARAMS, post-audit)",
 }
 
 
@@ -81,7 +81,9 @@ def problems_for(name, entry):
     slot = getattr(entry, "slot", None)
     special_type = getattr(entry, "special_type", SpecialType.NONE)
     if slot == "special" and special_type is SpecialType.NONE:
-        problems.append(f"{name}: slot=special but no special_type, so it can never trigger")
+        problems.append(
+            f"{name}: slot=special but no special_type, so it can never trigger"
+        )
     if slot not in (None, "special") and special_type is not SpecialType.NONE:
         problems.append(f"{name}: slot={slot!r} but special_type={special_type.name}")
     return problems

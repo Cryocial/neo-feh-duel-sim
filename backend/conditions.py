@@ -158,7 +158,9 @@ def _evaluate_cbt_stat_check(params: dict) -> Callable:
             unit_stat = unit.cbt_stat_with_phantom(stat)
             foe_stat = foe.cbt_stat_with_phantom(stat)
         else:
-            unit_stat = getattr(unit.combat_stats, stat, unit.unit.get_visible_stat(stat))
+            unit_stat = getattr(
+                unit.combat_stats, stat, unit.unit.get_visible_stat(stat)
+            )
             foe_stat = getattr(foe.combat_stats, stat, foe.unit.get_visible_stat(stat))
         threshold = foe_stat + margin
         if comparison == "lesser_than":
@@ -258,6 +260,7 @@ def _evaluate_potent_patience(params: dict) -> Callable:
 
 def _evaluate_style_enabled(params: dict) -> Callable:
     """Checks if unit should use style if possible"""
+
     def evaluate(unit: "CombatantState", foe: "CombatantState") -> bool:
         return unit.nb_styles == 1 and unit.style_enabled
 
@@ -309,6 +312,7 @@ class AllOf:
 
 
 Condition = AtomicCondition | AnyOf | AllOf
+
 
 def check_condition(
     cond: Condition,

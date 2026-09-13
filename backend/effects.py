@@ -136,7 +136,9 @@ def validate_effect_desc(desc: dict) -> list[str]:
 def build_effect(desc: dict, applied_by: str) -> Effect:
     problems = validate_effect_desc(desc)
     if problems:
-        raise ValueError(f"Malformed effect {desc.get('effect')!r}: " + "; ".join(problems))
+        raise ValueError(
+            f"Malformed effect {desc.get('effect')!r}: " + "; ".join(problems)
+        )
     return Effect(
         type=EffectType(desc["effect"]),
         applied_by=applied_by,
