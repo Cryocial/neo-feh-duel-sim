@@ -144,7 +144,7 @@ def condition_state(unit, *, is_initiator):
     """25/50 HP, so hp_below_pct 100 passes and hp_below_pct 0 fails."""
     return CombatantState(
         unit=unit, current_hp=25, current_cooldown=0,
-        is_initiator=is_initiator, start_of_combat_hp=25,
+        is_initiator=is_initiator,
     )
 
 

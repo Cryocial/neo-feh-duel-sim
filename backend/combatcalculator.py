@@ -21,7 +21,6 @@ class CombatantState:
     phantom_bonus: StatBlock = field(default_factory=StatBlock)
     defensive_stat: Literal["defense", "res"] | None = None
     cd_start_of_cbt: int = 0
-    start_of_combat_hp: int = 0
     damage_mitigated_bucket: int = 0
     bonus_count: int = 0
     penalty_count: int = 0
@@ -250,9 +249,6 @@ class CombatEngine:
         self._range_calculation()
 
         self._resolve_aoe()
-
-        for state in self.combatant_states.values():
-            state.start_of_combat_hp = state.current_hp
 
         self._evaluate_conditions("post_aoe")
 
