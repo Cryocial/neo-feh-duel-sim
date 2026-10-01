@@ -87,7 +87,14 @@ def twin_status(value):
     return Status(
         name="Test Twin",
         type="bonus",
-        effects=[{"effect": "TWIN", "target": "self", "params": {"value": value}, "conditions": []}],
+        effects=[
+            {
+                "effect": "TWIN",
+                "target": "self",
+                "params": {"value": value},
+                "conditions": [],
+            }
+        ],
     )
 
 
@@ -95,7 +102,9 @@ def test_non_piercable_dr_caps_without_twin():
     """No Twin: the effect's own max_triggers=1 caps it at a single trigger."""
     attacker = make_unit("A", atk=40, defense=20, spd=20)
     defender = make_unit("D", atk=10, defense=20, spd=10)
-    defender.active_statuses.append(special_dr_status("Special DR", 30, "every_strike", max_triggers=1))
+    defender.active_statuses.append(
+        special_dr_status("Special DR", 30, "every_strike", max_triggers=1)
+    )
 
     result = CombatEngine(attacker, defender).simulate()
 
@@ -111,7 +120,9 @@ def test_twin_affects_only_non_piercable_DR():
     attacker = make_unit("A", atk=40, defense=20, spd=20)
     defender = make_unit("D", atk=10, defense=20, spd=10)
     defender.active_statuses.append(piercable_dr_status(30, "first_strike"))
-    defender.active_statuses.append(special_dr_status("Special DR", 30, "every_strike", max_triggers=1))
+    defender.active_statuses.append(
+        special_dr_status("Special DR", 30, "every_strike", max_triggers=1)
+    )
     defender.active_statuses.append(twin_status(2))
 
     result = CombatEngine(attacker, defender).simulate()
@@ -127,7 +138,9 @@ def test_only_highest_twin_value_applies():
     attacker = make_unit("A", atk=40, defense=20, spd=20)
     attacker.active_statuses.append(brave_status())
     defender = make_unit("D", atk=10, defense=20, spd=10)
-    defender.active_statuses.append(special_dr_status("Special DR", 50, "every_strike", max_triggers=2))
+    defender.active_statuses.append(
+        special_dr_status("Special DR", 50, "every_strike", max_triggers=2)
+    )
     defender.active_statuses.append(twin_status(3))
     defender.active_statuses.append(twin_status(4))
 
@@ -143,7 +156,9 @@ def test_twin_infinite_removes_cap():
     attacker = make_unit("A", atk=40, defense=20, spd=20)
     attacker.active_statuses.append(brave_status())
     defender = make_unit("D", atk=10, defense=20, spd=10)
-    defender.active_statuses.append(special_dr_status("Special DR", 50, "every_strike", max_triggers=1))
+    defender.active_statuses.append(
+        special_dr_status("Special DR", 50, "every_strike", max_triggers=1)
+    )
     defender.active_statuses.append(twin_status(-1))
 
     result = CombatEngine(attacker, defender).simulate()
@@ -161,16 +176,26 @@ def test_effects_on_different_strikes_are_independently_tracked():
     charging +1."""
     attacker = make_unit("A", atk=40, defense=20, spd=20)
     attacker.special = Skill(
-        name="Special", slot="special", might=0, slaying=0, cooldown=1,
-        visible_stats=StatBlock(), effects=[],
-        allowed_movement_types=[], allowed_weapon_types=[],
+        name="Special",
+        slot="special",
+        might=0,
+        slaying=0,
+        cooldown=1,
+        visible_stats=StatBlock(),
+        effects=[],
+        allowed_movement_types=[],
+        allowed_weapon_types=[],
         special_type=SpecialType.OFF,
     )
     attacker.max_cooldown = 1
     attacker.active_statuses.append(brave_status())
     defender = make_unit("D", atk=10, defense=20, spd=10)
-    defender.active_statuses.append(special_dr_status("X", 30, "first_attack", max_triggers=1))
-    defender.active_statuses.append(special_dr_status("Y", 60, "any_special_ready_or_triggered", max_triggers=1))
+    defender.active_statuses.append(
+        special_dr_status("X", 30, "first_attack", max_triggers=1)
+    )
+    defender.active_statuses.append(
+        special_dr_status("Y", 60, "any_special_ready_or_triggered", max_triggers=1)
+    )
     defender.active_statuses.append(twin_status(2))
 
     result = CombatEngine(attacker, defender).simulate()
@@ -191,8 +216,12 @@ def test_different_effects_have_independent_caps_with_twin():
     attacker = make_unit("A", atk=40, defense=20, spd=50)
     attacker.active_statuses.append(brave_status())
     defender = make_unit("D", atk=10, defense=20, spd=0)
-    defender.active_statuses.append(special_dr_status("X", 30, "every_strike", max_triggers=1))
-    defender.active_statuses.append(special_dr_status("Y", 50, "every_strike", max_triggers=3))
+    defender.active_statuses.append(
+        special_dr_status("X", 30, "every_strike", max_triggers=1)
+    )
+    defender.active_statuses.append(
+        special_dr_status("Y", 50, "every_strike", max_triggers=3)
+    )
     defender.active_statuses.append(twin_status(2))
 
     result = CombatEngine(attacker, defender).simulate()
