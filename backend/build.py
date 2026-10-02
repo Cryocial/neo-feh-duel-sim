@@ -157,6 +157,11 @@ class Unit:
 
         self._initialize_stats()
         self.first_combat_of_turn = True
+        # Scenario facts the user sets; the engine never counts turns or
+        # tracks transformation itself, it just reads these.
+        self.is_transformed = False
+        self.is_savior = False
+        self.turn_window_active = False
         self.style_enabled = False
         self.chosen_range: int | None = None
         self.allies_within_1_space = 0
