@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import Literal
-from .constants import EffectType, STRIKE_VALUES, FORMULA_NAMES
+from .constants import COMBAT_STATS, EffectType, STRIKE_VALUES, FORMULA_NAMES
 from .conditions import Condition, build_conditions
 
 EFFECT_LIST_MAP: dict[EffectType, str] = {
@@ -35,8 +35,10 @@ EFFECT_LIST_MAP: dict[EffectType, str] = {
     EffectType.OFF_FROZEN: "effects_strike_sequence",
     EffectType.DEF_FROZEN: "effects_strike_sequence",
     # ── Start of turn ────────────────────────────────────────────────────
-    EffectType.GRANT_VISIBLE_STAT: "effects_start_of_turn",
+    EffectType.GRANT_VISIBLE_BUFF: "effects_start_of_turn",
+    EffectType.INFLICT_VISIBLE_DEBUFF: "effects_start_of_turn",
     EffectType.GRANT_STATUS: "effects_start_of_turn",
+    EffectType.GRANT_GREAT_TALENT: "effects_start_of_turn",
     # ── Pre-combat ───────────────────────────────────────────────────────
     EffectType.BURN_DAMAGE: "effects_pre_combat",
     EffectType.BURN_HEAL: "effects_pre_combat",
@@ -73,6 +75,7 @@ EFFECT_LIST_MAP: dict[EffectType, str] = {
     EffectType.MIRACLE_NEUT: "effects_on_strike",
     # ── Post-combat ──────────────────────────────────────────────────────
     EffectType.HEAL_POST_CBT: "effects_after_combat",
+    EffectType.GRANT_GREAT_TALENT_POST_CBT: "effects_after_combat",
     EffectType.DAMAGE_POST_CBT: "effects_after_combat",
     EffectType.DEEP_WOUNDS_POST_CBT: "effects_after_combat",
     EffectType.NEUT_DEEP_WOUNDS_POST_CBT: "effects_after_combat",
@@ -100,10 +103,19 @@ REQUIRED_PARAMS: dict[EffectType, frozenset[str]] = {
     EffectType.STAT_BOOST: frozenset({"stats"}),
     EffectType.STAT_DAUNT: frozenset({"stats"}),
     EffectType.PHANTOM_STAT: frozenset({"stats"}),
-    EffectType.GRANT_VISIBLE_STAT: frozenset({"stats"}),
+    EffectType.GRANT_VISIBLE_BUFF: frozenset({"stats"}),
+    EffectType.INFLICT_VISIBLE_DEBUFF: frozenset({"stats"}),
     EffectType.GRANT_STATUS: frozenset({"status"}),
+    EffectType.GRANT_GREAT_TALENT: frozenset({"stats"}),
+    EffectType.GRANT_GREAT_TALENT_POST_CBT: frozenset({"stats"}),
 }
 
+# One effect per phase Great Talent can be granted in; a new way of granting it
+# is a new member here, a list-map entry, and one call to _grant_great_talent.
+GREAT_TALENT_TYPES = frozenset({
+    EffectType.GRANT_GREAT_TALENT,
+    EffectType.GRANT_GREAT_TALENT_POST_CBT,
+})
 
 def _formula_names(params: dict):
     """Every formula name in a param block, a nested flat block included."""
@@ -139,6 +151,17 @@ def validate_effect_desc(desc: dict) -> list[str]:
             "burn_taken is only known once burn has landed, "
             "so only BURN_HEAL can read it"
         )
+    magnitude_types = {EffectType.GRANT_VISIBLE_BUFF, EffectType.INFLICT_VISIBLE_DEBUFF}
+    if effect_type in magnitude_types | GREAT_TALENT_TYPES:
+        negative = {k: v for k, v in params.get("stats", {}).items() if v < 0}
+        if negative:
+            problems.append(
+                f"{effect_type.value} stats are magnitudes and must be >= 0, got {negative}"
+            )
+    if effect_type in GREAT_TALENT_TYPES:
+        unknown = sorted(set(params.get("stats", {})) - set(COMBAT_STATS))
+        if unknown:
+            problems.append(f"{effect_type.value} stats must be among {COMBAT_STATS}, got {unknown}")
     if effect_type is EffectType.BRIAR and "flat" not in params and not params.get("formula"):
         problems.append("BRIAR needs a percent: 'flat' or a 'formula'")
     return problems
