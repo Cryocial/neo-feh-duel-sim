@@ -870,9 +870,9 @@ Processed by `_initialize` before combat begins. These grant visible stats and s
 
 | Effect | FEH accurate Description | Details | `params`|
 |---|---|---|---|
-| `HEAL_POST_CBT` | Restores X HP to unit after combat | **Applied to unit**. Sources add up, the heal goes through the post-combat \[Deep Wounds] check and caps at max HP. | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
+| `HEAL_POST_CBT` | Restores X HP to unit after combat | **Applied to unit**. Sources add up, the heal goes through the post-combat \[Deep Wounds] check and caps at max HP. Like every after-combat effect it needs the unit alive, and an effect whose source died never fires. | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
 | `GRANT_GREAT_TALENT_POST_CBT` | Grants Great Talent+X to unit's stats after combat, up to a cap | **Granted to unit** once the fight is over, so it never affects this combat; it shows up in the `*_great_talent` result. Same per-stat cap rule as `GRANT_GREAT_TALENT`. | `{ stats: { atk: int, spd: int, defense: int, res: int }, max: int }` |
-| `DAMAGE_POST_CBT` | After combat, deals X damage to unit | **Applied to unit**. | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
+| `DAMAGE_POST_CBT` | After combat, deals X damage to unit | **Applied to unit**: sits on the unit that takes the damage, so a Savage Blow-style skill uses `target: "foe"`, the same way `BURN_DAMAGE` does. Sources add up; floors at 1 HP. | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
 | `DEEP_WOUNDS_POST_CBT` | Unit cannot be healed after combat | **Applied to unit**. Blocks post-combat healing only; `DEEP_WOUNDS_IN_CBT` is checked on its own list and neither gates the other. | `{}` |
 | `NEUT_DEEP_WOUNDS_POST_CBT` | Neutralizes effects that prevent unit from healing after combat | **Applied to unit**. Presence flag, lifts the post-combat block entirely. | `{}` |
 | `REDUCE_DEEP_WOUNDS_POST_CBT` | Reduces effects that prevent unit from healing after combat by X% | **Applied to unit**. Lets a % of healing through, stacks multiplicatively, rounds UP. Without it, post-combat healing stays fully blocked. | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
