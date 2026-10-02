@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from typing import Literal
 from .constants import COMBAT_STATS, Color, EffectType, STRIKE_VALUES, FORMULA_NAMES
 from .conditions import Condition, build_conditions
-from .conditions import Condition, build_conditions
 
 EFFECT_LIST_MAP: dict[EffectType, str] = {
     # ── AoE ──────────────────────────────────────────────────────────────
@@ -17,6 +16,7 @@ EFFECT_LIST_MAP: dict[EffectType, str] = {
     EffectType.STAT_DAUNT: "effects_combat_stats",
     EffectType.BONUS_NEUT: "effects_combat_stats",
     EffectType.PENALTY_NEUT: "effects_combat_stats",
+    EffectType.FEUD: "effects_combat_stats",
     EffectType.BONUS_DOUBLER: "effects_combat_stats",
     EffectType.PENALTY_DOUBLER: "effects_combat_stats",
     EffectType.FRINGE_BONUS: "effects_combat_stats",
@@ -168,6 +168,10 @@ def validate_effect_desc(desc: dict) -> list[str]:
         unknown = sorted(set(params.get("stats", {})) - set(COMBAT_STATS))
         if unknown:
             problems.append(f"{effect_type.value} stats must be among {COMBAT_STATS}, got {unknown}")
+    if effect_type is EffectType.FEUD:
+        unknown = [c for c in params.get("colors", []) if c not in Color.__members__]
+        if unknown:
+            problems.append(f"FEUD colors must be Color names, got {unknown}")
     if effect_type is EffectType.BRIAR and "flat" not in params and not params.get("formula"):
         problems.append("BRIAR needs a percent: 'flat' or a 'formula'")
     return problems

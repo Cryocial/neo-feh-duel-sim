@@ -111,6 +111,17 @@ def _evaluate_foe_weapon_type(params: dict) -> Callable:
     return evaluate
 
 
+def _evaluate_foe_color(params: dict) -> Callable:
+    """Checks if the foe's colour is in a list (the colour-gated half of a
+    Feud skill: "if in combat against a blue foe, inflicts -4")."""
+    colors = params["colors"]
+
+    def evaluate(unit: "CombatantState", foe: "CombatantState") -> bool:
+        return foe.unit.color.name in colors
+
+    return evaluate
+
+
 def _make_hp_pct_evaluator(
     compare: Callable[[float, float], bool],
 ) -> Callable[[dict], Callable]:
@@ -302,6 +313,7 @@ CONDITION_REGISTRY: dict[str, tuple[Timing, Callable[[dict], Callable]]] = {
     "savior": ("static", _evaluate_savior),
     "turn_window": ("static", _evaluate_turn_window),
     "foe_weapon_type": ("static", _evaluate_foe_weapon_type),
+    "foe_color": ("static", _evaluate_foe_color),
     "is_engaged": ("static", _evaluate_is_engaged),
     "style_enabled": ("static", _evaluate_style_enabled),
     "potent_patience": ("static", _evaluate_potent_patience),

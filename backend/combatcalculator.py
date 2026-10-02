@@ -269,11 +269,15 @@ class CombatEngine:
 
         self._evaluate_conditions("static")
 
+        self._apply_feud()
+
         self._range_calculation()
 
         self._resolve_aoe()
 
         self._evaluate_conditions("post_aoe")
+
+        self._apply_feud()
 
         self._combat_stat_calculations()
 
@@ -434,6 +438,53 @@ class CombatEngine:
                         effect.conditions = remaining_conditions
                         updated_conditions.append(effect)
                 setattr(state, list_name, updated_conditions)
+
+    def _apply_feud(self):
+        """FEUD sits on the unit whose allies' skills are disabled, the way
+        FU_DENY sits on the unit that can't follow up. It strips "ally" effects
+        on that unit and the "enemy" effects those allies put on the foe.
+
+        Blue Feud 3: "disables skills of all blue foes, excluding foe in
+        combat. If in combat against a blue foe, disables skills of all foes,
+        excluding foe in combat." So with `colors` an ally is disabled if its
+        own colour is listed, or every ally is if the unit itself is of a
+        listed colour. Without `colors`, every ally. A Feud whose conditions
+        haven't resolved yet does nothing, which is why this runs after each
+        early condition pass.
+        """
+        for role, foe_role in (("attacker", "defender"), ("defender", "attacker")):
+            state = self.combatant_states[role]
+            foe = self.combatant_states[foe_role]
+            feuds = [
+                e for e in state.effects_combat_stats
+                if e.type is EffectType.FEUD and not e.conditions
+            ]
+            if not feuds:
+                continue
+
+            every_ally = False
+            listed: set[str] = set()
+            for feud in feuds:
+                colors = feud.params.get("colors")
+                if colors is None or state.unit.color.name in colors:
+                    every_ally = True
+                    break
+                listed.update(colors)
+
+            def disabled(effect):
+                return every_ally or (
+                    effect.source_color is not None and effect.source_color.name in listed
+                )
+
+            for name in EFFECT_LISTS:
+                setattr(state, name, [
+                    e for e in getattr(state, name)
+                    if not (e.applied_by == "ally" and disabled(e))
+                ])
+                setattr(foe, name, [
+                    e for e in getattr(foe, name)
+                    if not (e.applied_by == "enemy" and disabled(e))
+                ])
 
     # ── Combat Range calculation ─────────────────────────────────────────────────
 

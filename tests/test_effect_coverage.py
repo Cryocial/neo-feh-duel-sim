@@ -62,7 +62,6 @@ UNTESTED_CONDITION_TYPES = frozenset(
         "ally_within_spaces",
         "foe_initiates",
         "is_engaged",
-        "unit_initiates",
     }
 )
 
