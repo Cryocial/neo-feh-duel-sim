@@ -134,7 +134,7 @@ def loaded_matchup():
         name="Flame",
         effects=[
             {
-                "effect": "PRE_CBT_DAMAGE",
+                "effect": "BURN_DAMAGE",
                 "target": "foe",
                 "params": {"flat": 7},
                 "conditions": [],

@@ -89,8 +89,9 @@ class EffectType(str, Enum):
     GRANT_STATUS = "GRANT_STATUS"
 
     # ── Pre-combat ────────────────────────────────────────────────────────────
-    PRE_CBT_DAMAGE = "PRE_CBT_DAMAGE"
+    BURN_DAMAGE = "BURN_DAMAGE"
     PRE_CBT_HEAL = "PRE_CBT_HEAL"
+    BURN_HEAL = "BURN_HEAL"
 
     # ── On-strike ─────────────────────────────────────────────────────────────
     DR_PIERCE = "DR_PIERCE"
