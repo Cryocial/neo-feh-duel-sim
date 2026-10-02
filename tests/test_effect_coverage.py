@@ -20,37 +20,10 @@ from backend.constants import EffectType
 TESTS_DIR = Path(__file__).resolve().parent
 THIS_FILE = Path(__file__).resolve()
 
-UNTESTED_EFFECT_TYPES = frozenset(
-    {
-        "FLAT_DAMAGE_AOE",
-        "PULSE_AOE",
-        "PHANTOM_STAT",
-        "POTENT",
-        "EFFECTIVE",
-        "NEUT_EFFECTIVE",
-        "DR_FLOOR",
-        "DEEP_WOUNDS_IN_CBT",
-        "NEUT_DEEP_WOUNDS_IN_CBT",
-        "REDUCE_DEEP_WOUNDS_IN_CBT",
-        "STAFF_FULL_DAMAGE",
-        "HEAL_POST_CBT",
-        "DAMAGE_POST_CBT",
-        "DEEP_WOUNDS_POST_CBT",
-        "REDUCE_DEEP_WOUNDS_POST_CBT",
-        "NEUT_DEEP_WOUNDS_POST_CBT",
-    }
-)
+UNTESTED_EFFECT_TYPES: frozenset[str] = frozenset()
 
 UNTESTED_CONDITION_TYPES = frozenset(
     {
-        "first_combat_of_turn",
-        "foe_weapon_type",
-        "potent_patience",
-        "bonus_penalty_total",
-        "cbt_stat_check",
-        "cbt_stat_sum_check",
-        "potent_spd_check",
-        "triggers_brave",
         "ally_within_spaces",
         "foe_initiates",
         "is_engaged",
