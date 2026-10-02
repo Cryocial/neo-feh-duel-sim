@@ -58,7 +58,6 @@ def make_state(
     bonus_count=0,
     penalty_count=0,
     spaces_moved=0,
-    damage_mitigated_bucket=0,
     burn_taken=0,
     combat_stats=None,
 ):
@@ -74,7 +73,6 @@ def make_state(
     state.bonus_count = bonus_count
     state.penalty_count = penalty_count
     state.spaces_moved = spaces_moved
-    state.damage_mitigated_bucket = damage_mitigated_bucket
     state.burn_taken = burn_taken
     state.combat_stats = combat_stats
     return state

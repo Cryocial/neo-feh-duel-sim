@@ -103,6 +103,8 @@ class EffectType(str, Enum):
     PERC_DR_STRIKE = "PERC_DR_STRIKE"
     TWIN = "TWIN"
     FLAT_DAMAGE_STRIKE = "FLAT_DAMAGE_STRIKE"
+    REFLEX = "REFLEX"
+    BRIAR = "BRIAR"
     PULSE_STRIKE = "PULSE_STRIKE"
     SCOWL_STRIKE = "SCOWL_STRIKE"
     HEAL_STRIKE = "HEAL_STRIKE"
@@ -163,7 +165,6 @@ FORMULA_NAMES: frozenset[str] = frozenset(
         "spaces_moved",
         "sum_visible_buffs",
         "sum_foe_visible_debuffs",
-        "mitigated_bucket",
         "unit_max_hp",
         "burn_taken",
         "phantom_spd_diff",
