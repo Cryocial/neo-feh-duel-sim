@@ -417,7 +417,7 @@ class CombatantState:
     current_cooldown:        int                        # initialized to max_cooldown - pre_charge
     combat_stats:            StatBlock | None = None
     defensive_stat:          Literal["defense", "res"] | None = None
-    damage_mitigated_bucket: int = 0                   # cumulated mitigated damage (for reflex, etc.)
+    reflect_bucket: int = 0                            # damage REFLEX / BRIAR add to the unit's next strike
     bonus_count:             int = 0                   # number of active bonuses
     penalty_count:           int = 0                   # number of active penalties
     special_use_count:       int = 0                   # times the Special was used this combat
@@ -830,6 +830,8 @@ Processed by `_initialize` before combat begins. These grant visible stats and s
 | `PERC_DR_STRIKE` | Reduce damage from foe's attacks during combat by X% | **Applied to unit**. Held by the unit being struck and strike-matched. Sources stack multiplicatively and the surviving damage rounds UP. `piercable: false` implies its special DR. It is potentially trigger-capped: `max_triggers` (`-1` = unlimited) counted per effect in `special_dr_count`, raised by `TWIN`. | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str, piercable: bool, max_triggers: int }` |
 | `TWIN` | Any "reduces damage by X%" effect can be triggered a new max of times | **Applied to unit**. Held by the unit being struck. Raises the `max_triggers` cap of that unit's non-piercable DR sources; `value: -1` means unlimited. Highest value wins, sources do not stack. | `{ value: int }` |
 | `FLAT_DAMAGE_STRIKE` | Unit deals +X damage | **Applied to unit**. Held by the striking unit and strike-matched. Sources add up and land before any damage reduction. | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
+| `REFLEX` | Unit's next attack deals damage = total damage reduced on this hit | **Applied to unit**. Held by the unit being struck and strike-matched. Adds the damage negated on a matching hit (percent and flat DR, after the staff halving) to `reflect_bucket`; the unit's very next strike spends the whole bucket as true damage. Sources stack: each matching Reflex adds the full amount. | `{ strike: str }` |
+| `BRIAR` | Unit's next attack deals damage = X% of foe's attack damage prior to reduction | **Applied to unit**. Held by the unit being struck and strike-matched. Adds `floor(pre-reduction damage × X / 100)` to `reflect_bucket`, spent the same way as `REFLEX`. X is the resolved formula block (`flat` for a fixed percent); only the highest X among matching sources applies. | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
 | `PULSE_STRIKE` | Grants Special count -X to unit | **Applied to unit**, strike-matched from that unit's own side. Resolved for both combatants at the top of the strike, before the Special-ready check. `cap_cd_start_of_cbt` caps the reduction at `cd_start_of_cbt`, the cooldown the unit had entering combat. | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str, cap_cd_start_of_cbt: bool }` |
 | `SCOWL_STRIKE` | Inflicts Special cooldown count + X on unit | **Applied to unit**. Summed and netted against `PULSE_STRIKE` in a single clamp, floored at 0. | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
 | `HEAL_STRIKE` | When unit deals damage to foe , restores X HP to unit| **Applied to unit**. Held by the striking unit and strike-matched. Sources add up, the heal caps at max HP. Resolved on every matching strike, including one that deals 0 damage. | `{ formula: str, multiplier: float, flat: int, min: int, max: int, strike: str }` |
@@ -901,7 +903,6 @@ Formula names resolve to raw game quantities; skill-specific offsets and caps li
 | `spaces_moved` | Spaces the unit moved before combat (Incited / Truly Incited) | — |
 | `sum_visible_buffs` | Sum of unit's visible stat bonuses, each floored at 0 (Treachery) | — |
 | `sum_foe_visible_debuffs` | Sum of foe's visible stat penalties, each floored at 0 (Dominance) | — |
-| `mitigated_bucket` | Unit's accumulated mitigated-damage total (Reflex) | — |
 | `unit_max_hp` | Unit's max HP (percent heals: pair with `multiplier`) | — |
 | `phantom_spd_diff` | `unit_spd - foe_spd`, in-combat, **including Phantom Spd**, floored at 0 (Dodge: pair with `multiplier`/`max` for the cap). Distinct from the plain `spd_diff` locals used by the follow-up check and `potent_spd_check`, which deliberately exclude Phantom. | — |
 | `foe_penalty_count` | Foe's active penalty count (Creation Pulse: pair with `max` for the cap) | — |

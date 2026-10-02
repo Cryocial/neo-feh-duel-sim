@@ -21,7 +21,7 @@ class CombatantState:
     phantom_bonus: StatBlock = field(default_factory=StatBlock)
     defensive_stat: Literal["defense", "res"] | None = None
     cd_start_of_cbt: int = 0
-    damage_mitigated_bucket: int = 0
+    reflect_bucket: int = 0
     bonus_count: int = 0
     penalty_count: int = 0
     special_type: SpecialType = SpecialType.NONE
@@ -1078,7 +1078,9 @@ class CombatEngine:
         modified_atk = math.trunc(raw_atk * wta)
         base_damage = max(0, modified_atk - defensive_stat)
 
-        true_damage = 0
+        # Reflected damage (REFLEX / BRIAR) is spent on the unit's next strike.
+        true_damage = striker_state.reflect_bucket
+        striker_state.reflect_bucket = 0
         for effect in striker_state.effects_on_strike:
             if effect.type == EffectType.FLAT_DAMAGE_STRIKE and self._strike_matches(
                 strike,
@@ -1096,10 +1098,10 @@ class CombatEngine:
                 )
 
         final_damage = base_damage + true_damage
-        pre_mitigation_damage = final_damage
         if striker_state.unit.weapon_type is WeaponType.STAFF:
             if not self._staff_full_damage(striker_state):
                 final_damage = math.trunc(final_damage * 0.5)
+        pre_mitigation_damage = final_damage
 
         pierce_mult = 1.0
         for effect in striker_state.effects_on_strike:
@@ -1223,8 +1225,31 @@ class CombatEngine:
             if not special_miracle:
                 target_state.miracle_used = True
 
+        # Reflex sources stack; Briar applies only its highest percent.
         mitigated_amount = pre_mitigation_damage - final_damage
-        target_state.damage_mitigated_bucket += mitigated_amount
+        briar_pct = 0
+        for effect in target_state.effects_on_strike:
+            if effect.type not in (EffectType.REFLEX, EffectType.BRIAR):
+                continue
+            if not self._strike_matches(
+                strike,
+                "target",
+                effect.params,
+                striker_special_ready=striker_special_ready,
+                target_special_ready=target_special_ready,
+                striker_special_triggers=striker_special_triggers,
+                target_special_triggers=target_special_triggers,
+                striker_special_used=striker_special_used,
+                target_special_used=target_special_used,
+            ):
+                continue
+            if effect.type is EffectType.REFLEX:
+                target_state.reflect_bucket += mitigated_amount
+            else:
+                pct = self._resolve_formula(effect.params, target_state, striker_state)
+                briar_pct = max(briar_pct, pct)
+        if briar_pct:
+            target_state.reflect_bucket += math.floor(pre_mitigation_damage * briar_pct / 100)
         target_state.current_hp -= final_damage
 
         hit_heal = 0
@@ -1531,8 +1556,6 @@ class CombatEngine:
                     variable = sum(
                         max(0, getattr(vd, s)) for s in ("atk", "spd", "defense", "res")
                     )
-                case "mitigated_bucket":  # Reflex
-                    variable = unit_state.damage_mitigated_bucket
                 case "unit_max_hp":
                     variable = unit_state.unit.max_hp
                 case "phantom_spd_diff":

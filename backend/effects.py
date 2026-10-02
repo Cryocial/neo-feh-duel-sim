@@ -52,6 +52,8 @@ EFFECT_LIST_MAP: dict[EffectType, str] = {
     EffectType.FLAT_DR_STRIKE: "effects_on_strike",
     EffectType.PERC_DR_STRIKE: "effects_on_strike",
     EffectType.FLAT_DAMAGE_STRIKE: "effects_on_strike",
+    EffectType.REFLEX: "effects_on_strike",
+    EffectType.BRIAR: "effects_on_strike",
     EffectType.PULSE_STRIKE: "effects_on_strike",
     EffectType.SCOWL_STRIKE: "effects_on_strike",
     EffectType.HEAL_STRIKE: "effects_on_strike",
@@ -132,6 +134,8 @@ def validate_effect_desc(desc: dict) -> list[str]:
         problems.append(f"unknown strike value {params['strike']!r}")
     if "formula" in params and params["formula"] not in FORMULA_NAMES:
         problems.append(f"unknown formula {params['formula']!r}")
+    if effect_type is EffectType.BRIAR and "flat" not in params and not params.get("formula"):
+        problems.append("BRIAR needs a percent: 'flat' or a 'formula'")
     return problems
 
 
