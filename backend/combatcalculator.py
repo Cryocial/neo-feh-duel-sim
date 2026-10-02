@@ -3,7 +3,7 @@ from dataclasses import dataclass, field, replace
 from typing import Literal
 
 from .build import Unit, StatBlock, DivineVein
-from .constants import Color, StrikeType, EffectType, WeaponType, SpecialType
+from .constants import Color, StrikeMatch, StrikeType, EffectType, WeaponType, SpecialType
 from .effects import Effect, build_effect, EFFECT_LIST_MAP
 from .conditions import Timing, Condition, check_condition
 from .jsonbootupstuff import BONUS_DATABASE, PENALTY_DATABASE
@@ -1604,58 +1604,51 @@ class CombatEngine:
         The four flags are absolute: `_ready` means the Special could trigger,
         `_triggers` means it actually does on this strike.
         """
-        strike_value = params.get("strike", "every_strike")
-        match strike_value:
-            case "every_strike":
+        raw = params.get("strike", StrikeMatch.EVERY_STRIKE)
+        try:
+            strike_match = StrikeMatch(raw)
+        except ValueError:
+            raise ValueError(f"Unknown strike value {raw!r} in _strike_matches") from None
+
+        is_first = strike.strike_type is StrikeType.FIRST
+        is_follow_up = strike.strike_type is StrikeType.FOLLOW_UP
+        unit_triggers = striker_special_triggers if role == "striker" else target_special_triggers
+        foe_triggers = target_special_triggers if role == "striker" else striker_special_triggers
+        unit_ready = striker_special_ready if role == "striker" else target_special_ready
+        foe_ready = target_special_ready if role == "striker" else striker_special_ready
+
+        match strike_match:
+            case StrikeMatch.EVERY_STRIKE:
                 return True
-            case "first_strike":
-                return (
-                    strike.strike_type is StrikeType.FIRST
-                    and not strike.brave_second_hit
-                )
-            case "first_attack":
-                return strike.strike_type is StrikeType.FIRST
-            case "first_attack_brave":
-                return (
-                    strike.strike_type is StrikeType.FIRST and strike.brave_second_hit
-                )
-            case "first_follow_up":
-                return (
-                    strike.strike_type is StrikeType.FOLLOW_UP
-                    and not strike.brave_second_hit
-                )
-            case "follow_up":
-                return strike.strike_type is StrikeType.FOLLOW_UP
-            case "follow_up_brave":
-                return (
-                    strike.strike_type is StrikeType.FOLLOW_UP
-                    and strike.brave_second_hit
-                )
-            case "both_first_strikes":
+            case StrikeMatch.FIRST_STRIKE:
+                return is_first and not strike.brave_second_hit
+            case StrikeMatch.FIRST_ATTACK:
+                return is_first
+            case StrikeMatch.FIRST_ATTACK_BRAVE:
+                return is_first and strike.brave_second_hit
+            case StrikeMatch.FIRST_FOLLOW_UP:
+                return is_follow_up and not strike.brave_second_hit
+            case StrikeMatch.FOLLOW_UP:
+                return is_follow_up
+            case StrikeMatch.FOLLOW_UP_BRAVE:
+                return is_follow_up and strike.brave_second_hit
+            case StrikeMatch.BOTH_FIRST_STRIKES:
                 return not strike.brave_second_hit
-            case "both_second_strikes":
+            case StrikeMatch.BOTH_SECOND_STRIKES:
                 return strike.brave_second_hit
-            case "consecutive":
+            case StrikeMatch.CONSECUTIVE:
                 return strike.consecutive
-            case "unit_special_triggers":
-                return (role == "striker" and striker_special_triggers) or (
-                    role == "target" and target_special_triggers
-                )
-            case "foe_special_triggers":
-                return (role == "striker" and target_special_triggers) or (
-                    role == "target" and striker_special_triggers
-                )
-            case "unit_special_ready":
-                return (role == "striker" and striker_special_ready) or (
-                    role == "target" and target_special_ready
-                )
-            case "foe_special_ready":
-                return (role == "striker" and target_special_ready) or (
-                    role == "target" and striker_special_ready
-                )
-            case "any_special_ready":
+            case StrikeMatch.UNIT_SPECIAL_TRIGGERS:
+                return unit_triggers
+            case StrikeMatch.FOE_SPECIAL_TRIGGERS:
+                return foe_triggers
+            case StrikeMatch.UNIT_SPECIAL_READY:
+                return unit_ready
+            case StrikeMatch.FOE_SPECIAL_READY:
+                return foe_ready
+            case StrikeMatch.ANY_SPECIAL_READY:
                 return striker_special_ready or target_special_ready
-            case "any_special_ready_or_triggered":
+            case StrikeMatch.ANY_SPECIAL_READY_OR_TRIGGERED:
                 return (
                     striker_special_ready
                     or target_special_ready
@@ -1663,6 +1656,4 @@ class CombatEngine:
                     or target_special_used
                 )
             case _:
-                raise ValueError(
-                    f"Unknown strike value {strike_value!r} in _strike_matches"
-                )
+                raise ValueError(f"{strike_match!r} has no rule in _strike_matches")
