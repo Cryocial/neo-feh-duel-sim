@@ -11,8 +11,10 @@ penalties, each stat calculated independently.
 shows nothing, but the doubler still reads the 6 and adds it to the uncapped
 combat stat. Allies aren't simulated; the user enters the highest bonus /
 penalty per stat among allies within 2 spaces on the Unit, read only while
-allies_within_2_spaces > 0. Every source stacks. The bonus side is inert under
-the foe's Lull, the penalty side under the unit's own Neutralize Penalties.
+allies_within_2_spaces > 0. Every source stacks. Neutralization (the foe's
+Lull for bonuses, the unit's own Neutralize Penalties for penalties) zeroes
+the unit's own half: the plain doublers go inert, while Fringe and Sabotage
+keep working as long as an ally within 2 spaces supplies the value.
 
 Setup: one strike each. The attacker (40 Atk unless stated) hits a 20 Def foe;
 the foe (25 Atk unless stated) counters the 20 Def attacker.
@@ -144,8 +146,18 @@ def test_fringe_bonus_ignores_the_ally_block_when_no_ally_is_within_2_spaces():
     assert dealt(fight(attacker)) == 24 + 4
 
 
-def test_fringe_bonus_is_inert_under_the_foes_lull():
+def test_fringe_bonus_still_grants_the_allies_bonus_under_lull():
+    """Lull zeroes the unit's own +4 (visible and doubled), but the ally's +6
+    is not the unit's bonus: 40 + 6 in combat."""
     attacker = with_allies(buffed_attacker(4, flag("FRINGE_BONUS")), bonuses={"atk": 6})
+    foe = make_unit("D", hp=100, atk=25)
+    foe.active_statuses.append(flag("BONUS_NEUT"))
+
+    assert dealt(fight(attacker, foe)) == 26
+
+
+def test_fringe_bonus_under_lull_with_no_ally_grants_nothing():
+    attacker = with_allies(buffed_attacker(4, flag("FRINGE_BONUS")), bonuses={"atk": 6}, count=0)
     foe = make_unit("D", hp=100, atk=25)
     foe.active_statuses.append(flag("BONUS_NEUT"))
 
@@ -236,8 +248,20 @@ def test_sabotage_ignores_the_ally_block_when_no_ally_is_within_2_spaces():
     assert fight(make_unit("A"), foe)["attacker_final_hp"] == 50 - (35 - 3 - 3 - 20)
 
 
-def test_sabotage_is_inert_against_neutralize_penalties():
+def test_sabotage_still_inflicts_the_allies_penalty_under_neutralize_penalties():
+    """Neut Pen lifts the foe's own -3 (visible and doubled), but its ally's
+    -5 still lands: 35 - 5 counters for 10."""
     foe = with_allies(debuffed_defender(debuff=3), penalties={"atk": 5})
+    foe.active_statuses.append(Status(name="Sabotage", type="penalty", effects=[{
+        "effect": "SABOTAGE", "target": "self", "params": {}, "conditions": [],
+    }]))
+    foe.active_statuses.append(flag("PENALTY_NEUT"))
+
+    assert fight(make_unit("A"), foe)["attacker_final_hp"] == 50 - (35 - 5 - 20)
+
+
+def test_sabotage_under_neutralize_penalties_with_no_ally_inflicts_nothing():
+    foe = with_allies(debuffed_defender(debuff=3), penalties={"atk": 5}, count=0)
     foe.active_statuses.append(Status(name="Sabotage", type="penalty", effects=[{
         "effect": "SABOTAGE", "target": "self", "params": {}, "conditions": [],
     }]))
