@@ -74,13 +74,16 @@ At simulation start, the `effects` lists of the equipped `Skill` and `Status` ob
 ```python
 @dataclass
 class Effect:
-    type:       EffectType
-    applied_by: Literal["bonus", "penalty", "self", "foe", "ally", "enemy"]
-    params:     dict
-    conditions: list[Condition]
+    type:         EffectType
+    applied_by:   Literal["self", "foe", "ally", "enemy"]
+    params:       dict
+    conditions:   list[Condition]
+    source_color: Color | None = None
 ```
 
-`applied_by` tracks the **source** of the effect, not its target: `"bonus"` if the effect comes from a bonus status, `"penalty"` from a penalty status, `"self"` from the unit's own skill, `"foe"` from the opponent's skill, `"ally"` from an ally, `"enemy"` from an enemy. This information is useful for example in bonus or penalty neutralization effects.
+`applied_by` tracks the **source** of the effect, not its target: `"self"` if it comes from the holder's own skills or statuses, `"foe"` from the opponent's, `"ally"` from a skill one of the holder's allies has equipped, `"enemy"` from a skill one of the opponent's allies has equipped. Conditions and formulas are always evaluated from the source's point of view (`_owner_and_opponent`), so a `"foe"` or `"enemy"` effect sitting in a unit's list still reads "unit" as the side that produced it.
+
+Ally skills enter through `Unit.ally_supports`, a list of `AllySupport(skill, color)` records: the support (a Drive, a Crux, ...) and the colour of the ally providing it. Their effects distribute like any other skill's — `target: "self"` onto the supported unit as `"ally"`, `target: "foe"` onto its opponent as `"enemy"` — and carry the giver's colour in `source_color`, which is what `FEUD`'s "disables skills of all blue foes" clause filters on.
 
 ---
 

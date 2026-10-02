@@ -19,6 +19,15 @@ from .jsonbootupstuff import BONUS_DATABASE, PENALTY_DATABASE
 UnitRole = Literal["attacker", "defender"]
 StrikeRole = Literal["striker", "target"]
 
+EFFECT_LISTS = (
+    "effects_AoE",
+    "effects_combat_stats",
+    "effects_strike_sequence",
+    "effects_pre_combat",
+    "effects_on_strike",
+    "effects_after_combat",
+)
+
 
 @dataclass
 class CombatantState:
@@ -133,73 +142,39 @@ def _base_combat_range(weapon_type: WeaponType) -> int:
 
 
 def _distribute_effects(attacker: CombatantState, defender: CombatantState) -> None:
-    attacker_skills = filter(
-        None,
-        [
-            attacker.unit.weapon,
-            attacker.unit.special,
-            attacker.unit.a_slot,
-            attacker.unit.b_slot,
-            attacker.unit.c_slot,
-            attacker.unit.s_slot,
-            attacker.unit.x_slot,
-        ],
-    )
-    for skill in attacker_skills:
-        for desc in skill.effects:
-            is_self = desc["target"] == "self"
-            effect = build_effect(desc, applied_by="self" if is_self else "foe")
-            target = attacker if is_self else defender
-            _add_to_bucket(target, effect)
-        attacker.nb_styles += skill.grants_style
+    for own, other in ((attacker, defender), (defender, attacker)):
+        _distribute_from(own.unit.equipped_items, own, other, "self", "foe")
+        _distribute_from(own.unit.active_statuses, own, other, "self", "foe")
+        if own.active_ally_divine_vein:
+            _distribute_from([own.active_ally_divine_vein], own, other, "self", "foe")
+        for support in own.unit.ally_supports:
+            _distribute_from([support.skill], own, other, "ally", "enemy", support.color)
+        # Styles are a player-phase action: only the initiator's count.
+        if own.is_initiator:
+            own.nb_styles += sum(s.grants_style for s in own.unit.equipped_items)
+            own.nb_styles += sum(s.grants_style for s in own.unit.active_statuses)
 
-    for status in attacker.unit.active_statuses:
-        for desc in status.effects:
-            is_self = desc["target"] == "self"
-            effect = build_effect(desc, applied_by="self" if is_self else "foe")
-            target = attacker if is_self else defender
-            _add_to_bucket(target, effect)
-        attacker.nb_styles += status.grants_style
 
-    if attacker.active_ally_divine_vein:
-        for desc in attacker.active_ally_divine_vein.effects:
+def _distribute_from(sources, own, other, self_tag, foe_tag, source_color=None):
+    """Routes each source's effects: target "self" into `own`'s lists tagged
+    self_tag, target "foe" into `other`'s tagged foe_tag."""
+    for source in sources:
+        for desc in source.effects:
             is_self = desc["target"] == "self"
-            effect = build_effect(desc, applied_by="self" if is_self else "foe")
-            target = attacker if is_self else defender
-            _add_to_bucket(target, effect)
+            effect = build_effect(
+                desc, applied_by=self_tag if is_self else foe_tag, source_color=source_color
+            )
+            _add_to_bucket(own if is_self else other, effect)
 
-    defender_skills = filter(
-        None,
-        [
-            defender.unit.weapon,
-            defender.unit.special,
-            defender.unit.a_slot,
-            defender.unit.b_slot,
-            defender.unit.c_slot,
-            defender.unit.s_slot,
-            defender.unit.x_slot,
-        ],
-    )
-    for skill in defender_skills:
-        for desc in skill.effects:
-            is_self = desc["target"] == "self"
-            effect = build_effect(desc, applied_by="self" if is_self else "foe")
-            target = defender if is_self else attacker
-            _add_to_bucket(target, effect)
 
-    for status in defender.unit.active_statuses:
-        for desc in status.effects:
-            is_self = desc["target"] == "self"
-            effect = build_effect(desc, applied_by="self" if is_self else "foe")
-            target = defender if is_self else attacker
-            _add_to_bucket(target, effect)
+def _owner_and_opponent(effect: Effect, holder: CombatantState, foe: CombatantState):
+    """The side whose skill produced `effect`, then the other. Conditions and
+    formulas evaluate from the owner's view; "foe" / "enemy" effects were put
+    in the holder's list by the opposing side."""
+    if effect.applied_by in ("foe", "enemy"):
+        return foe, holder
+    return holder, foe
 
-    if defender.active_ally_divine_vein:
-        for desc in defender.active_ally_divine_vein.effects:
-            is_self = desc["target"] == "self"
-            effect = build_effect(desc, applied_by="self" if is_self else "foe")
-            target = defender if is_self else attacker
-            _add_to_bucket(target, effect)
 
 def _bonuses_neutralized(state: CombatantState, foe: CombatantState) -> bool:
     """The foe's Lull (BONUS_NEUT) neutralizes this unit's visible bonuses:
@@ -231,10 +206,7 @@ def _evaluate_conditions_for_effect(
     foe_state: CombatantState,
     timing: Timing,
 ) -> tuple[bool, list[Condition]]:
-    if effect.applied_by == "foe":
-        owner, opponent = foe_state, unit_state
-    else:
-        owner, opponent = unit_state, foe_state
+    owner, opponent = _owner_and_opponent(effect, unit_state, foe_state)
     remaining = []
     for cond in effect.conditions:
         result = check_condition(cond, timing, owner, opponent)
@@ -359,8 +331,7 @@ class CombatEngine:
                 for effect in state.effects_start_of_turn:
                     if bool(effect.conditions) != conditional:
                         continue
-                    owner = foe if effect.applied_by == "foe" else state
-                    opponent = state if effect.applied_by == "foe" else foe
+                    owner, opponent = _owner_and_opponent(effect, state, foe)
                     if not self._start_of_turn_conditions_pass(effect, owner, opponent):
                         continue
                     self._apply_grant(effect, state)
@@ -453,14 +424,7 @@ class CombatEngine:
         for role, foe_role in (("attacker", "defender"), ("defender", "attacker")):
             state = self.combatant_states[role]
             foe_state = self.combatant_states[foe_role]
-            for list_name in (
-                "effects_AoE",
-                "effects_combat_stats",
-                "effects_strike_sequence",
-                "effects_pre_combat",
-                "effects_on_strike",
-                "effects_after_combat",
-            ):
+            for list_name in EFFECT_LISTS:
                 updated_conditions = []
                 for effect in getattr(state, list_name):
                     keep, remaining_conditions = _evaluate_conditions_for_effect(
@@ -599,12 +563,7 @@ class CombatEngine:
                 if effect.type not in (EffectType.STAT_BOOST, EffectType.STAT_DAUNT):
                     continue
 
-                # applied_by == "foe" means the foe inflicted this effect, so the
-                # foe's state is the formula's "unit" (matches the healing/DW crossover).
-                if effect.applied_by == "foe":
-                    owner, opponent = foe, state
-                else:
-                    owner, opponent = state, foe
+                owner, opponent = _owner_and_opponent(effect, state, foe)
 
                 magnitude = self._resolve_formula(effect.params, owner, opponent)
                 if effect.type == EffectType.STAT_DAUNT:
@@ -636,10 +595,7 @@ class CombatEngine:
                 if effect.type != EffectType.PHANTOM_STAT:
                     continue
 
-                if effect.applied_by == "foe":
-                    owner, opponent = foe, state
-                else:
-                    owner, opponent = state, foe
+                owner, opponent = _owner_and_opponent(effect, state, foe)
 
                 magnitude = self._resolve_formula(effect.params, owner, opponent)
                 stats = effect.params["stats"]
@@ -1459,13 +1415,7 @@ class CombatEngine:
                 for e in effects:
                     if e.type != reduce_type:
                         continue
-                    # The effect sits in unit_state's list, but its formula may
-                    # scale off whoever OWNS it. applied_by == "foe" means the foe
-                    # inflicted it, so the foe's state is the formula's "unit".
-                    if e.applied_by == "foe":
-                        owner, opponent = foe_state, unit_state
-                    else:
-                        owner, opponent = unit_state, foe_state
+                    owner, opponent = _owner_and_opponent(e, unit_state, foe_state)
                     pct = self._resolve_formula(e.params, owner, opponent)
                     survive *= (100 - pct) / 100
                     found = True

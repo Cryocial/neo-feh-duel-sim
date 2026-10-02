@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Literal
-from .constants import COMBAT_STATS, EffectType, STRIKE_VALUES, FORMULA_NAMES
+from .constants import COMBAT_STATS, Color, EffectType, STRIKE_VALUES, FORMULA_NAMES
+from .conditions import Condition, build_conditions
 from .conditions import Condition, build_conditions
 
 EFFECT_LIST_MAP: dict[EffectType, str] = {
@@ -90,9 +91,10 @@ EFFECT_LIST_MAP: dict[EffectType, str] = {
 @dataclass
 class Effect:
     type: EffectType
-    applied_by: Literal["bonus", "penalty", "self", "foe", "ally", "enemy"]
+    applied_by: Literal["self", "foe", "ally", "enemy"]
     params: dict
     conditions: list[Condition]
+    source_color: Color | None = None  # the ally's colour for ally/enemy effects
 
 
 # Params the engine reads with [] rather than .get(); missing keys fail here,
@@ -171,7 +173,7 @@ def validate_effect_desc(desc: dict) -> list[str]:
     return problems
 
 
-def build_effect(desc: dict, applied_by: str) -> Effect:
+def build_effect(desc: dict, applied_by: str, source_color: Color | None = None) -> Effect:
     problems = validate_effect_desc(desc)
     if problems:
         raise ValueError(
@@ -182,4 +184,5 @@ def build_effect(desc: dict, applied_by: str) -> Effect:
         applied_by=applied_by,
         params=desc.get("params", {}),
         conditions=build_conditions(desc.get("conditions", [])),
+        source_color=source_color,
     )

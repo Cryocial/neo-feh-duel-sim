@@ -91,6 +91,14 @@ class DivineVein:
     effects: list[dict]
 
 
+@dataclass(frozen=True)
+class AllySupport:
+    """A skill an ally has equipped whose in-combat effects reach this unit
+    (Drive) or its foe (Crux), tagged with the ally's colour for Feud."""
+    skill: Skill
+    color: Color
+
+
 class Unit:
     """
     The primary Unit class representing a hero in the game.
@@ -151,6 +159,7 @@ class Unit:
         self.visible_buffs = StatBlock()
         self.visible_debuffs = StatBlock()
         self.active_statuses: list[Status] = []
+        self.ally_supports: list[AllySupport] = []
 
         self._max_cooldown_override: int | None = None
         self.pre_charge = 0
