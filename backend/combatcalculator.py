@@ -1067,7 +1067,10 @@ class CombatEngine:
         """
         for state in self.combatant_states.values():
             for effect in state.effects_pre_combat:
-                if effect.type != EffectType.SPECIAL_TRIGGER_NEUT:
+                # The AoE-time call can see conditions that only resolve later;
+                # those effects are skipped here and picked up by the call
+                # before the strike loop, once every pass has run.
+                if effect.type != EffectType.SPECIAL_TRIGGER_NEUT or effect.conditions:
                     continue
                 state.special_denied = (
                     state.special_denied
