@@ -8,7 +8,7 @@ real skill's authentic numbers.
 
 import pytest
 
-from backend.build import Unit
+from backend.build import Unit, Status
 from backend.constants import MovementType, WeaponType, Color
 from backend.combatcalculator import CombatEngine, CombatantState
 
@@ -76,3 +76,52 @@ def make_state(
     state.damage_mitigated_bucket = damage_mitigated_bucket
     state.combat_stats = combat_stats
     return state
+
+
+# ── combat-order test helpers ────────────────────────────────────────────────
+#
+# Shared by the follow-up (GFU / FU_DENY / NFU / Frozen) and strike-order
+# (Vantage / Desperation) test files. Units are same-colour melee with equal
+# Spd by default, so no weapon-triangle multiplier, the defender always
+# counters, and nobody gets a natural follow-up unless a test sets a Spd gap.
+# Damage per hit is atk - def, so counting damage counts strikes.
+
+COMBAT_ORDER_HP = 200
+
+
+def order_unit(name, color=Color.RED, hp=COMBAT_ORDER_HP, atk=40, spd=20,
+               defense=20, res=20):
+    """A round-numbered sword infantry unit for combat-order tests."""
+    return Unit(
+        name=name,
+        movement_type=MovementType.INFANTRY,
+        weapon_type=WeaponType.SWORD,
+        color=color,
+        hp=hp,
+        atk=atk,
+        spd=spd,
+        defense=defense,
+        res=res,
+    )
+
+
+def seq_status(effect_name, params=None):
+    """A bonus status carrying one strike-sequence effect on its holder."""
+    return Status(
+        name=f"Test {effect_name}",
+        type="bonus",
+        effects=[{
+            "effect": effect_name,
+            "target": "self",
+            "params": params or {},
+            "conditions": [],
+        }],
+    )
+
+
+def dealt_to_defender(result, max_hp=COMBAT_ORDER_HP):
+    return max_hp - result["defender_final_hp"]
+
+
+def dealt_to_attacker(result, max_hp=COMBAT_ORDER_HP):
+    return max_hp - result["attacker_final_hp"]
