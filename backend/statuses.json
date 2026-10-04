@@ -262,11 +262,9 @@
     "type": "bonus",
     "effects": [
       {
-        "effect": "FLAT_DAMAGE_STRIKE",
+        "effect": "REFLEX",
         "target": "self",
         "params": {
-          "formula": "mitigated_bucket",
-          "multiplier": 1,
           "strike": "every_strike"
         },
         "conditions": []
