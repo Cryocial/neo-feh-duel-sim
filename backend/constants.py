@@ -96,6 +96,7 @@ class EffectType(str, Enum):
     # ── On-strike ─────────────────────────────────────────────────────────────
     DR_PIERCE = "DR_PIERCE"
     HEXBLADE_STRIKE = "HEXBLADE_STRIKE"
+    NEUT_HEXBLADE = "NEUT_HEXBLADE"
     EFFECTIVE = "EFFECTIVE"
     NEUT_EFFECTIVE = "NEUT_EFFECTIVE"
     SPECIAL_TRIGGER_NEUT = "SPECIAL_TRIGGER_NEUT"
