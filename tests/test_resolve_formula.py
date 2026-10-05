@@ -179,6 +179,30 @@ def test_spd_diff_floored_at_zero_when_slower(engine, plain_unit, plain_foe):
     assert engine._resolve_formula(params, unit, foe) == 0
 
 
+def test_cbt_def_diff_positive(engine, plain_unit, plain_foe):
+    # combat def 33 vs 30 -> diff 3, x4 = 12 (Breath of Life 4's "difference x 4")
+    unit = make_state(
+        plain_unit, combat_stats=StatBlock(hp=50, atk=30, spd=30, defense=33, res=30)
+    )
+    foe = make_state(
+        plain_foe, combat_stats=StatBlock(hp=50, atk=25, spd=20, defense=30, res=25)
+    )
+    params = {"formula": "cbt_def_diff", "multiplier": 4}
+    assert engine._resolve_formula(params, unit, foe) == 12
+
+
+def test_cbt_def_diff_floored_at_zero_when_lower(engine, plain_unit, plain_foe):
+    # unit's def lower -> cbt_def_diff floors at 0
+    unit = make_state(
+        plain_unit, combat_stats=StatBlock(hp=50, atk=30, spd=30, defense=20, res=30)
+    )
+    foe = make_state(
+        plain_foe, combat_stats=StatBlock(hp=50, atk=25, spd=20, defense=30, res=25)
+    )
+    params = {"formula": "cbt_def_diff", "multiplier": 4}
+    assert engine._resolve_formula(params, unit, foe) == 0
+
+
 def test_unit_cbt_atk_uses_combat_stats_when_present(engine, plain_unit, plain_foe):
     unit = make_state(
         plain_unit, combat_stats=StatBlock(hp=50, atk=44, spd=30, defense=30, res=30)

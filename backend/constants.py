@@ -160,6 +160,7 @@ FORMULA_NAMES: frozenset[str] = frozenset(
         "",
         "bonus_count",
         "all_bonus_penalty_both",
+        "cbt_def_diff",
         "spaces_moved",
         "sum_visible_buffs",
         "sum_foe_visible_debuffs",

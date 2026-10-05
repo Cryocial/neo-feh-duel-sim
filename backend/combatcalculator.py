@@ -1519,6 +1519,8 @@ class CombatEngine:
                         + foe_state.bonus_count
                         + foe_state.penalty_count
                     )
+                case "cbt_def_diff":
+                    variable = max(0, cs.defense - foe_state.combat_stats.defense)
                 case "spaces_moved":
                     variable = unit_state.spaces_moved
                 case "sum_visible_buffs":

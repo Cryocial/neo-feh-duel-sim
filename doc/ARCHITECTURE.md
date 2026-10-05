@@ -897,6 +897,7 @@ Formula names resolve to raw game quantities; skill-specific offsets and caps li
 | `""` (empty) | `0` — only the `flat` component applies | — |
 | `bonus_count` | Unit's active bonus count | — |
 | `all_bonus_penalty_both` | Sum of bonus + penalty counts on **both** unit and foe (Empathy) | — |
+| `cbt_def_diff` | `unit_def - foe_def`, in-combat, floored at 0 (Breath of Life 4's "difference between stats": pair with `multiplier: 4`) | — |
 | `spaces_moved` | Spaces the unit moved before combat (Incited / Truly Incited) | — |
 | `sum_visible_buffs` | Sum of unit's visible stat bonuses, each floored at 0 (Treachery) | — |
 | `sum_foe_visible_debuffs` | Sum of foe's visible stat penalties, each floored at 0 (Dominance) | — |
