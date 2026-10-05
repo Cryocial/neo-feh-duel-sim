@@ -418,6 +418,7 @@ class CombatantState:
     combat_stats:            StatBlock | None = None
     defensive_stat:          Literal["defense", "res"] | None = None
     damage_mitigated_bucket: int = 0                   # cumulated mitigated damage (for reflex, etc.)
+    burn_taken:              int = 0                   # HP that BURN_DAMAGE actually took this combat (burn_taken formula)
     bonus_count:             int = 0                   # number of active bonuses
     penalty_count:           int = 0                   # number of active penalties
     special_use_count:       int = 0                   # times the Special was used this combat
@@ -441,7 +442,7 @@ class CombatantState:
 
 `effects_strike_sequence` : for effects used to determine the strike sequence, for example effects of type `EffectType.FLASH`, `EffectType.GFU`, `EffectType.POTENT`, `EffectType.BRAVE`, `EffectType.VANTAGE`, `EffectType.DESPERATION_NEUT`, etc.
 
-`effects_pre_combat` : for burn damage and start-of-combat healing, i.e. of type `EffectType.BURN_DAMAGE`, `EffectType.PRE_CBT_HEAL`, `EffectType.BURN_HEAL`.
+`effects_pre_combat` : for burn damage and start-of-combat healing, i.e. of type `EffectType.BURN_DAMAGE` and `EffectType.PRE_CBT_HEAL`.
 
 `effects_on_strike` : for per-strike effects, for example effects of type `EffectType.FLAT_DR_STRIKE`, `EffectType.PERC_DR_STRIKE`, `EffectType.FLAT_DAMAGE_STRIKE`, `EffectType.PULSE_STRIKE`, `EffectType.SCOWL_STRIKE`, `EffectType.HEAL_STRIKE`, `EffectType.OFF_BREATH`, `EffectType.GUARD_NEUT`, etc.
 
@@ -813,8 +814,7 @@ Processed by `_initialize` before combat begins. These grant visible stats and s
 | Effect | FEH accurate Description | Details | `params`|
 |---|---|---|---|
 | `BURN_DAMAGE` | Deals damage to unit as combat begins | **Applied to unit**. Sources add up, and HP is floored at 1. Distinct from AoE damage (`TRIGGER_AOE`): burn lands after every condition pass, so it never moves an HP check, while AoE lands before the start-of-combat snapshot and does. | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
-| `PRE_CBT_HEAL` | Restores HP to unit as combat begins | **Applied to unit**. Only the largest source applies, the heal caps at max HP. | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
-| `BURN_HEAL` | Also restores HP equal to any damage dealt to unit as combat began | **Applied to unit**. Presence flag: refunds the HP `BURN_DAMAGE` actually cost this phase — never more, so burn floored at 1 HP refunds only what was lost. Added on top of whichever `PRE_CBT_HEAL` won rather than competing with it, and refunds burn only, never AoE damage (that landed earlier, in `_resolve_aoe`). | `{}` |
+| `PRE_CBT_HEAL` | Restores HP to unit as combat begins | **Applied to unit**. Only the largest source applies, the heal caps at max HP. A heal that also restores burn damage (Breath of Life 4's "+ damage dealt to unit as combat begins") adds the `burn_taken` formula to its own value, as a nested `flat` block when the base is itself a formula, so that part competes with the rest of its heal and is never added on top of another source. | `{ formula: str, multiplier: float, flat: int or formula block, min: int, max: int }` |
 
 #### `effects_on_strike`
 
@@ -890,7 +890,8 @@ In the Special-related values below, "unit" means the combatant who **owns the e
 ### C - `formula` Value Reference
 
 Formula names resolve to raw game quantities; skill-specific offsets and caps live in the params (`flat` for offsets, `min`/`max` for clamps), not baked into the formula. For example, the Liberate "+4, max 8" is `"formula": "bonus_count", "multiplier": 1, "flat": 4, "max": 8`, and Dodge's "Spd diff ×4, max 40%" is `"formula": "phantom_spd_diff", "multiplier": 4, "min": 0, "max": 40`.
-.
+
+`flat` can also be a nested formula block, resolved the same way and added on, so one value can sum two quantities. For example, Breath of Life 4's heal of 40% of max HP plus the HP burn took is `"formula": "unit_max_hp", "multiplier": 0.4, "flat": {"formula": "burn_taken", "multiplier": 1}`.
 
 | Value | Resolves to | Extra params |
 |---|---|---|
@@ -902,6 +903,7 @@ Formula names resolve to raw game quantities; skill-specific offsets and caps li
 | `sum_foe_visible_debuffs` | Sum of foe's visible stat penalties, each floored at 0 (Dominance) | — |
 | `mitigated_bucket` | Unit's accumulated mitigated-damage total (Reflex) | — |
 | `unit_max_hp` | Unit's max HP (percent heals: pair with `multiplier`) | — |
+| `burn_taken` | HP that `BURN_DAMAGE` actually took from the unit this combat, after the 1-HP floor; never AoE damage. Only known once burn has landed, so only `PRE_CBT_HEAL` may read it (checked at load) | — |
 | `phantom_spd_diff` | `unit_spd - foe_spd`, in-combat, **including Phantom Spd**, floored at 0 (Dodge: pair with `multiplier`/`max` for the cap). Distinct from the plain `spd_diff` locals used by the follow-up check and `potent_spd_check`, which deliberately exclude Phantom. | — |
 | `foe_penalty_count` | Foe's active penalty count (Creation Pulse: pair with `max` for the cap) | — |
 | `unit_cbt_atk` | Unit's in-combat Atk | — |

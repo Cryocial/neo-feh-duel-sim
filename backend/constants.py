@@ -91,7 +91,6 @@ class EffectType(str, Enum):
     # ── Pre-combat ────────────────────────────────────────────────────────────
     BURN_DAMAGE = "BURN_DAMAGE"
     PRE_CBT_HEAL = "PRE_CBT_HEAL"
-    BURN_HEAL = "BURN_HEAL"
 
     # ── On-strike ─────────────────────────────────────────────────────────────
     DR_PIERCE = "DR_PIERCE"
@@ -165,6 +164,7 @@ FORMULA_NAMES: frozenset[str] = frozenset(
         "sum_foe_visible_debuffs",
         "mitigated_bucket",
         "unit_max_hp",
+        "burn_taken",
         "phantom_spd_diff",
         "foe_penalty_count",
         "unit_cbt_atk",

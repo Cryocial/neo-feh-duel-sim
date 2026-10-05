@@ -184,6 +184,22 @@ def test_simulate_is_repeatable_and_leaves_units_untouched():
             },
             "unknown formula",
         ),
+        (
+            {
+                "effect": "PRE_CBT_HEAL",
+                "target": "self",
+                "params": {"flat": {"formula": "bonus_count_plus_4"}},
+            },
+            "unknown formula",
+        ),
+        (
+            {
+                "effect": "BURN_DAMAGE",
+                "target": "foe",
+                "params": {"formula": "burn_taken", "multiplier": 1},
+            },
+            "only PRE_CBT_HEAL can read it",
+        ),
     ],
 )
 def test_build_effect_rejects_malformed_descriptions(desc, message):

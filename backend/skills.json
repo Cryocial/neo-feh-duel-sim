@@ -120,7 +120,11 @@
         "target": "self",
         "params": {
           "formula": "unit_max_hp",
-          "multiplier": 0.4
+          "multiplier": 0.4,
+          "flat": {
+            "formula": "burn_taken",
+            "multiplier": 1
+          }
         },
         "conditions": [
           {
@@ -147,21 +151,6 @@
               "stat": "defense",
               "margin": 1,
               "comparison": "lesser_than"
-            }
-          }
-        ]
-      },
-      {
-        "effect": "BURN_HEAL",
-        "target": "self",
-        "params": {},
-        "conditions": [
-          {
-            "type": "cbt_stat_check",
-            "params": {
-              "stat": "defense",
-              "margin": 1,
-              "comparison": "greater_or_equal"
             }
           }
         ]

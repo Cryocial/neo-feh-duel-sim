@@ -1,6 +1,6 @@
 """
-Burn damage and start-of-combat healing (BURN_DAMAGE / PRE_CBT_HEAL /
-BURN_HEAL), resolved in _resolve_pre_combat before the strike loop.
+Burn damage and start-of-combat healing (BURN_DAMAGE / PRE_CBT_HEAL),
+resolved in _resolve_pre_combat before the strike loop.
 
 Burn damage is not AoE damage: burn lands after every condition pass and so
 never moves an HP check, while AoE damage (TRIGGER_AOE) lands before the
@@ -11,6 +11,10 @@ Rules verified:
   - PRE_CBT_HEAL sources DON'T stack: only the highest single source heals
     (three Imbue-style sources of 20, 20 and 10 restore 20, not 50)
   - healing still caps at max HP
+  - a heal can also restore what burn cost through the burn_taken formula;
+    that part belongs to its own heal's value and competes with it, never on
+    top of another source (Breath of Life 4: "max 40% of max HP + damage
+    dealt as combat begins; only highest value applied")
 
 Setup: same colour, both melee, equal Spd, so the exchange is exactly one
 strike each. The attacker (40 Atk) hits the 20-Def defender for 20; the
@@ -96,11 +100,12 @@ def test_pre_combat_heal_caps_at_max_hp():
     assert attacker_hp_before_counter(result) == 50
 
 
-def burn_heal():
-    return Status(name="Burn Heal", type="bonus", effects=[{
-        "effect": "BURN_HEAL",
+def heal_plus_burn(amount):
+    """Heals amount plus whatever burn cost the unit (Breath of Life 4 pattern)."""
+    return Status(name=f"Heal {amount} + burn", type="bonus", effects=[{
+        "effect": "PRE_CBT_HEAL",
         "target": "self",
-        "params": {},
+        "params": {"formula": "burn_taken", "multiplier": 1, "flat": amount},
         "conditions": [],
     }])
 
@@ -133,15 +138,14 @@ def test_burn_damage_sources_stack():
     assert attacker_hp_before_counter(result) == 32
 
 
-# ── BURN_HEAL: refunding what burn cost ──────────────────────────────────────
+# ── burn_taken: restoring what burn cost ─────────────────────────────────────
 
 
-def test_burn_heal_is_added_on_top_of_the_highest_heal():
-    """20/50, burn 10, a 20 heal and a burn refund: 20 - 10 + (20 + 10)."""
+def test_a_heal_can_also_restore_what_burn_cost():
+    """20/50, burn 10, a heal of 20 + burn_taken: 20 - 10 + (20 + 10)."""
     attacker = make_unit("A")
     attacker.current_hp = 20
-    attacker.active_statuses.append(heal(20))
-    attacker.active_statuses.append(burn_heal())
+    attacker.active_statuses.append(heal_plus_burn(20))
     defender = make_unit("D", hp=100, atk=25)
     defender.active_statuses.append(damage_foe(10))
 
@@ -150,12 +154,11 @@ def test_burn_heal_is_added_on_top_of_the_highest_heal():
     assert attacker_hp_before_counter(result) == 40
 
 
-def test_burn_heal_refunds_only_the_hp_burn_actually_cost():
-    """19 HP against 99 burn floors at 1, so it cost 18: refund 18, not 99."""
+def test_burn_taken_is_only_the_hp_burn_actually_cost():
+    """19 HP against 99 burn floors at 1, so it cost 18: restore 18, not 99."""
     attacker = make_unit("A")
     attacker.current_hp = 19
-    attacker.active_statuses.append(heal(20))
-    attacker.active_statuses.append(burn_heal())
+    attacker.active_statuses.append(heal_plus_burn(20))
     defender = make_unit("D", hp=100, atk=25)
     defender.active_statuses.append(damage_foe(99))
 
@@ -164,25 +167,54 @@ def test_burn_heal_refunds_only_the_hp_burn_actually_cost():
     assert attacker_hp_before_counter(result) == 1 + 20 + 18
 
 
-def test_burn_heal_does_nothing_without_burn():
+def test_burn_taken_is_zero_without_burn():
     attacker = make_unit("A")
     attacker.current_hp = 20
-    attacker.active_statuses.append(burn_heal())
+    attacker.active_statuses.append(heal_plus_burn(0))
 
     result = CombatEngine(attacker, make_unit("D", hp=100, atk=25)).simulate()
 
     assert attacker_hp_before_counter(result) == 20
 
 
-def test_burn_heal_does_not_refund_aoe_damage():
-    """The defender eats 20 from the AoE and 20 from the strike; its BURN_HEAL
-    finds no burn to refund, so nothing comes back."""
+def test_burn_taken_does_not_count_aoe_damage():
+    """The defender eats 20 from the AoE and 20 from the strike; burn_taken
+    finds no burn, so nothing comes back."""
     defender = make_unit("D", hp=100, atk=25)
-    defender.active_statuses.append(burn_heal())
+    defender.active_statuses.append(heal_plus_burn(0))
 
     result = CombatEngine(aoe_attacker(), defender).simulate()
 
     assert result["defender_final_hp"] == 100 - 20 - 20
+
+
+def test_the_burn_part_counts_toward_its_own_heal_when_heals_compete():
+    """20/50, burn 10: 20 + burn_taken is worth 30 and beats a plain 25."""
+    attacker = make_unit("A")
+    attacker.current_hp = 20
+    attacker.active_statuses.append(heal_plus_burn(20))
+    attacker.active_statuses.append(heal(25))
+    defender = make_unit("D", hp=100, atk=25)
+    defender.active_statuses.append(damage_foe(10))
+
+    result = CombatEngine(attacker, defender).simulate()
+
+    assert attacker_hp_before_counter(result) == 10 + 30
+
+
+def test_the_burn_part_is_never_added_on_top_of_a_bigger_heal():
+    """20/50, burn 10: 10 + burn_taken is worth 20, so a plain 25 wins and
+    restores 25 alone, not 25 + 10."""
+    attacker = make_unit("A")
+    attacker.current_hp = 20
+    attacker.active_statuses.append(heal_plus_burn(10))
+    attacker.active_statuses.append(heal(25))
+    defender = make_unit("D", hp=100, atk=25)
+    defender.active_statuses.append(damage_foe(10))
+
+    result = CombatEngine(attacker, defender).simulate()
+
+    assert attacker_hp_before_counter(result) == 10 + 25
 
 
 # ── burn damage is not reduced by anything ───────────────────────────────────
@@ -287,7 +319,7 @@ def test_breath_of_life_4_heals_40_percent_and_refunds_burn_when_def_wins():
 
     result = CombatEngine(attacker, defender).simulate()
 
-    # 20 - 10 burn + (20 heal + 10 refund), then a 25-25 counter for 0
+    # 20 - 10 burn + (20 heal + 10 burn_taken), then a 25-25 counter for 0
     assert result["attacker_final_hp"] == 40
 
 
@@ -303,3 +335,20 @@ def test_breath_of_life_4_heals_20_percent_and_refunds_nothing_when_def_loses():
 
     # 20 - 10 burn + 10 heal, then a 25-15 counter for 10
     assert result["attacker_final_hp"] == 10
+
+
+def test_breath_of_life_4_competes_with_a_status_heal_as_one_value():
+    """Def 25 vs 20, burn 10: Breath of Life 4 is worth 20 + 10 = 30 and beats
+    a plain 25 from a status. The old BURN_HEAL rule added the 10 on top of
+    whichever heal won instead (25 + 10, for 45)."""
+    attacker = make_unit("A", defense=25)
+    attacker.current_hp = 20
+    attacker.c_slot = SKILL_DATABASE["Breath of Life 4"]
+    attacker.active_statuses.append(heal(25))
+    defender = make_unit("D", hp=100, atk=25)
+    defender.active_statuses.append(damage_foe(10))
+
+    result = CombatEngine(attacker, defender).simulate()
+
+    # 20 - 10 burn + max(20 + 10, 25), then a 25-25 counter for 0
+    assert result["attacker_final_hp"] == 40

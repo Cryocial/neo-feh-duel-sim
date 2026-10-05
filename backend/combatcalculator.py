@@ -22,6 +22,7 @@ class CombatantState:
     defensive_stat: Literal["defense", "res"] | None = None
     cd_start_of_cbt: int = 0
     damage_mitigated_bucket: int = 0
+    burn_taken: int = 0
     bonus_count: int = 0
     penalty_count: int = 0
     special_type: SpecialType = SpecialType.NONE
@@ -890,12 +891,12 @@ class CombatEngine:
             self._process_strike(strike)
 
     def _resolve_pre_combat(self):
-        """Processes BURN_DAMAGE, PRE_CBT_HEAL and BURN_HEAL.
+        """Processes BURN_DAMAGE, then PRE_CBT_HEAL.
 
         Burn damage and AoE damage are distinct: burn lands here, after every
         condition pass, so it never moves an HP check, while AoE damage
         (TRIGGER_AOE) landed back in _resolve_aoe, before the start-of-combat
-        snapshot, and does. That is why BURN_HEAL refunds only what this phase
+        snapshot, and does. That is why burn_taken counts only what this phase
         took.
         """
         atk_state = self.combatant_states["attacker"]
@@ -914,15 +915,16 @@ class CombatEngine:
             )
             for role, state, foe in sides
         }
-        taken = {}
         for role, state, _ in sides:
             before = state.current_hp
             if burn[role] > 0:
                 state.current_hp = max(1, state.current_hp - burn[role])
-            taken[role] = before - state.current_hp
+            state.burn_taken = before - state.current_hp
 
         for role, state, foe in sides:
-            # Pre-combat heals don't stack: only the highest source applies...
+            # Pre-combat heals don't stack: only the highest source applies. A
+            # heal that also restores burn damage reads it through the burn_taken
+            # formula, as part of its own value, never on top of another source.
             heal = max(
                 (
                     self._resolve_formula(e.params, state, foe)
@@ -931,12 +933,6 @@ class CombatEngine:
                 ),
                 default=0,
             )
-            # ...but BURN_HEAL refunds the HP burn actually cost, on top of
-            # whichever heal won, and never more than was lost.
-            if taken[role] and any(
-                e.type == EffectType.BURN_HEAL for e in state.effects_pre_combat
-            ):
-                heal += taken[role]
             self._apply_healing(role, heal, phase="in_combat")
 
     def _apply_twin_effects(self):
@@ -1499,10 +1495,16 @@ class CombatEngine:
     def _resolve_formula(
         self, params: dict, unit_state: CombatantState, foe_state: CombatantState
     ) -> int:
-        """Resolves a {formula, multiplier, flat, min, max} param block into a number."""
+        """Resolves a {formula, multiplier, flat, min, max} param block into a number.
+
+        flat may itself be a param block, resolved the same way and added on, so
+        one value can sum two formulas (40% of max HP + burn_taken).
+        """
         formula = params.get("formula", "")
         multiplier = params.get("multiplier", 0)
         flat = params.get("flat", 0)
+        if isinstance(flat, dict):
+            flat = self._resolve_formula(flat, unit_state, foe_state)
         min_val = params.get("min", 0)
         max_val = params.get("max", -1)
         variable = 0.0
@@ -1540,6 +1542,8 @@ class CombatEngine:
                     variable = unit_state.damage_mitigated_bucket
                 case "unit_max_hp":
                     variable = unit_state.unit.max_hp
+                case "burn_taken":
+                    variable = unit_state.burn_taken
                 case "phantom_spd_diff":
                     # Distinct from the follow-up/Potent spd_diff locals in
                     # _determine_strike_sequence and _evaluate_potent_spd_check —

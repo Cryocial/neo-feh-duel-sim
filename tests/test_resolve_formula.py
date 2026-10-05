@@ -3,10 +3,12 @@ Tests for CombatEngine._resolve_formula.
 
 The pipeline is:  value = floor(variable * multiplier) + flat
                   then clamp to [min, max]  (min default 0, max default -1 = no cap)
+                  flat may itself be a block, resolved the same way and added on
 
 Key behaviors verified here:
   - flat-only (empty formula) returns just flat
   - multiplier + flat compose correctly with floor()
+  - a nested flat block adds a second formula
   - min defaults to 0, so results never go negative unless min is set negative
   - max defaults to -1 (no cap); a non-negative max clamps
   - each named formula reads the field it claims to
@@ -52,6 +54,18 @@ def test_multiplier_plus_flat(engine, plain_unit, plain_foe):
     state = make_state(plain_unit, bonus_count=3)
     result = engine._resolve_formula(params, state, make_state(plain_foe))
     assert result == 11
+
+
+def test_nested_flat_adds_a_second_formula(engine, plain_unit, plain_foe):
+    # Breath of Life 4: 40% of 50 max hp = 20, + 10 burn_taken = 30
+    params = {
+        "formula": "unit_max_hp",
+        "multiplier": 0.4,
+        "flat": {"formula": "burn_taken", "multiplier": 1},
+    }
+    state = make_state(plain_unit, burn_taken=10)
+    result = engine._resolve_formula(params, state, make_state(plain_foe))
+    assert result == 30
 
 
 # ── clamping ──────────────────────────────────────────────────────────────────
@@ -150,6 +164,12 @@ def test_mitigated_bucket(engine, plain_unit, plain_foe):
     params = {"formula": "mitigated_bucket", "multiplier": 1}
     state = make_state(plain_unit, damage_mitigated_bucket=12)
     assert engine._resolve_formula(params, state, make_state(plain_foe)) == 12
+
+
+def test_burn_taken(engine, plain_unit, plain_foe):
+    params = {"formula": "burn_taken", "multiplier": 1}
+    state = make_state(plain_unit, burn_taken=7)
+    assert engine._resolve_formula(params, state, make_state(plain_foe)) == 7
 
 
 # ── named formulas: combat-stat dependent ─────────────────────────────────────
