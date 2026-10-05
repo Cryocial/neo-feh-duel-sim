@@ -134,7 +134,7 @@ def loaded_matchup():
         name="Flame",
         effects=[
             {
-                "effect": "PRE_CBT_DAMAGE",
+                "effect": "BURN_DAMAGE",
                 "target": "foe",
                 "params": {"flat": 7},
                 "conditions": [],
@@ -183,6 +183,22 @@ def test_simulate_is_repeatable_and_leaves_units_untouched():
                 "params": {"formula": "bonus_count_plus_4"},
             },
             "unknown formula",
+        ),
+        (
+            {
+                "effect": "PRE_CBT_HEAL",
+                "target": "self",
+                "params": {"flat": {"formula": "bonus_count_plus_4"}},
+            },
+            "unknown formula",
+        ),
+        (
+            {
+                "effect": "BURN_DAMAGE",
+                "target": "foe",
+                "params": {"formula": "burn_taken", "multiplier": 1},
+            },
+            "only PRE_CBT_HEAL can read it",
         ),
     ],
 )

@@ -89,7 +89,7 @@ class EffectType(str, Enum):
     GRANT_STATUS = "GRANT_STATUS"
 
     # ── Pre-combat ────────────────────────────────────────────────────────────
-    PRE_CBT_DAMAGE = "PRE_CBT_DAMAGE"
+    BURN_DAMAGE = "BURN_DAMAGE"
     PRE_CBT_HEAL = "PRE_CBT_HEAL"
 
     # ── On-strike ─────────────────────────────────────────────────────────────
@@ -164,6 +164,7 @@ FORMULA_NAMES: frozenset[str] = frozenset(
         "sum_foe_visible_debuffs",
         "mitigated_bucket",
         "unit_max_hp",
+        "burn_taken",
         "phantom_spd_diff",
         "foe_penalty_count",
         "unit_cbt_atk",

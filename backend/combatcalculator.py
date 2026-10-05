@@ -22,6 +22,7 @@ class CombatantState:
     defensive_stat: Literal["defense", "res"] | None = None
     cd_start_of_cbt: int = 0
     damage_mitigated_bucket: int = 0
+    burn_taken: int = 0
     bonus_count: int = 0
     penalty_count: int = 0
     special_type: SpecialType = SpecialType.NONE
@@ -890,40 +891,49 @@ class CombatEngine:
             self._process_strike(strike)
 
     def _resolve_pre_combat(self):
-        """Processes PRE_CBT_DAMAGE and PRE_CBT_HEAL."""
+        """Processes BURN_DAMAGE, then PRE_CBT_HEAL.
+
+        Burn damage and AoE damage are distinct: burn lands here, after every
+        condition pass, so it never moves an HP check, while AoE damage
+        (TRIGGER_AOE) landed back in _resolve_aoe, before the start-of-combat
+        snapshot, and does. That is why burn_taken counts only what this phase
+        took.
+        """
         atk_state = self.combatant_states["attacker"]
         def_state = self.combatant_states["defender"]
-
-        atk_predmg = sum(
-            self._resolve_formula(e.params, atk_state, def_state)
-            for e in atk_state.effects_pre_combat
-            if e.type == EffectType.PRE_CBT_DAMAGE
-        )
-        def_predmg = sum(
-            self._resolve_formula(e.params, def_state, atk_state)
-            for e in def_state.effects_pre_combat
-            if e.type == EffectType.PRE_CBT_DAMAGE
+        sides = (
+            ("attacker", atk_state, def_state),
+            ("defender", def_state, atk_state),
         )
 
-        if def_predmg > 0:
-            def_state.current_hp = max(1, def_state.current_hp - def_predmg)
-        if atk_predmg > 0:
-            atk_state.current_hp = max(1, atk_state.current_hp - atk_predmg)
+        # Both sums resolve before either lands, so neither sees the other's damage.
+        burn = {
+            role: sum(
+                self._resolve_formula(e.params, state, foe)
+                for e in state.effects_pre_combat
+                if e.type == EffectType.BURN_DAMAGE
+            )
+            for role, state, foe in sides
+        }
+        for role, state, _ in sides:
+            before = state.current_hp
+            if burn[role] > 0:
+                state.current_hp = max(1, state.current_hp - burn[role])
+            state.burn_taken = before - state.current_hp
 
-        # Process Pre-Combat Heal
-        atk_preheal = sum(
-            self._resolve_formula(e.params, atk_state, def_state)
-            for e in atk_state.effects_pre_combat
-            if e.type == EffectType.PRE_CBT_HEAL
-        )
-        def_preheal = sum(
-            self._resolve_formula(e.params, def_state, atk_state)
-            for e in def_state.effects_pre_combat
-            if e.type == EffectType.PRE_CBT_HEAL
-        )
-
-        self._apply_healing("attacker", atk_preheal, phase="in_combat")
-        self._apply_healing("defender", def_preheal, phase="in_combat")
+        for role, state, foe in sides:
+            # Pre-combat heals don't stack: only the highest source applies. A
+            # heal that also restores burn damage reads it through the burn_taken
+            # formula, as part of its own value, never on top of another source.
+            heal = max(
+                (
+                    self._resolve_formula(e.params, state, foe)
+                    for e in state.effects_pre_combat
+                    if e.type == EffectType.PRE_CBT_HEAL
+                ),
+                default=0,
+            )
+            self._apply_healing(role, heal, phase="in_combat")
 
     def _apply_twin_effects(self):
         """Apply twin effect if needed."""
@@ -1485,10 +1495,16 @@ class CombatEngine:
     def _resolve_formula(
         self, params: dict, unit_state: CombatantState, foe_state: CombatantState
     ) -> int:
-        """Resolves a {formula, multiplier, flat, min, max} param block into a number."""
+        """Resolves a {formula, multiplier, flat, min, max} param block into a number.
+
+        flat may itself be a param block, resolved the same way and added on, so
+        one value can sum two formulas (40% of max HP + burn_taken).
+        """
         formula = params.get("formula", "")
         multiplier = params.get("multiplier", 0)
         flat = params.get("flat", 0)
+        if isinstance(flat, dict):
+            flat = self._resolve_formula(flat, unit_state, foe_state)
         min_val = params.get("min", 0)
         max_val = params.get("max", -1)
         variable = 0.0
@@ -1526,6 +1542,8 @@ class CombatEngine:
                     variable = unit_state.damage_mitigated_bucket
                 case "unit_max_hp":
                     variable = unit_state.unit.max_hp
+                case "burn_taken":
+                    variable = unit_state.burn_taken
                 case "phantom_spd_diff":
                     # Distinct from the follow-up/Potent spd_diff locals in
                     # _determine_strike_sequence and _evaluate_potent_spd_check —

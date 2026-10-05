@@ -38,7 +38,7 @@ EFFECT_LIST_MAP: dict[EffectType, str] = {
     EffectType.GRANT_VISIBLE_STAT: "effects_start_of_turn",
     EffectType.GRANT_STATUS: "effects_start_of_turn",
     # ── Pre-combat ───────────────────────────────────────────────────────
-    EffectType.PRE_CBT_DAMAGE: "effects_pre_combat",
+    EffectType.BURN_DAMAGE: "effects_pre_combat",
     EffectType.PRE_CBT_HEAL: "effects_pre_combat",
     # ── On-strike ────────────────────────────────────────────────────────
     EffectType.TWIN: "effects_pre_combat",
@@ -109,6 +109,13 @@ EXTRA_STRIKE_VALUES: dict[EffectType, frozenset[str]] = {
 }
 
 
+def _formula_names(params: dict):
+    """Every formula name in a param block, a nested flat block included."""
+    yield params.get("formula", "")
+    if isinstance(params.get("flat"), dict):
+        yield from _formula_names(params["flat"])
+
+
 def validate_effect_desc(desc: dict) -> list[str]:
     """Returns every problem with a raw effect dict, empty if it is well-formed.
     Shared by build_effect (raises) and the data-integrity tests (reports)."""
@@ -128,8 +135,15 @@ def validate_effect_desc(desc: dict) -> list[str]:
     allowed_strikes = STRIKE_VALUES | EXTRA_STRIKE_VALUES.get(effect_type, frozenset())
     if "strike" in params and params["strike"] not in allowed_strikes:
         problems.append(f"unknown strike value {params['strike']!r}")
-    if "formula" in params and params["formula"] not in FORMULA_NAMES:
-        problems.append(f"unknown formula {params['formula']!r}")
+    formulas = list(_formula_names(params))
+    for name in formulas:
+        if name not in FORMULA_NAMES:
+            problems.append(f"unknown formula {name!r}")
+    if "burn_taken" in formulas and effect_type is not EffectType.PRE_CBT_HEAL:
+        problems.append(
+            "burn_taken is only known once burn has landed, "
+            "so only PRE_CBT_HEAL can read it"
+        )
     return problems
 
 
