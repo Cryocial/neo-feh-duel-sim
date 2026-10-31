@@ -459,6 +459,8 @@ class CombatEngine:
 
         has_hexblade_aoe = any(
             e.type == EffectType.HEXBLADE_AOE for e in state.effects_AoE
+        ) and not any(
+            e.type == EffectType.NEUT_HEXBLADE for e in foe_state.effects_pre_combat
         )
         if has_hexblade_aoe:
             visible_def = min(
@@ -974,6 +976,9 @@ class CombatEngine:
         has_hexblade = any(
             e.type == EffectType.HEXBLADE_STRIKE
             for e in striker_state.effects_pre_combat
+        ) and not any(
+            e.type == EffectType.NEUT_HEXBLADE
+            for e in target_state.effects_pre_combat
         )
 
         if has_hexblade:

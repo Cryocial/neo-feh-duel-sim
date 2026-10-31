@@ -45,6 +45,7 @@ EFFECT_LIST_MAP: dict[EffectType, str] = {
     EffectType.TWIN: "effects_pre_combat",
     EffectType.DR_PIERCE: "effects_on_strike",
     EffectType.HEXBLADE_STRIKE: "effects_pre_combat",
+    EffectType.NEUT_HEXBLADE: "effects_pre_combat",
     EffectType.EFFECTIVE: "effects_on_strike",
     EffectType.NEUT_EFFECTIVE: "effects_on_strike",
     EffectType.SPECIAL_TRIGGER_NEUT: "effects_pre_combat",
