@@ -794,8 +794,8 @@ class CombatEngine:
         # otherwise follow-ups queue after both sides' first strikes, same order.
         # Vantage only decides which side goes first.
         sides = [
-            (defender_first, defender_followups, self.has_desperation(def_state, atk_state)),
-            (attacker_first, attacker_followups, self.has_desperation(atk_state, def_state)),
+            (defender_first, defender_followups, self._has_desperation(def_state, atk_state)),
+            (attacker_first, attacker_followups, self._has_desperation(atk_state, def_state)),
         ]
         if not defender_vantage:
             sides.reverse()
@@ -833,12 +833,12 @@ class CombatEngine:
             best = mult if best is None else max(best, mult)
         return best
 
-    def has_desperation(self, own, foe):
-                return any(
-                    e.type == EffectType.DESPERATION for e in own.effects_strike_sequence
-                ) and not any(
-                    e.type == EffectType.DESPERATION_NEUT for e in foe.effects_strike_sequence
-                )
+    def _has_desperation(self, own, foe):
+        return any(
+            e.type == EffectType.DESPERATION for e in own.effects_strike_sequence
+        ) and not any(
+            e.type == EffectType.DESPERATION_NEUT for e in foe.effects_strike_sequence
+        )
 
     # ── Combat phase and mechanics ───────────────────────────────────────────────
 
