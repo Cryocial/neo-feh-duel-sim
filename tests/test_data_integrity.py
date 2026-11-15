@@ -4,8 +4,9 @@ registries, so a malformed skill fails CI before anyone equips it.
 
 Each entry is one parametrized case. The checks mirror build_effect exactly
 (effect type, target, required params, strike and formula names) and add the
-things build_effect can't see: condition types inside any_of / all_of, and a
-Special slot that never declared its special_type.
+things build_effect can't see: condition types inside any_of / all_of, a
+Special slot that never declared its special_type, and a skill filed under a
+status type.
 
 KNOWN_BROKEN is a strict ledger of entries that fail today.
 They are marked xfail(strict=True): the moment one of them validates cleanly
@@ -69,6 +70,8 @@ def problems_for(name, entry):
         )
     if slot not in (None, "special") and special_type is not SpecialType.NONE:
         problems.append(f"{name}: slot={slot!r} but special_type={special_type.name}")
+    if slot in ("bonus", "penalty"):
+        problems.append(f"{name}: slot={slot!r} is a status type, not a skill slot")
     return problems
 
 

@@ -114,7 +114,7 @@
     ]
   },
   "Breath of Life 4": {
-    "type": "bonus",
+    "type": "passive_c",
     "effects": [
       {
         "effect": "PRE_CBT_HEAL",
