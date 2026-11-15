@@ -26,8 +26,6 @@ from backend.jsonbootupstuff import (
 )
 
 KNOWN_BROKEN = {
-    "Divine Nectar": "strike 'first_sequence', and effect "
-    "'NEUT_DEEP_WOUNDS_STRIKE' (audit #9, #11)",
     "Stone": "strike 'on_foe_special' (audit #9); its PERC_DR_AOE effect "
     "only exists once PR #36 lands",
 }

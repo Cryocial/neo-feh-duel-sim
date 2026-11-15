@@ -312,7 +312,7 @@
         "params": {
           "formula": "",
           "flat": 10,
-          "strike": "first_sequence"
+          "strike": "every_strike"
         },
         "conditions": [
           {
@@ -324,7 +324,7 @@
         ]
       },
       {
-        "effect": "NEUT_DEEP_WOUNDS_STRIKE",
+        "effect": "NEUT_DEEP_WOUNDS_IN_CBT",
         "target": "self",
         "params": {},
         "conditions": []
