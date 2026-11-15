@@ -26,10 +26,6 @@ from backend.jsonbootupstuff import (
 )
 
 KNOWN_BROKEN = {
-    "Atk Liberate": "formula 'bonus_count_plus_4' does not exist (audit #10)",
-    "Spd Liberate": "formula 'bonus_count_plus_4' does not exist (audit #10)",
-    "Def Liberate": "formula 'bonus_count_plus_4' does not exist (audit #10)",
-    "Res Liberate": "formula 'bonus_count_plus_4' does not exist (audit #10)",
     "Divine Nectar": "strike 'first_sequence', and effect "
     "'NEUT_DEEP_WOUNDS_STRIKE' (audit #9, #11)",
     "Stone": "strike 'on_foe_special' (audit #9); its PERC_DR_AOE effect "
