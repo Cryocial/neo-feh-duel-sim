@@ -1,5 +1,5 @@
 """
-Burn damage and start-of-combat healing (BURN_DAMAGE / PRE_CBT_HEAL),
+Burn damage and start-of-combat healing (BURN_DAMAGE / BURN_HEAL),
 resolved in _resolve_pre_combat before the strike loop.
 
 Burn damage is not AoE damage: burn lands after every condition pass and so
@@ -8,7 +8,7 @@ start-of-combat snapshot and does. Both are pinned below.
 
 Rules verified:
   - BURN_DAMAGE sources STACK: every source lands, floored at 1 HP
-  - PRE_CBT_HEAL sources DON'T stack: only the highest single source heals
+  - BURN_HEAL sources DON'T stack: only the highest single source heals
     (three Imbue-style sources of 20, 20 and 10 restore 20, not 50)
   - healing still caps at max HP
   - a heal can also restore what burn cost through the burn_taken formula;
@@ -44,7 +44,7 @@ def make_unit(name, hp=50, atk=40, spd=10, defense=20, res=20):
 
 def heal(amount):
     return Status(name=f"Heal {amount}", type="bonus", effects=[{
-        "effect": "PRE_CBT_HEAL",
+        "effect": "BURN_HEAL",
         "target": "self",
         "params": {"flat": amount},
         "conditions": [],
@@ -103,7 +103,7 @@ def test_pre_combat_heal_caps_at_max_hp():
 def heal_plus_burn(amount):
     """Heals amount plus whatever burn cost the unit (Breath of Life 4 pattern)."""
     return Status(name=f"Heal {amount} + burn", type="bonus", effects=[{
-        "effect": "PRE_CBT_HEAL",
+        "effect": "BURN_HEAL",
         "target": "self",
         "params": {"formula": "burn_taken", "multiplier": 1, "flat": amount},
         "conditions": [],
@@ -339,8 +339,8 @@ def test_breath_of_life_4_heals_20_percent_and_refunds_nothing_when_def_loses():
 
 def test_breath_of_life_4_competes_with_a_status_heal_as_one_value():
     """Def 25 vs 20, burn 10: Breath of Life 4 is worth 20 + 10 = 30 and beats
-    a plain 25 from a status. The old BURN_HEAL rule added the 10 on top of
-    whichever heal won instead (25 + 10, for 45)."""
+    a plain 25 from a status. Refunding burn as a separate effect would add
+    the 10 on top of whichever heal won instead (25 + 10, for 45)."""
     attacker = make_unit("A", defense=25)
     attacker.current_hp = 20
     attacker.c_slot = SKILL_DATABASE["Breath of Life 4"]

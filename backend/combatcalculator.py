@@ -891,7 +891,7 @@ class CombatEngine:
             self._process_strike(strike)
 
     def _resolve_pre_combat(self):
-        """Processes BURN_DAMAGE, then PRE_CBT_HEAL.
+        """Processes BURN_DAMAGE, then BURN_HEAL.
 
         Burn damage and AoE damage are distinct: burn lands here, after every
         condition pass, so it never moves an HP check, while AoE damage
@@ -929,7 +929,7 @@ class CombatEngine:
                 (
                     self._resolve_formula(e.params, state, foe)
                     for e in state.effects_pre_combat
-                    if e.type == EffectType.PRE_CBT_HEAL
+                    if e.type == EffectType.BURN_HEAL
                 ),
                 default=0,
             )
