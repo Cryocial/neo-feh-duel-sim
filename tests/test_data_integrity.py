@@ -26,7 +26,6 @@ from backend.jsonbootupstuff import (
 )
 
 KNOWN_BROKEN = {
-    "Arcane Cake": "strike 'on_foe_special' is not a STRIKE_VALUES entry (audit #9)",
     "Chosen Sword": "effects [1]-[3] are nested {'effects': [...]} wrappers, "
     "and strike 'on_foe_special' (audit #7, #9)",
     "Dragon Fang": "slot=special with no special_type, and strike "

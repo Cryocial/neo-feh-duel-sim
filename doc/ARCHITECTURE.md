@@ -172,7 +172,7 @@ class Skill:
         "flat": 15,
         "min": 15,
         "max": 15,
-        "strike": "on_special"
+        "strike": "foe_special_triggers"
       },
       "conditions": []
     },
