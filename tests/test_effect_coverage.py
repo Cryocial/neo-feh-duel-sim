@@ -25,7 +25,6 @@ UNTESTED_EFFECT_TYPES = frozenset(
         "FLAT_DAMAGE_AOE",
         "HEXBLADE_AOE",
         "PULSE_AOE",
-        "BONUS_NEUT",
         "PENALTY_NEUT",
         "PHANTOM_STAT",
         "FU_DENY",
@@ -76,10 +75,6 @@ UNTESTED_CONDITION_TYPES = frozenset(
         "cbt_stat_sum_check",
         "potent_spd_check",
         "triggers_brave",
-        "ally_within_spaces",
-        "foe_initiates",
-        "is_engaged",
-        "unit_initiates",
     }
 )
 

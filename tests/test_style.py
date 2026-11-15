@@ -9,9 +9,13 @@ Rules verified:
   - grants_style can come from either an equipped Skill or an active Status
   - RANGE_EXTENSION overrides combat_range: fixed value if min == max,
     otherwise the user-chosen unit.chosen_range
+  - A flexible range (min != max) needs chosen_range set within its span;
+    left unset or set outside it, simulate() raises ValueError
 
 See test_range.py for combat_range's default (no style involved).
 """
+
+import pytest
 
 from backend.build import Unit, Status, Skill, StatBlock
 from backend.constants import MovementType, WeaponType, Color
@@ -169,6 +173,22 @@ def test_flexible_range_extension_uses_chosen_range():
     engine.simulate()
 
     assert engine.combat_range == 4
+
+
+def test_flexible_range_extension_without_valid_chosen_range_raises():
+    """min != max -> chosen_range is required: left unset, or set outside the
+    style's span, it raises instead of resolving silently."""
+    attacker = make_unit("A", weapon_type=WeaponType.SWORD)
+    attacker.active_statuses.append(style_range_status(1, 6))
+    attacker.style_enabled = True
+    defender = make_unit("D")
+
+    with pytest.raises(ValueError, match="chosen_range"):
+        CombatEngine(attacker, defender).simulate()
+
+    attacker.chosen_range = 9
+    with pytest.raises(ValueError, match="chosen_range"):
+        CombatEngine(attacker, defender).simulate()
 
 
 def test_range_extension_does_not_apply_when_not_enabled():
