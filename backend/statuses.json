@@ -264,9 +264,7 @@
       {
         "effect": "REFLEX",
         "target": "self",
-        "params": {
-          "strike": "every_strike"
-        },
+        "params": {},
         "conditions": []
       }
     ]
