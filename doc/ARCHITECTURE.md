@@ -714,8 +714,10 @@ come after percent DR.
    Visible (stat-screen) values are used, since AoE resolves before in-combat
    stats exist.
 2. **Fixed damage** — `FLAT_DAMAGE_AOE` added on.
-3. **Flat damage reduction** — `FLAT_DR_AOE` subtracted, floored at 0.
-4. **Survival** — AoE damage cannot kill: the foe's HP floors at 1.
+3. **Percent damage reduction** — `PERC_DR_AOE` sources stack multiplicatively
+   and the surviving damage rounds UP. There is no AoE pierce.
+4. **Flat damage reduction** — `FLAT_DR_AOE` subtracted, floored at 0.
+5. **Survival** — AoE damage cannot kill: the foe's HP floors at 1.
 
 ## Simulation Timeline
 
