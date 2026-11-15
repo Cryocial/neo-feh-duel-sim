@@ -25,10 +25,7 @@ from backend.jsonbootupstuff import (
     SKILL_DATABASE,
 )
 
-KNOWN_BROKEN = {
-    "Stone": "strike 'on_foe_special' (audit #9); its PERC_DR_AOE effect "
-    "only exists once PR #36 lands",
-}
+KNOWN_BROKEN = {}
 
 
 def _entries():

@@ -53,7 +53,7 @@
             "flat": 10,
             "min": 10,
             "max": 10,
-            "strike": "on_foe_special"
+            "strike": "foe_special_triggers"
         },
         "conditions": []
       }
