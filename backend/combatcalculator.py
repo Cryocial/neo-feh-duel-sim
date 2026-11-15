@@ -1221,31 +1221,23 @@ class CombatEngine:
             if not special_miracle:
                 target_state.miracle_used = True
 
-        # Reflex sources stack; Briar applies only its highest percent.
-        mitigated_amount = pre_mitigation_damage - final_damage
-        briar_pct = 0
-        for effect in target_state.effects_on_strike:
-            if effect.type not in (EffectType.REFLEX, EffectType.BRIAR):
-                continue
-            if not self._strike_matches(
-                strike,
-                "target",
-                effect.params,
-                striker_special_ready=striker_special_ready,
-                target_special_ready=target_special_ready,
-                striker_special_triggers=striker_special_triggers,
-                target_special_triggers=target_special_triggers,
-                striker_special_used=striker_special_used,
-                target_special_used=target_special_used,
-            ):
-                continue
-            if effect.type is EffectType.REFLEX:
-                target_state.reflect_bucket += mitigated_amount
-            else:
-                pct = self._resolve_formula(effect.params, target_state, striker_state)
-                briar_pct = max(briar_pct, pct)
-        if briar_pct:
-            target_state.reflect_bucket += math.floor(pre_mitigation_damage * briar_pct / 100)
+        # Only the foe's first strike of the combat can be reflected. Reflex
+        # sources stack; Briar applies only its highest percent.
+        if strike.strike_type is StrikeType.FIRST and not strike.brave_second_hit:
+            mitigated_amount = pre_mitigation_damage - final_damage
+            briar_pct = 0
+            for effect in target_state.effects_on_strike:
+                if effect.type is EffectType.REFLEX:
+                    target_state.reflect_bucket += mitigated_amount
+                elif effect.type is EffectType.BRIAR:
+                    pct = self._resolve_formula(
+                        effect.params, target_state, striker_state
+                    )
+                    briar_pct = max(briar_pct, pct)
+            if briar_pct:
+                target_state.reflect_bucket += math.floor(
+                    pre_mitigation_damage * briar_pct / 100
+                )
         target_state.current_hp -= final_damage
 
         hit_heal = 0

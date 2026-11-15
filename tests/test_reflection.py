@@ -1,7 +1,8 @@
 """
-Reflected damage. REFLEX returns the damage a hit had negated; BRIAR returns a
-percentage of the hit's damage before any reduction. Both fill the target's
-reflect_bucket, which its very next strike spends in full as true damage.
+Reflected damage. Only the foe's first strike of the combat is reflected:
+REFLEX returns the damage that strike had negated; BRIAR returns a percentage
+of its damage before any reduction. Both fill the target's reflect_bucket,
+which its very next strike spends in full as true damage.
 
 Setup: sword attacker at 40 Atk / 20 Def, Spd 30 so it strikes twice; defender
 at 30 Atk / 20 Def, Spd 10, 100 HP. The attacker's raw hit is 20 and the
@@ -38,12 +39,12 @@ def half_dr(strike="first_strike"):
     return status("PERC_DR_STRIKE", {"flat": 50, "strike": strike, "piercable": True})
 
 
-def reflex(strike="first_strike"):
-    return status("REFLEX", {"strike": strike})
+def reflex():
+    return status("REFLEX", {})
 
 
-def briar(pct=40, strike="first_strike"):
-    return status("BRIAR", {"flat": pct, "strike": strike})
+def briar(pct=40):
+    return status("BRIAR", {"flat": pct})
 
 
 def defender(*statuses):
@@ -112,8 +113,8 @@ def test_briar_uses_only_the_highest_percent():
 
 
 def test_reflected_damage_is_spent_on_one_strike():
-    """GFU gives the defender a follow-up, so the order is A1 D1 A2 D2. Reflex
-    matches the first strike only: D1 carries the 10 reflected, D2 is plain."""
+    """GFU gives the defender a follow-up, so the order is A1 D1 A2 D2. D1
+    carries the 10 reflected from A1, D2 is plain."""
     foe = defender(half_dr(), reflex(), status("GFU", {}))
 
     result = CombatEngine(make_unit("A", spd=30), foe).simulate()
@@ -121,11 +122,34 @@ def test_reflected_damage_is_spent_on_one_strike():
     assert taken_by_attacker(result) == 20 + 10
 
 
-def test_reflect_bucket_refills_on_the_next_matching_hit():
-    """Same exchange with both effects on every strike: A2 is halved too, so D2
-    carries a fresh 10. Each counter spends only what the hit before it added."""
-    foe = defender(half_dr("every_strike"), reflex("every_strike"), status("GFU", {}))
+def test_a_follow_up_is_not_reflected():
+    """Same exchange with every strike halved: A2 has 10 negated too, but only
+    the foe's first strike feeds the bucket, so D2 stays plain."""
+    foe = defender(half_dr("every_strike"), reflex(), status("GFU", {}))
 
     result = CombatEngine(make_unit("A", spd=30), foe).simulate()
 
-    assert taken_by_attacker(result) == 20 + 20
+    assert taken_by_attacker(result) == 20 + 10
+
+
+def test_a_brave_second_hit_is_not_reflected():
+    """Equal Spd and a Brave attacker: A1, its brave second hit, then D1. Briar
+    reads the 20 from A1 alone: 8 on top of the counter, not 16."""
+    attacker = make_unit("A")
+    attacker.active_statuses.append(status("BRAVE", {}))
+
+    result = CombatEngine(attacker, defender(briar(40))).simulate()
+
+    assert taken_by_attacker(result) == 10 + 8
+
+
+def test_the_initiator_reflects_the_counter_on_its_follow_up():
+    """The foe's first strike is whichever one it lands first, here the
+    counter: 10 halved to 5, so the attacker's follow-up deals 20 + 5."""
+    attacker = make_unit("A", spd=30)
+    attacker.active_statuses.extend([half_dr(), reflex()])
+
+    result = CombatEngine(attacker, defender()).simulate()
+
+    assert taken_by_attacker(result) == 5
+    assert result["defender_final_hp"] == 100 - 20 - 25
