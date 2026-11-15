@@ -39,9 +39,6 @@ KNOWN_BROKEN = {
     "'NEUT_DEEP_WOUNDS_STRIKE' (audit #9, #11)",
     "Stone": "strike 'on_foe_special' (audit #9); its PERC_DR_AOE effect "
     "only exists once PR #36 lands",
-    "Water": "DR_PIERCE written with the formula block (flat: 50) instead of "
-    "value: 50, which is the key the engine reads; the pierce was "
-    "silently 0% (found by REQUIRED_PARAMS, post-audit)",
 }
 
 
