@@ -59,6 +59,7 @@ def make_state(
     penalty_count=0,
     spaces_moved=0,
     damage_mitigated_bucket=0,
+    burn_taken=0,
     combat_stats=None,
 ):
     """Helper to build a CombatantState with specific fields set.
@@ -74,5 +75,6 @@ def make_state(
     state.penalty_count = penalty_count
     state.spaces_moved = spaces_moved
     state.damage_mitigated_bucket = damage_mitigated_bucket
+    state.burn_taken = burn_taken
     state.combat_stats = combat_stats
     return state

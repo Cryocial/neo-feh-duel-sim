@@ -2,7 +2,7 @@
   "Flame": {
     "effects": [
       {
-        "effect": "PRE_CBT_DAMAGE",
+        "effect": "BURN_DAMAGE",
         "target": "foe",
         "params": {
           "formula": "",

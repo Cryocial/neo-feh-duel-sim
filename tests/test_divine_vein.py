@@ -49,7 +49,7 @@ def flame_like_vein(amount=7):
         name="Test Flame",
         effects=[
             {
-                "effect": "PRE_CBT_DAMAGE",
+                "effect": "BURN_DAMAGE",
                 "target": "foe",
                 "params": {"flat": amount},
                 "conditions": [],
