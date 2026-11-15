@@ -442,7 +442,7 @@ class CombatantState:
 
 `effects_strike_sequence` : for effects used to determine the strike sequence, for example effects of type `EffectType.FLASH`, `EffectType.GFU`, `EffectType.POTENT`, `EffectType.BRAVE`, `EffectType.VANTAGE`, `EffectType.DESPERATION_NEUT`, etc.
 
-`effects_pre_combat` : for burn damage and start-of-combat healing, i.e. of type `EffectType.BURN_DAMAGE` and `EffectType.PRE_CBT_HEAL`.
+`effects_pre_combat` : for burn damage and start-of-combat healing, i.e. of type `EffectType.BURN_DAMAGE` and `EffectType.BURN_HEAL`.
 
 `effects_on_strike` : for per-strike effects, for example effects of type `EffectType.FLAT_DR_STRIKE`, `EffectType.PERC_DR_STRIKE`, `EffectType.FLAT_DAMAGE_STRIKE`, `EffectType.PULSE_STRIKE`, `EffectType.SCOWL_STRIKE`, `EffectType.HEAL_STRIKE`, `EffectType.OFF_BREATH`, `EffectType.GUARD_NEUT`, etc.
 
@@ -814,7 +814,7 @@ Processed by `_initialize` before combat begins. These grant visible stats and s
 | Effect | FEH accurate Description | Details | `params`|
 |---|---|---|---|
 | `BURN_DAMAGE` | Deals damage to unit as combat begins | **Applied to unit**. Sources add up, and HP is floored at 1. Distinct from AoE damage (`TRIGGER_AOE`): burn lands after every condition pass, so it never moves an HP check, while AoE lands before the start-of-combat snapshot and does. | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
-| `PRE_CBT_HEAL` | Restores HP to unit as combat begins | **Applied to unit**. Only the largest source applies, the heal caps at max HP. A heal that also restores burn damage (Breath of Life 4's "+ damage dealt to unit as combat begins") adds the `burn_taken` formula to its own value, as a nested `flat` block when the base is itself a formula, so that part competes with the rest of its heal and is never added on top of another source. | `{ formula: str, multiplier: float, flat: int or formula block, min: int, max: int }` |
+| `BURN_HEAL` | Restores HP to unit as combat begins | **Applied to unit**. Only the largest source applies, the heal caps at max HP. A heal that also restores burn damage (Breath of Life 4's "+ damage dealt to unit as combat begins") adds the `burn_taken` formula to its own value, as a nested `flat` block when the base is itself a formula, so that part competes with the rest of its heal and is never added on top of another source. | `{ formula: str, multiplier: float, flat: int or formula block, min: int, max: int }` |
 
 #### `effects_on_strike`
 
@@ -903,7 +903,7 @@ Formula names resolve to raw game quantities; skill-specific offsets and caps li
 | `sum_foe_visible_debuffs` | Sum of foe's visible stat penalties, each floored at 0 (Dominance) | — |
 | `mitigated_bucket` | Unit's accumulated mitigated-damage total (Reflex) | — |
 | `unit_max_hp` | Unit's max HP (percent heals: pair with `multiplier`) | — |
-| `burn_taken` | HP that `BURN_DAMAGE` actually took from the unit this combat, after the 1-HP floor; never AoE damage. Only known once burn has landed, so only `PRE_CBT_HEAL` may read it (checked at load) | — |
+| `burn_taken` | HP that `BURN_DAMAGE` actually took from the unit this combat, after the 1-HP floor; never AoE damage. Only known once burn has landed, so only `BURN_HEAL` may read it (checked at load) | — |
 | `phantom_spd_diff` | `unit_spd - foe_spd`, in-combat, **including Phantom Spd**, floored at 0 (Dodge: pair with `multiplier`/`max` for the cap). Distinct from the plain `spd_diff` locals used by the follow-up check and `potent_spd_check`, which deliberately exclude Phantom. | — |
 | `foe_penalty_count` | Foe's active penalty count (Creation Pulse: pair with `max` for the cap) | — |
 | `unit_cbt_atk` | Unit's in-combat Atk | — |

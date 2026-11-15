@@ -39,7 +39,7 @@ EFFECT_LIST_MAP: dict[EffectType, str] = {
     EffectType.GRANT_STATUS: "effects_start_of_turn",
     # ── Pre-combat ───────────────────────────────────────────────────────
     EffectType.BURN_DAMAGE: "effects_pre_combat",
-    EffectType.PRE_CBT_HEAL: "effects_pre_combat",
+    EffectType.BURN_HEAL: "effects_pre_combat",
     # ── On-strike ────────────────────────────────────────────────────────
     EffectType.TWIN: "effects_pre_combat",
     EffectType.DR_PIERCE: "effects_on_strike",
@@ -139,10 +139,10 @@ def validate_effect_desc(desc: dict) -> list[str]:
     for name in formulas:
         if name not in FORMULA_NAMES:
             problems.append(f"unknown formula {name!r}")
-    if "burn_taken" in formulas and effect_type is not EffectType.PRE_CBT_HEAL:
+    if "burn_taken" in formulas and effect_type is not EffectType.BURN_HEAL:
         problems.append(
             "burn_taken is only known once burn has landed, "
-            "so only PRE_CBT_HEAL can read it"
+            "so only BURN_HEAL can read it"
         )
     return problems
 

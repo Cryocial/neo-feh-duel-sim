@@ -186,7 +186,7 @@ def test_simulate_is_repeatable_and_leaves_units_untouched():
         ),
         (
             {
-                "effect": "PRE_CBT_HEAL",
+                "effect": "BURN_HEAL",
                 "target": "self",
                 "params": {"flat": {"formula": "bonus_count_plus_4"}},
             },
@@ -198,7 +198,7 @@ def test_simulate_is_repeatable_and_leaves_units_untouched():
                 "target": "foe",
                 "params": {"formula": "burn_taken", "multiplier": 1},
             },
-            "only PRE_CBT_HEAL can read it",
+            "only BURN_HEAL can read it",
         ),
     ],
 )

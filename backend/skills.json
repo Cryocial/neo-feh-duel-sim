@@ -116,7 +116,7 @@
     "type": "bonus",
     "effects": [
       {
-        "effect": "PRE_CBT_HEAL",
+        "effect": "BURN_HEAL",
         "target": "self",
         "params": {
           "formula": "unit_max_hp",
@@ -138,7 +138,7 @@
         ]
       },
       {
-        "effect": "PRE_CBT_HEAL",
+        "effect": "BURN_HEAL",
         "target": "self",
         "params": {
           "formula": "unit_max_hp",
