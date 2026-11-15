@@ -8,6 +8,7 @@ Rules verified:
     later timing, and resolve once that timing is reached
   - a decisive branch settles the node at once, without waiting for the rest
   - ally_within_spaces reads the 1_space proximity count
+  - is_engaged passes when either combatant is Engaged
 """
 
 from backend.build import Unit, Skill, StatBlock
@@ -163,4 +164,20 @@ def test_ally_within_one_space_condition_evaluates():
 
     assert check_condition(cond, "static", unit, foe) is False
     unit.unit.allies_within_1_space = 1
+    assert check_condition(cond, "static", unit, foe) is True
+
+
+# ── is_engaged ───────────────────────────────────────────────────────────────
+
+
+def test_is_engaged_condition_passes_when_either_unit_is_engaged():
+    cond = build_conditions([{"type": "is_engaged"}])[0]
+    unit = condition_state(make_unit("A"), is_initiator=True)
+    foe = condition_state(make_unit("F"), is_initiator=False)
+
+    assert check_condition(cond, "static", unit, foe) is False
+    foe.unit.is_engaged = True
+    assert check_condition(cond, "static", unit, foe) is True
+    foe.unit.is_engaged = False
+    unit.unit.is_engaged = True
     assert check_condition(cond, "static", unit, foe) is True
