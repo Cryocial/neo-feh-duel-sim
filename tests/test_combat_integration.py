@@ -10,11 +10,16 @@ Setup choices that keep expected damage exact and hand-verifiable:
   - same color (RED vs RED) so there is NO weapon-triangle multiplier (wta = 1.0)
   - physical attacker so the targeted defensive stat is Def
   - no specials / no other skills, so damage per hit = atk - def
+
+The last section wields Chosen Sword from skills.json, a weapon that touches
+every step of the pipeline: start-of-turn grants, in-combat stats, the strike
+sequence and per-strike effects.
 """
 
-from backend.build import Unit, Status
-from backend.constants import MovementType, WeaponType, Color
+from backend.build import Unit, Skill, Status, StatBlock
+from backend.constants import MovementType, WeaponType, SpecialType, Color
 from backend.combatcalculator import CombatEngine
+from backend.jsonbootupstuff import SKILL_DATABASE
 
 
 def make_unit(name, color=Color.RED, hp=50, atk=40, spd=10, defense=20, res=20):
@@ -122,3 +127,65 @@ def test_stat_boost_multiple_stats():
     result = CombatEngine(attacker, defender).simulate()
     # 40+6 atk - 20 def = 26 damage, single hit (spd still equal -> no follow-up)
     assert result["defender_final_hp"] == 50 - 26
+
+
+# ── Chosen Sword, from skills.json ───────────────────────────────────────────
+
+
+def chosen_sword_wielder():
+    """40 Atk / 10 Spd / 20 Def. The sword grants Atk/Spd/Def+6 at start of
+    turn and Atk/Def/Res+16 in combat: 62 Atk, 16 Spd, 42 Def."""
+    unit = make_unit("A", atk=40, defense=20, spd=10)
+    unit.weapon = SKILL_DATABASE["Chosen Sword"]
+    return unit
+
+
+def test_chosen_sword_grants_reach_combat():
+    """Against 40 Def / 10 Spd the wielder is 6 Spd faster (follow-up) and has
+    2 more Def (attacks twice), so it lands four strikes of 62 - 40 + 25 = 47.
+    The foe's 50 Atk leaves 8 against 42 Def, which the sword's 15 flat
+    reduction takes down to 0."""
+    attacker = chosen_sword_wielder()
+    defender = make_unit("D", hp=200, atk=50, defense=40, spd=10)
+
+    engine = CombatEngine(attacker, defender)
+    result = engine.simulate()
+
+    state = engine.combatant_states["attacker"]
+    assert state.granted_visible_buffs == StatBlock(atk=6, spd=6, defense=6)
+    assert [status.name for status in state.granted_statuses] == ["Breath"]
+    assert result["defender_final_hp"] == 200 - 4 * 47
+    assert result["attacker_final_hp"] == 50
+
+
+def test_chosen_sword_reduces_the_foes_special_by_an_additional_15():
+    """Same matchup, the foe now at 70 Atk with a Special ready for its only
+    strike: 70 - 42 + 10 = 38, less 15, and 15 more because the Special
+    triggers."""
+    attacker = chosen_sword_wielder()
+    defender = make_unit("D", hp=200, atk=70, defense=40, spd=10)
+    defender.special = Skill(
+        name="Test Special",
+        slot="special",
+        might=0,
+        slaying=0,
+        cooldown=1,
+        visible_stats=StatBlock(),
+        effects=[
+            {
+                "effect": "FLAT_DAMAGE_STRIKE",
+                "target": "self",
+                "params": {"flat": 10, "strike": "unit_special_triggers"},
+                "conditions": [],
+            }
+        ],
+        allowed_movement_types=[],
+        allowed_weapon_types=[],
+        special_type=SpecialType.OFF,
+    )
+    defender.pre_charge = 1  # ready on its first strike
+
+    result = CombatEngine(attacker, defender).simulate()
+
+    assert result["attacker_final_hp"] == 50 - 8
+    assert result["defender_final_hp"] == 200 - 4 * 47

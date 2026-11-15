@@ -26,8 +26,6 @@ from backend.jsonbootupstuff import (
 )
 
 KNOWN_BROKEN = {
-    "Chosen Sword": "effects [1]-[3] are nested {'effects': [...]} wrappers, "
-    "and strike 'on_foe_special' (audit #7, #9)",
     "Dragon Fang": "slot=special with no special_type, and strike "
     "'on_unit_special' (audit #8, #9)",
     "Atk Liberate": "formula 'bonus_count_plus_4' does not exist (audit #10)",

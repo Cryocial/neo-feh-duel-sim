@@ -188,46 +188,24 @@
         "conditions": []
       },
       {
-        "effects": [
-          {
-            "effect": "GRANT_VISIBLE_STAT",
-            "target": "self",
-            "params": {
-              "stats": {
-                "atk": 6,
-                "spd": 6
-              }
-            },
-            "conditions": []
+        "effect": "GRANT_VISIBLE_STAT",
+        "target": "self",
+        "params": {
+          "stats": {
+            "atk": 6,
+            "spd": 6,
+            "defense": 6
           }
-        ]
+        },
+        "conditions": []
       },
       {
-        "effects": [
-          {
-            "effect": "GRANT_VISIBLE_STAT",
-            "target": "self",
-            "params": {
-              "stats": {
-                "atk": 6,
-                "def": 6
-              }
-            },
-            "conditions": []
-          }
-        ]
-      },
-      {
-        "effects": [
-          {
-            "effect": "GRANT_STATUS",
-            "target": "self",
-            "params": {
-              "status": "Breath"
-            },
-            "conditions": []
-          }
-        ]
+        "effect": "GRANT_STATUS",
+        "target": "self",
+        "params": {
+          "status": "Breath"
+        },
+        "conditions": []
       },
       {
         "effect": "FLAT_DAMAGE_STRIKE",
@@ -264,7 +242,7 @@
           "flat": 15,
           "min": 15,
           "max": 15,
-          "strike": "on_foe_special"
+          "strike": "foe_special_triggers"
         },
         "conditions": []
       },
