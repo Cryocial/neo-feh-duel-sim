@@ -14,13 +14,13 @@ These tests drive counts through the full simulate() path and via the
 visible-buff layers, then assert bonus_count / penalty_count land correctly.
 
 NOTE: _compute_counts iterates unit.active_statuses but NOT granted_statuses,
-so statuses granted at start of turn are not yet counted. test_granted_status_
-not_counted documents that current behavior (see the xfail note).
+so statuses granted at start of turn are not yet counted.
+test_granted_status_is_counted is an expected failure until they are.
 """
 
 import pytest
 
-from backend.build import Unit, Status, StatBlock
+from backend.build import Unit, Skill, Status, StatBlock
 from backend.constants import MovementType, WeaponType, Color
 from backend.combatcalculator import CombatEngine
 
@@ -126,21 +126,50 @@ def test_statuses_and_visible_combine():
 # ── documents a known gap: granted_statuses are NOT counted yet ────────────────
 
 
-@pytest.mark.xfail(
-    reason="_compute_counts iterates unit.active_statuses only, "
-    "not granted_statuses; documents current behavior"
-)
-def test_granted_status_would_be_counted():
-    """If a status is added to granted_statuses (as start-of-turn GRANT_STATUS
-    does), _compute_counts does NOT currently include it. This xfail documents
-    that; if _compute_counts is later updated to count granted_statuses, this
-    test will start passing (XPASS) and should be un-xfailed."""
+def breath_granter():
+    """A C-slot skill granting its unit the Breath status at start of turn."""
+    return Skill(
+        name="Test Grant",
+        slot="passive_c",
+        might=0,
+        slaying=0,
+        cooldown=0,
+        visible_stats=StatBlock(),
+        effects=[
+            {
+                "effect": "GRANT_STATUS",
+                "target": "self",
+                "params": {"status": "Breath"},
+                "conditions": [],
+            }
+        ],
+        allowed_movement_types=[],
+        allowed_weapon_types=[],
+    )
+
+
+def test_start_of_turn_grant_gives_the_status():
+    """The grant itself works, so the expected failure below can only be about
+    the count."""
     a = make_unit("A")
+    a.c_slot = breath_granter()
     d = make_unit("D")
-    eng = CombatEngine(a, d)
-    # manually simulate a granted status before counts run would require
-    # hooking mid-simulate; instead assert the semantic we WANT:
-    eng.simulate()
-    # after a hypothetical granted bonus status, we'd want bonus_count >= 1
-    # but current code won't reflect granted_statuses, so this fails as expected
-    assert eng.combatant_states["attacker"].bonus_count >= 1
+    eng = engine_after_counts(a, d)
+    granted = eng.combatant_states["attacker"].granted_statuses
+    assert [status.name for status in granted] == ["Breath"]
+
+
+@pytest.mark.xfail(
+    strict=True,
+    raises=AssertionError,
+    reason="_compute_counts iterates unit.active_statuses only, not granted_statuses",
+)
+def test_granted_status_is_counted():
+    """Breath is a bonus, so a unit granted it at start of turn has one bonus.
+    The count stays at 0 until _compute_counts reads granted_statuses; once it
+    does, this test passes and its xfail marker must go."""
+    a = make_unit("A")
+    a.c_slot = breath_granter()
+    d = make_unit("D")
+    eng = engine_after_counts(a, d)
+    assert eng.combatant_states["attacker"].bonus_count == 1
