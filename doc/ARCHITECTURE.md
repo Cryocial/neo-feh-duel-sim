@@ -678,10 +678,15 @@ At startup, three JSON files are parsed to build the in-memory databases.
 ---
 ## Damage Calculation Pipeline
 
-1. **Base damage** — `max(0, trunc(Atk × effectiveness × WTA) − defensive_stat)`.
-   Effectiveness (×1.5, unless `NEUT_EFFECTIVE`) and the weapon-triangle
-   multiplier (`_get_wta_multiplier`, incl. Triangle Adept / Cancel Affinity)
-   apply to Atk here.
+1. **Base damage** — `max(0, Atk + trunc(Atk × WTA%) − defensive_stat)`.
+   Effectiveness comes first: Atk ×1.5, truncated, unless `NEUT_EFFECTIVE`.
+   The weapon triangle then adds or takes away a percent of that Atk
+   (`_get_wta_percent`: ±20, or the Triangle Adept value unless Cancel
+   Affinity reverts it). That percent of Atk is truncated toward zero on its
+   own before it is applied, as in the game: at a disadvantage 33 Atk loses
+   `trunc(6.6) = 6` and becomes 27, where `trunc(33 × 0.8)` would give 26.
+   It is worked out from whole numbers (`Atk × percent / 100`), since a float
+   multiplier is not exact: `45 × 1.4` evaluates to `62.99999999999999`.
 2. **Fixed / true damage** — `FLAT_DAMAGE_STRIKE` effects added on
    (Change of Fate, Treachery, etc.).
 3. **Offensive Special damage** — special-trigger damage boosts.
@@ -842,7 +847,7 @@ Processed by `_initialize` before combat begins. These grant visible stats and s
 | `DEEP_WOUNDS_IN_CBT` | Unit cannot be healed during combat | **Applied to unit**. Covers pre-combat and per-strike heals, stored in the afflicted unit's list and checked against that unit's own heals. | `{}` |
 | `NEUT_DEEP_WOUNDS_IN_CBT` | Neutralizes effects that prevent unit from healing during combat | **Applied to unit**. Self-protective: lives in the protected unit's own list, checked alongside any Deep Wounds afflicting that same unit. | `{}` |
 | `REDUCE_DEEP_WOUNDS_IN_CBT` | Reduces effects that prevent unit from healing during combat by X% | **Applied to unit**. Lets a % of healing through. Multiple sources stack multiplicatively. | `{ formula: str, multiplier: float, flat: int, min: int, max: int }` |
-| `TRIANGLE_ADEPT` | If unit has weapon-triangle advantage, boosts Atk by 20% through its next action, and if unit has weapon-triangle disadvantage, reduces Atk by20% through its next action | **Applied to unit**, though read from either combatant's list. Amplifies an existing Weapon Triangle advantage to a larger magnitude. Never creates advantage where none exists. Highest source wins; empty `params` default to 40%. | `{ flat: int }` |
+| `TRIANGLE_ADEPT` | If unit has weapon-triangle advantage, boosts Atk by 20% through its next action, and if unit has weapon-triangle disadvantage, reduces Atk by20% through its next action | **Applied to unit**, though read from either combatant's list. Amplifies an existing Weapon Triangle advantage to a larger magnitude. Never creates advantage where none exists. Highest source wins; empty `params` default to 40%. `flat` is the whole percent of Atk gained or lost in total, in place of the base 20, and is applied as step 1 of the damage pipeline describes. | `{ flat: int }` |
 | `CANCEL_AFFINITY` | If unit has weapon-triangle disadvantage, reverses weapon-triangle advantage granted by foe's skills | **Applied to unit**, though read from either combatant's list. Reverts the Weapon Triangle to its base ±20%. Presence flag. | `{}` |
 | `STAFF_FULL_DAMAGE` | Calculates damage from staff like other weapons | **Applied to unit**. Presence flag, read from the striker's own list in `_staff_full_damage`. | `{}` |
 | `MIRACLE` | If unit's HP > 1 and foe would reduce unit's HP to 0 during combat, unit survives with 1 HP | **Applied to unit**. `strike: "on_unit_special"` = special miracle: needs the special ready, unbypassable. Otherwise skill miracle: once per combat (`miracle_used`), bypassed by `FATAL_SMOKE` on the striker. | `{ strike, piercable }` |
