@@ -8,6 +8,8 @@ Rules verified:
     to its params value (default 40% -> 1.40 / 0.60)
   - Cancel Affinity (on either side) neutralizes the TA amplification,
     reverting to base ±20%
+  - In a full combat, with the effects carried by a status, the multiplier
+    scales the striker's Atk, truncated, before Def is subtracted
 
 PREREQUISITES (must exist in source before these pass):
   - constants.py: EffectType.TRIANGLE_ADEPT, EffectType.CANCEL_AFFINITY
@@ -17,7 +19,7 @@ PREREQUISITES (must exist in source before these pass):
 
 import pytest
 
-from backend.build import Unit
+from backend.build import Unit, Status
 from backend.constants import MovementType, WeaponType, Color, EffectType
 from backend.effects import Effect
 from backend.combatcalculator import CombatEngine, CombatantState
@@ -26,7 +28,7 @@ from backend.combatcalculator import CombatEngine, CombatantState
 # ── helpers ───────────────────────────────────────────────────────────────────
 
 
-def colored_unit(color: Color, name="U") -> Unit:
+def colored_unit(color: Color, name="U", atk=30) -> Unit:
     """A minimal unit of a given color. Weapon type is arbitrary here since
     WTA is color-based; stats are round and irrelevant to the multiplier."""
     return Unit(
@@ -35,7 +37,7 @@ def colored_unit(color: Color, name="U") -> Unit:
         weapon_type=WeaponType.SWORD,
         color=color,
         hp=40,
-        atk=30,
+        atk=atk,
         spd=30,
         defense=20,
         res=20,
@@ -165,3 +167,69 @@ def test_cancel_affinity_without_ta_leaves_base(engine):
     striker = state_with(colored_unit(Color.RED))
     target = state_with(colored_unit(Color.GREEN), [cancel_affinity_effect()])
     assert engine._get_wta_multiplier(striker, target) == pytest.approx(1.20)
+
+
+# ── through a full combat ─────────────────────────────────────────────────────
+#
+# The tests above hand-build the states. These carry the effects in a status
+# and run simulate(): RED initiates on GREEN, 40 Atk against 20 Def each way,
+# equal Spd so each side strikes once. Atk is scaled, truncated, and Def comes
+# off after: 48 - 20 at +20%, 32 - 20 at -20%.
+
+
+def holding(effect, params=None) -> Status:
+    """A status carrying one effect on its holder."""
+    return Status(
+        name=effect,
+        type="bonus",
+        effects=[
+            {
+                "effect": effect,
+                "target": "self",
+                "params": params or {},
+                "conditions": [],
+            }
+        ],
+    )
+
+
+def duel(attacker_statuses=(), defender_statuses=()):
+    """Returns the damage RED dealt to GREEN and the damage it took back."""
+    attacker = colored_unit(Color.RED, "A", atk=40)
+    attacker.active_statuses.extend(attacker_statuses)
+    defender = colored_unit(Color.GREEN, "D", atk=40)
+    defender.active_statuses.extend(defender_statuses)
+    result = CombatEngine(attacker, defender).simulate()
+    return (
+        defender.current_hp - result["defender_final_hp"],
+        attacker.current_hp - result["attacker_final_hp"],
+    )
+
+
+def test_plain_advantage_in_combat():
+    dealt, taken = duel()
+    assert dealt == 48 - 20
+    assert taken == 32 - 20
+
+
+def test_triangle_adept_in_a_status_amplifies_both_directions():
+    """One TRIANGLE_ADEPT, on the attacker: its strike goes to +40% and the
+    foe's counter to -40%."""
+    dealt, taken = duel(attacker_statuses=[holding("TRIANGLE_ADEPT", {"flat": 40})])
+    assert dealt == 56 - 20
+    assert taken == 24 - 20
+
+
+def test_triangle_adept_on_the_disadvantaged_unit_does_the_same():
+    dealt, taken = duel(defender_statuses=[holding("TRIANGLE_ADEPT", {"flat": 40})])
+    assert dealt == 56 - 20
+    assert taken == 24 - 20
+
+
+def test_cancel_affinity_in_a_status_restores_the_base_triangle():
+    dealt, taken = duel(
+        attacker_statuses=[holding("TRIANGLE_ADEPT", {"flat": 40})],
+        defender_statuses=[holding("CANCEL_AFFINITY")],
+    )
+    assert dealt == 48 - 20
+    assert taken == 32 - 20
