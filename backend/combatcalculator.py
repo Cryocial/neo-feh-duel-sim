@@ -1053,7 +1053,7 @@ class CombatEngine:
         striker_special_used = striker_state.special_use_count > 0
         target_special_used = target_state.special_use_count > 0
 
-        wta = self._get_wta_multiplier(striker_state, target_state)
+        wta_percent = self._get_wta_percent(striker_state, target_state)
         is_effective = any(
             e.type == EffectType.EFFECTIVE
             and self._strike_matches(
@@ -1076,7 +1076,12 @@ class CombatEngine:
         if is_effective and not is_neut_effective:
             raw_atk = math.trunc(raw_atk * 1.5)
 
-        modified_atk = math.trunc(raw_atk * wta)
+        # The triangle's share of Atk is truncated toward zero on its own, then
+        # added: at -20%, 33 Atk loses trunc(6.6) = 6 and strikes with 27, where
+        # trunc(33 × 0.8) would give 26. Atk × percent is a whole number, so
+        # dividing it by 100 lands on the right side of every integer, which a
+        # float multiplier does not: 45 × 1.4 is 62.99999999999999.
+        modified_atk = raw_atk + math.trunc(raw_atk * wta_percent / 100)
         base_damage = max(0, modified_atk - defensive_stat)
 
         true_damage = 0
@@ -1357,21 +1362,25 @@ class CombatEngine:
         new_hp = unit_state.current_hp + amount
         unit_state.current_hp = min(unit_state.unit.max_hp, new_hp)
 
-    def _get_wta_multiplier(
+    def _get_wta_percent(
         self, striker_state: CombatantState, target_state: CombatantState
-    ) -> float:
-        """Calculates the WTA multiplier.
+    ) -> int:
+        """Share of the striker's Atk the weapon triangle adds, as a signed percent.
 
         Base advantage is ±20%. Triangle Adept (on either combatant) amplifies
         an EXISTING advantage to a larger value (default ±40%). Cancel Affinity
         on either side neutralizes the Triangle Adept amplification, reverting
         to the base ±20%.
+
+        A whole percent and not a multiplier: that share of Atk is truncated
+        before it is added, which one multiplication does not reproduce, and
+        1.4 has no exact float.
         """
         advantage = self._check_color_advantage(striker_state, target_state)
         if advantage == 0:
-            return 1.0
+            return 0
 
-        magnitude = 0.20
+        percent = 20
 
         ta_effects = [
             e
@@ -1384,14 +1393,14 @@ class CombatEngine:
         )
 
         if ta_effects and not cancel_affinity:
-            magnitude = max(
-                self._resolve_formula(e.params, striker_state, target_state) / 100
+            percent = max(
+                self._resolve_formula(e.params, striker_state, target_state)
                 if e.params
-                else 0.40
+                else 40
                 for e in ta_effects
             )
 
-        return 1.0 + (magnitude * advantage)
+        return percent * advantage
 
     def _check_color_advantage(
         self, striker_state: CombatantState, target_state: CombatantState
