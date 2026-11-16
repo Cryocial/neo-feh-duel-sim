@@ -8,6 +8,7 @@
 5. [JSON Parsing](#json-parsing)
 6. [User Flow](#user-flow)
 7. [Simulation Timeline](#simulation-timeline)
+8. [Testing](#testing)
 
 ---
 
@@ -750,6 +751,62 @@ step that consumes it reads it.
 13. Call `_resolve_combat`: snapshots `cd_start_of_cbt`, runs `_resolve_pre_combat` (`effects_pre_combat`: Flared Sparrow, BoL, etc.), applies twin, special denial and the defensive stat, then loops over the strike sequence consulting `effects_on_strike`.
 
 14. Call `_resolve_after_combat`: processes `effects_after_combat`.
+
+---
+
+## Testing
+
+`pytest -q` runs everything in `tests/`. Build the units and what they carry
+with the helpers in `tests/helpers.py`, run one combat, and assert on what the
+combat did.
+
+| Helper | Builds |
+|---|---|
+| `make_unit(name, **stats)` | A red sword infantry unit: 50 HP, 40 Atk, 10 Spd, 20 Def, 20 Res. Two of them share a colour, a Spd and a range, so each lands one strike of 20. Stats, `color`, `weapon_type`, `statuses` and any other `Unit` argument can be given. |
+| `effect(name, params)` | One effect description, in the shape the JSON files store. `target` and `conditions` are keyword arguments. |
+| `condition(kind, **params)` | One condition description. |
+| `status(*effects)` | A fake `Status` carrying those effects. |
+| `skill(*effects)` | A fake `Skill` carrying those effects, every other field neutral. |
+| `special(special_type, *effects)` | A fake Special with a cooldown of 1. |
+| `fight(attacker, defender)` | Runs the combat. The result has each side's final HP (`attacker_hp`, `defender_hp`), the HP it lost (`attacker_lost`, `defender_lost`), its `CombatantState` (`attacker`, `defender`) and the `engine`. |
+
+```python
+def test_flash_blocks_the_counter():
+    flash = status(effect("FLASH"), kind="penalty")
+
+    outcome = fight(make_unit("A"), make_unit("D", statuses=[flash]))
+
+    assert outcome.attacker_lost == 0
+    assert outcome.defender_lost == 20
+```
+
+### Which carrier
+
+`_distribute_effects` handles a skill, a status and a Divine Vein the same way,
+so a fake status is the default carrier: it needs no slot and several can be
+stacked. Use a fake skill where the carrier matters:
+
+- start-of-turn grants (`GRANT_VISIBLE_STAT`, `GRANT_STATUS`), which
+  `_initialize` reads from equipped skills only;
+- Specials, and anything else a skill stores (`visible_stats`, `slaying`,
+  `grants_style`);
+- tests that read `bonus_count` / `penalty_count`, since every active status
+  adds one to its holder's count.
+
+A real entry from the JSON files belongs in the tests about that entry.
+
+### What a test asserts
+
+- Damage, read from `attacker_lost` / `defender_lost`, with the arithmetic in
+  the docstring or in a comment. The starting HP is not repeated as a literal.
+- The outcome of `simulate()`. Calling an engine method directly is for pure
+  calculations (`_resolve_formula`, `_get_wta_multiplier`, `_strike_matches`,
+  `check_condition`), and an effect or condition tested that way also gets one
+  test through `simulate()`.
+- A module docstring lists the rules its tests verify. A test's docstring
+  explains its numbers.
+- Expected failures are strict (`xfail_strict`): an `xfail` test that starts
+  passing fails the run, so it must fail for the reason it gives.
 
 ---
 
