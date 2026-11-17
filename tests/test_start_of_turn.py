@@ -15,9 +15,12 @@ Requires (must be present in source):
   - EffectType.GRANT_VISIBLE_STAT
   - "visible_stat_check" condition registered under the "start_of_turn" phase
   - _apply_grant / _initialize wired into simulate()
+
+The last section follows a grant into combat: it must raise the in-combat
+stat, and BONUS_NEUT must strip it like any other visible buff.
 """
 
-from backend.build import Unit, Skill, StatBlock
+from backend.build import Unit, Skill, Status, StatBlock
 from backend.constants import MovementType, WeaponType, Color
 from backend.combatcalculator import CombatEngine
 
@@ -161,3 +164,69 @@ def test_self_visible_grant():
     assert atk_state.visible_stat("atk") == 36  # 30 + 6
     # two buffed stats -> 2 bonuses
     assert atk_state.bonus_count == 2
+
+
+# ── a grant reaches combat ────────────────────────────────────────────────────
+
+
+def hone_atk_skill(amount):
+    """A C-slot 'Hone Atk': grants visible Atk+amount to the unit itself."""
+    return Skill(
+        name="Hone Atk",
+        slot="c_slot",
+        might=0,
+        slaying=0,
+        cooldown=0,
+        visible_stats=StatBlock(),
+        effects=[
+            {
+                "effect": "GRANT_VISIBLE_STAT",
+                "target": "self",
+                "params": {"stats": {"atk": amount}},
+                "conditions": [],
+            }
+        ],
+        allowed_movement_types=[],
+        allowed_weapon_types=[],
+    )
+
+
+def test_start_of_turn_grant_reaches_combat_stats():
+    """A Hone-style Atk+6 grant raises in-combat Atk, not just the stat screen."""
+    # attacker is faster by 20 -> it strikes twice
+    attacker = make_unit("A", atk=40, spd=30)
+    attacker.c_slot = hone_atk_skill(6)
+    defender = make_unit("D", hp=100, atk=25, spd=10)
+
+    engine = CombatEngine(attacker, defender)
+    result = engine.simulate()
+
+    assert engine.combatant_states["attacker"].combat_stats.atk == 46
+    # 2 x (46 - 20)
+    assert result["defender_final_hp"] == 100 - 52
+
+
+def test_bonus_neut_still_strips_a_granted_buff():
+    """BONUS_NEUT on the foe neutralizes the grant like any other visible buff."""
+    attacker = make_unit("A", atk=40, spd=30)
+    attacker.c_slot = hone_atk_skill(6)
+    defender = make_unit("D", hp=100, atk=25, spd=10)
+    defender.active_statuses.append(
+        Status(
+            name="Neut",
+            type="bonus",
+            effects=[
+                {
+                    "effect": "BONUS_NEUT",
+                    "target": "self",
+                    "params": {},
+                    "conditions": [],
+                }
+            ],
+        )
+    )
+
+    result = CombatEngine(attacker, defender).simulate()
+
+    # 2 x (40 - 20)
+    assert result["defender_final_hp"] == 100 - 40
