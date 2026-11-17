@@ -44,12 +44,15 @@ EFFECT_LIST_MAP: dict[EffectType, str] = {
     EffectType.TWIN: "effects_pre_combat",
     EffectType.DR_PIERCE: "effects_on_strike",
     EffectType.HEXBLADE_STRIKE: "effects_pre_combat",
+    EffectType.NEUT_HEXBLADE: "effects_pre_combat",
     EffectType.EFFECTIVE: "effects_on_strike",
     EffectType.NEUT_EFFECTIVE: "effects_on_strike",
     EffectType.SPECIAL_TRIGGER_NEUT: "effects_pre_combat",
     EffectType.FLAT_DR_STRIKE: "effects_on_strike",
     EffectType.PERC_DR_STRIKE: "effects_on_strike",
     EffectType.FLAT_DAMAGE_STRIKE: "effects_on_strike",
+    EffectType.REFLEX: "effects_on_strike",
+    EffectType.BRIAR: "effects_on_strike",
     EffectType.PULSE_STRIKE: "effects_on_strike",
     EffectType.SCOWL_STRIKE: "effects_on_strike",
     EffectType.HEAL_STRIKE: "effects_on_strike",
@@ -144,6 +147,8 @@ def validate_effect_desc(desc: dict) -> list[str]:
             "burn_taken is only known once burn has landed, "
             "so only BURN_HEAL can read it"
         )
+    if effect_type is EffectType.BRIAR and "flat" not in params and not params.get("formula"):
+        problems.append("BRIAR needs a percent: 'flat' or a 'formula'")
     return problems
 
 

@@ -160,12 +160,6 @@ def test_unit_max_hp_with_multiplier(engine, plain_unit, plain_foe):
     )
 
 
-def test_mitigated_bucket(engine, plain_unit, plain_foe):
-    params = {"formula": "mitigated_bucket", "multiplier": 1}
-    state = make_state(plain_unit, damage_mitigated_bucket=12)
-    assert engine._resolve_formula(params, state, make_state(plain_foe)) == 12
-
-
 def test_burn_taken(engine, plain_unit, plain_foe):
     params = {"formula": "burn_taken", "multiplier": 1}
     state = make_state(plain_unit, burn_taken=7)

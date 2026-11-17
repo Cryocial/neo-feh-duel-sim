@@ -21,8 +21,8 @@ class CombatantState:
     phantom_bonus: StatBlock = field(default_factory=StatBlock)
     defensive_stat: Literal["defense", "res"] | None = None
     cd_start_of_cbt: int = 0
-    damage_mitigated_bucket: int = 0
     burn_taken: int = 0
+    reflect_bucket: int = 0
     bonus_count: int = 0
     penalty_count: int = 0
     special_type: SpecialType = SpecialType.NONE
@@ -460,6 +460,8 @@ class CombatEngine:
 
         has_hexblade_aoe = any(
             e.type == EffectType.HEXBLADE_AOE for e in state.effects_AoE
+        ) and not any(
+            e.type == EffectType.NEUT_HEXBLADE for e in foe_state.effects_pre_combat
         )
         if has_hexblade_aoe:
             visible_def = min(
@@ -782,9 +784,6 @@ class CombatEngine:
             defender_first = []
             defender_followups = []
 
-        attacker_package = attacker_first + attacker_followups
-        defender_package = defender_first + defender_followups
-
         defender_vantage = any(
             e.type == EffectType.VANTAGE for e in def_state.effects_strike_sequence
         )
@@ -794,38 +793,24 @@ class CombatEngine:
                 for e in atk_state.effects_strike_sequence
             )
 
-        attacker_desperation = any(
-            e.type == EffectType.DESPERATION for e in atk_state.effects_strike_sequence
-        )
-        if attacker_desperation:
-            attacker_desperation = not any(
-                e.type == EffectType.DESPERATION_NEUT
-                for e in def_state.effects_strike_sequence
-            )
+        # Desperation lands a side's follow-ups right after its own first strikes;
+        # otherwise follow-ups queue after both sides' first strikes, same order.
+        # Vantage only decides which side goes first.
+        sides = [
+            (defender_first, defender_followups, self._has_desperation(def_state, atk_state)),
+            (attacker_first, attacker_followups, self._has_desperation(atk_state, def_state)),
+        ]
+        if not defender_vantage:
+            sides.reverse()
 
-        if defender_vantage and attacker_desperation:
-            strike_sequence = (
-                defender_first
-                + attacker_first
-                + attacker_followups
-                + defender_followups
-            )
-        elif defender_vantage:
-            strike_sequence = (
-                defender_first
-                + attacker_first
-                + defender_followups
-                + attacker_followups
-            )
-        elif attacker_desperation:
-            strike_sequence = attacker_package + defender_package
-        else:
-            strike_sequence = (
-                attacker_first
-                + defender_first
-                + attacker_followups
-                + defender_followups
-            )
+        strike_sequence, deferred = [], []
+        for first, followups, desperation in sides:
+            strike_sequence += first
+            if desperation:
+                strike_sequence += followups
+            else:
+                deferred += followups
+        strike_sequence += deferred
 
         for i in range(1, len(strike_sequence)):
             strike_sequence[i].consecutive = (
@@ -850,6 +835,13 @@ class CombatEngine:
             mult = pct / 100
             best = mult if best is None else max(best, mult)
         return best
+
+    def _has_desperation(self, own, foe):
+        return any(
+            e.type == EffectType.DESPERATION for e in own.effects_strike_sequence
+        ) and not any(
+            e.type == EffectType.DESPERATION_NEUT for e in foe.effects_strike_sequence
+        )
 
     # ── Combat phase and mechanics ───────────────────────────────────────────────
 
@@ -980,6 +972,9 @@ class CombatEngine:
         has_hexblade = any(
             e.type == EffectType.HEXBLADE_STRIKE
             for e in striker_state.effects_pre_combat
+        ) and not any(
+            e.type == EffectType.NEUT_HEXBLADE
+            for e in target_state.effects_pre_combat
         )
 
         if has_hexblade:
@@ -1079,7 +1074,9 @@ class CombatEngine:
         modified_atk = math.trunc(raw_atk * wta)
         base_damage = max(0, modified_atk - defensive_stat)
 
-        true_damage = 0
+        # Reflected damage (REFLEX / BRIAR) is spent on the unit's next strike.
+        true_damage = striker_state.reflect_bucket
+        striker_state.reflect_bucket = 0
         for effect in striker_state.effects_on_strike:
             if effect.type == EffectType.FLAT_DAMAGE_STRIKE and self._strike_matches(
                 strike,
@@ -1097,10 +1094,10 @@ class CombatEngine:
                 )
 
         final_damage = base_damage + true_damage
-        pre_mitigation_damage = final_damage
         if striker_state.unit.weapon_type is WeaponType.STAFF:
             if not self._staff_full_damage(striker_state):
                 final_damage = math.trunc(final_damage * 0.5)
+        pre_mitigation_damage = final_damage
 
         pierce_mult = 1.0
         for effect in striker_state.effects_on_strike:
@@ -1224,8 +1221,23 @@ class CombatEngine:
             if not special_miracle:
                 target_state.miracle_used = True
 
-        mitigated_amount = pre_mitigation_damage - final_damage
-        target_state.damage_mitigated_bucket += mitigated_amount
+        # Only the foe's first strike of the combat can be reflected. Reflex
+        # sources stack; Briar applies only its highest percent.
+        if strike.strike_type is StrikeType.FIRST and not strike.brave_second_hit:
+            mitigated_amount = pre_mitigation_damage - final_damage
+            briar_pct = 0
+            for effect in target_state.effects_on_strike:
+                if effect.type is EffectType.REFLEX:
+                    target_state.reflect_bucket += mitigated_amount
+                elif effect.type is EffectType.BRIAR:
+                    pct = self._resolve_formula(
+                        effect.params, target_state, striker_state
+                    )
+                    briar_pct = max(briar_pct, pct)
+            if briar_pct:
+                target_state.reflect_bucket += math.floor(
+                    pre_mitigation_damage * briar_pct / 100
+                )
         target_state.current_hp -= final_damage
 
         hit_heal = 0
@@ -1538,8 +1550,6 @@ class CombatEngine:
                     variable = sum(
                         max(0, getattr(vd, s)) for s in ("atk", "spd", "defense", "res")
                     )
-                case "mitigated_bucket":  # Reflex
-                    variable = unit_state.damage_mitigated_bucket
                 case "unit_max_hp":
                     variable = unit_state.unit.max_hp
                 case "burn_taken":
