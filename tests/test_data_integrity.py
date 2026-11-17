@@ -4,8 +4,9 @@ registries, so a malformed skill fails CI before anyone equips it.
 
 Each entry is one parametrized case. The checks mirror build_effect exactly
 (effect type, target, required params, strike and formula names) and add the
-things build_effect can't see: condition types inside any_of / all_of, and a
-Special slot that never declared its special_type.
+things build_effect can't see: condition types inside any_of / all_of, a
+Special slot that never declared its special_type, and a skill filed under a
+status type.
 
 KNOWN_BROKEN is a strict ledger of entries that fail today.
 They are marked xfail(strict=True): the moment one of them validates cleanly
@@ -25,24 +26,7 @@ from backend.jsonbootupstuff import (
     SKILL_DATABASE,
 )
 
-KNOWN_BROKEN = {
-    "Arcane Cake": "strike 'on_foe_special' is not a STRIKE_VALUES entry (audit #9)",
-    "Chosen Sword": "effects [1]-[3] are nested {'effects': [...]} wrappers, "
-    "and strike 'on_foe_special' (audit #7, #9)",
-    "Dragon Fang": "slot=special with no special_type, and strike "
-    "'on_unit_special' (audit #8, #9)",
-    "Atk Liberate": "formula 'bonus_count_plus_4' does not exist (audit #10)",
-    "Spd Liberate": "formula 'bonus_count_plus_4' does not exist (audit #10)",
-    "Def Liberate": "formula 'bonus_count_plus_4' does not exist (audit #10)",
-    "Res Liberate": "formula 'bonus_count_plus_4' does not exist (audit #10)",
-    "Divine Nectar": "strike 'first_sequence', and effect "
-    "'NEUT_DEEP_WOUNDS_STRIKE' (audit #9, #11)",
-    "Stone": "strike 'on_foe_special' (audit #9); its PERC_DR_AOE effect "
-    "only exists once PR #36 lands",
-    "Water": "DR_PIERCE written with the formula block (flat: 50) instead of "
-    "value: 50, which is the key the engine reads; the pierce was "
-    "silently 0% (found by REQUIRED_PARAMS, post-audit)",
-}
+KNOWN_BROKEN = {}
 
 
 def _entries():
@@ -86,6 +70,8 @@ def problems_for(name, entry):
         )
     if slot not in (None, "special") and special_type is not SpecialType.NONE:
         problems.append(f"{name}: slot={slot!r} but special_type={special_type.name}")
+    if slot in ("bonus", "penalty"):
+        problems.append(f"{name}: slot={slot!r} is a status type, not a skill slot")
     return problems
 
 

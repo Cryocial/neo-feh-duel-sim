@@ -53,7 +53,7 @@
             "flat": 10,
             "min": 10,
             "max": 10,
-            "strike": "on_foe_special"
+            "strike": "foe_special_triggers"
         },
         "conditions": []
       }
@@ -168,12 +168,8 @@
         "effect": "DR_PIERCE",
         "target": "self",
         "params": {
-            "formula": "",
-            "multiplier": 0,
-            "flat": 50,
-            "min": 50,
-            "max": 50,
-            "strike": "every_strike"
+          "value": 50,
+          "strike": "every_strike"
         },
         "conditions": []
       }

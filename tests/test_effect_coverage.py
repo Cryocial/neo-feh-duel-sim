@@ -51,8 +51,6 @@ UNTESTED_EFFECT_TYPES = frozenset(
         "DEF_GUARD",
         "GUARD_NEUT",
         "DR_FLOOR",
-        "DEEP_WOUNDS_IN_CBT",
-        "NEUT_DEEP_WOUNDS_IN_CBT",
         "REDUCE_DEEP_WOUNDS_IN_CBT",
         "STAFF_FULL_DAMAGE",
         "HEAL_POST_CBT",
@@ -65,7 +63,6 @@ UNTESTED_EFFECT_TYPES = frozenset(
 
 UNTESTED_CONDITION_TYPES = frozenset(
     {
-        "first_combat_of_turn",
         "foe_weapon_type",
         "potent_patience",
         "bonus_penalty_total",

@@ -9,6 +9,10 @@ Rules verified:
   - "unit_special_ready" matches whenever the cooldown is at 0, whether or not
     the Special actually triggers on that strike
   - triggering resets the cooldown to max_cooldown; not triggering charges it
+  - Arcane Cake, from skills.json, takes an additional 15 off the strike the
+    foe's Special triggers on
+  - Dragon Fang, from skills.json, adds 50% of the unit's Atk to the strike it
+    triggers on
 
 Setup: same color (no weapon-triangle multiplier), both melee (so the defender
 can always counter), no follow-up unless a Spd gap is set on purpose. Specials
@@ -19,6 +23,7 @@ ready after charging once.
 from backend.build import Unit, Skill, Status, StatBlock
 from backend.constants import MovementType, WeaponType, SpecialType, Color
 from backend.combatcalculator import CombatEngine
+from backend.jsonbootupstuff import SKILL_DATABASE
 
 
 def make_unit(name, color=Color.RED, hp=50, atk=40, spd=10, defense=20, res=20):
@@ -722,3 +727,56 @@ def test_aoe_denial_leaves_an_offensive_special_alone():
     # Triggers on A2 and resets
     assert engine.combatant_states["attacker"].special_use_count == 1
     assert engine.combatant_states["attacker"].current_cooldown == 1
+
+
+# ── Arcane Cake, from skills.json ────────────────────────────────────────────
+
+
+def test_arcane_cake_reduces_the_foes_special_by_an_additional_15():
+    """Arcane Cake takes 15 off every strike and 15 more off the one the foe's
+    Special triggers on. It also grants its wielder +15 to every stat and +25
+    damage, so the 60 Atk attacker faces 35 Def and stays 5 Spd faster."""
+    attacker = make_unit("A", hp=100, atk=60, spd=30, defense=20)
+    give_special(
+        attacker,
+        SpecialType.OFF,
+        [flat_damage(10, "unit_special_triggers")],
+        max_cooldown=3,
+    )
+    attacker.pre_charge = 3  # ready on the first strike
+    defender = make_unit("D", hp=100, atk=20, spd=10, defense=20)
+    defender.weapon = SKILL_DATABASE["Arcane Cake"]
+
+    engine = CombatEngine(attacker, defender)
+    result = engine.simulate()
+
+    # A1: Special triggers -> 25 + 10 - 15 - 15 = 5
+    # D1: 35 - 20 + 25 = 40
+    # A2: Special back on cooldown -> 25 - 15 = 10
+    assert result["defender_final_hp"] == 100 - 5 - 10
+    assert result["attacker_final_hp"] == 100 - 40
+    assert engine.combatant_states["attacker"].special_use_count == 1
+
+
+# ── Dragon Fang, from skills.json ────────────────────────────────────────────
+
+
+def test_dragon_fang_adds_half_of_atk_to_the_strike_it_triggers_on():
+    """Dragon Fang boosts damage by 50% of the unit's Atk, rounded down: 41
+    Atk adds 20, to the strike it triggers on and no other. Its cooldown of 4
+    is read from the entry, so it is back at 4 after triggering."""
+    attacker = make_unit("A", hp=100, atk=41, spd=30, defense=20)
+    attacker.special = SKILL_DATABASE["Dragon Fang"]
+    attacker.pre_charge = 4  # ready on the first strike
+    defender = make_unit("D", hp=100, atk=30, spd=10, defense=20)
+
+    engine = CombatEngine(attacker, defender)
+    result = engine.simulate()
+
+    # A1: Special triggers -> 21 + 20 = 41, cooldown back to 4
+    # D1: 10 damage, cooldown 3
+    # A2: not ready -> 21, cooldown 2
+    assert result["defender_final_hp"] == 100 - 41 - 21
+    assert result["attacker_final_hp"] == 100 - 10
+    assert engine.combatant_states["attacker"].special_use_count == 1
+    assert engine.combatant_states["attacker"].current_cooldown == 2

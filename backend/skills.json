@@ -68,7 +68,7 @@
           "flat": 15,
           "min": 15,
           "max": 15,
-          "strike": "on_foe_special"
+          "strike": "foe_special_triggers"
         },
         "conditions": []
       },
@@ -85,6 +85,7 @@
   },
   "Dragon Fang": {
     "type": "special",
+    "special_type": "OFF",
     "visible": {
       "might": 0,
       "range": 0,
@@ -106,14 +107,14 @@
           "flat": 0,
           "min": 0,
           "max": -1,
-          "strike": "on_unit_special"
+          "strike": "unit_special_triggers"
         },
         "conditions": []
       }
     ]
   },
   "Breath of Life 4": {
-    "type": "bonus",
+    "type": "passive_c",
     "effects": [
       {
         "effect": "BURN_HEAL",
@@ -192,46 +193,24 @@
         "conditions": []
       },
       {
-        "effects": [
-          {
-            "effect": "GRANT_VISIBLE_STAT",
-            "target": "self",
-            "params": {
-              "stats": {
-                "atk": 6,
-                "spd": 6
-              }
-            },
-            "conditions": []
+        "effect": "GRANT_VISIBLE_STAT",
+        "target": "self",
+        "params": {
+          "stats": {
+            "atk": 6,
+            "spd": 6,
+            "defense": 6
           }
-        ]
+        },
+        "conditions": []
       },
       {
-        "effects": [
-          {
-            "effect": "GRANT_VISIBLE_STAT",
-            "target": "self",
-            "params": {
-              "stats": {
-                "atk": 6,
-                "def": 6
-              }
-            },
-            "conditions": []
-          }
-        ]
-      },
-      {
-        "effects": [
-          {
-            "effect": "GRANT_STATUS",
-            "target": "self",
-            "params": {
-              "status": "Breath"
-            },
-            "conditions": []
-          }
-        ]
+        "effect": "GRANT_STATUS",
+        "target": "self",
+        "params": {
+          "status": "Breath"
+        },
+        "conditions": []
       },
       {
         "effect": "FLAT_DAMAGE_STRIKE",
@@ -268,7 +247,7 @@
           "flat": 15,
           "min": 15,
           "max": 15,
-          "strike": "on_foe_special"
+          "strike": "foe_special_triggers"
         },
         "conditions": []
       },

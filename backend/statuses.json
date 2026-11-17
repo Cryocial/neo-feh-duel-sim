@@ -99,8 +99,9 @@
           "stats": [
             "atk"
           ],
-          "formula": "bonus_count_plus_4",
+          "formula": "bonus_count",
           "multiplier": 1,
+          "flat": 4,
           "min": 4,
           "max": 8
         },
@@ -118,8 +119,9 @@
           "stats": [
             "spd"
           ],
-          "formula": "bonus_count_plus_4",
+          "formula": "bonus_count",
           "multiplier": 1,
+          "flat": 4,
           "min": 4,
           "max": 8
         },
@@ -137,8 +139,9 @@
           "stats": [
             "defense"
           ],
-          "formula": "bonus_count_plus_4",
+          "formula": "bonus_count",
           "multiplier": 1,
+          "flat": 4,
           "min": 4,
           "max": 8
         },
@@ -156,8 +159,9 @@
           "stats": [
             "res"
           ],
-          "formula": "bonus_count_plus_4",
+          "formula": "bonus_count",
           "multiplier": 1,
+          "flat": 4,
           "min": 4,
           "max": 8
         },
@@ -308,7 +312,7 @@
         "params": {
           "formula": "",
           "flat": 10,
-          "strike": "first_sequence"
+          "strike": "every_strike"
         },
         "conditions": [
           {
@@ -320,7 +324,7 @@
         ]
       },
       {
-        "effect": "NEUT_DEEP_WOUNDS_STRIKE",
+        "effect": "NEUT_DEEP_WOUNDS_IN_CBT",
         "target": "self",
         "params": {},
         "conditions": []
