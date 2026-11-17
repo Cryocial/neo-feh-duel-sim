@@ -7,11 +7,13 @@ Rules verified:
   - A vein's target: self effects apply to whichever unit it's attached to
   - A vein's target: foe effects apply to that unit's opponent
   - Attacker and defender veins are both wired and resolved symmetrically
+  - The Water vein from divine_veins.json halves the foe's piercable percent DR
 """
 
-from backend.build import Unit, DivineVein
+from backend.build import Unit, DivineVein, Status
 from backend.constants import MovementType, WeaponType, Color
 from backend.combatcalculator import CombatEngine
+from backend.jsonbootupstuff import DIVINE_VEINS_DATABASE
 
 
 def make_unit(name, color=Color.RED, hp=50, atk=40, spd=10, defense=20, res=20):
@@ -118,3 +120,38 @@ def test_defender_divine_vein_foe_effect_applies_to_attacker():
     # Pre-combat: attacker takes 7 flat damage before the strike sequence
     assert result["attacker_final_hp"] == 50 - 7 - 10
     assert result["defender_final_hp"] == 50 - 20
+
+
+# ── Water, from divine_veins.json ────────────────────────────────────────────
+
+
+def test_water_vein_pierces_the_foes_percent_dr():
+    """The Water vein's DR_PIERCE halves the foe's piercable percent DR: 40%
+    becomes 20%, so the 20-damage strike of the unit standing on it deals
+    ceil(20 * 0.8) = 16 instead of ceil(20 * 0.6) = 12. The Spd-5 the vein
+    also inflicts changes nothing here: at Spd 14 the foe is never 5 slower,
+    so each unit strikes once."""
+    attacker = make_unit("A", atk=40, defense=20, spd=10)
+    defender = make_unit("D", atk=30, defense=20, spd=14)
+    defender.active_statuses.append(
+        Status(
+            name="Test DR",
+            type="bonus",
+            effects=[
+                {
+                    "effect": "PERC_DR_STRIKE",
+                    "target": "self",
+                    "params": {"flat": 40, "strike": "every_strike", "piercable": True},
+                    "conditions": [],
+                }
+            ],
+        )
+    )
+
+    plain = CombatEngine(attacker, defender).simulate()
+    on_water = CombatEngine(
+        attacker, defender, attacker_divine_vein=DIVINE_VEINS_DATABASE["Water"]
+    ).simulate()
+
+    assert plain["defender_final_hp"] == 50 - 12
+    assert on_water["defender_final_hp"] == 50 - 16
