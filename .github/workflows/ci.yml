@@ -32,7 +32,9 @@ jobs:
 
       # Runs the suite.
       # -q keeps the log readable; a failure still prints the full traceback.
-      - run: uv run pytest -q
+      # --cov lists the lines of backend/ the suite never executed. It only
+      # reports: no threshold, so coverage alone never fails the job.
+      - run: uv run pytest -q --cov=backend --cov-report=term-missing
 
   # Lint check. Separate job, so a lint failure and a test failure are
   #  reported independently instead of one masking the other.
