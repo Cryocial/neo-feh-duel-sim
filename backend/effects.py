@@ -70,7 +70,7 @@ EFFECT_LIST_MAP: dict[EffectType, str] = {
     EffectType.CANCEL_AFFINITY: "effects_on_strike",
     EffectType.STAFF_FULL_DAMAGE: "effects_on_strike",
     EffectType.MIRACLE: "effects_on_strike",
-    EffectType.FATAL_SMOKE: "effects_on_strike",
+    EffectType.MIRACLE_NEUT: "effects_on_strike",
     # ── Post-combat ──────────────────────────────────────────────────────
     EffectType.HEAL_POST_CBT: "effects_after_combat",
     EffectType.DAMAGE_POST_CBT: "effects_after_combat",
@@ -104,13 +104,6 @@ REQUIRED_PARAMS: dict[EffectType, frozenset[str]] = {
     EffectType.GRANT_STATUS: frozenset({"status"}),
 }
 
-# Effects that overload "strike" as a mode flag instead of a strike matcher.
-# MIRACLE's "on_unit_special" means Special-grade miracle and is read directly
-# by _miracle_survives; it never reaches _strike_matches.
-EXTRA_STRIKE_VALUES: dict[EffectType, frozenset[str]] = {
-    EffectType.MIRACLE: frozenset({"on_unit_special"}),
-}
-
 
 def _formula_names(params: dict):
     """Every formula name in a param block, a nested flat block included."""
@@ -135,8 +128,7 @@ def validate_effect_desc(desc: dict) -> list[str]:
     missing = REQUIRED_PARAMS.get(effect_type, frozenset()) - params.keys()
     if missing:
         problems.append(f"{effect_type.value} missing params {sorted(missing)}")
-    allowed_strikes = STRIKE_VALUES | EXTRA_STRIKE_VALUES.get(effect_type, frozenset())
-    if "strike" in params and params["strike"] not in allowed_strikes:
+    if "strike" in params and params["strike"] not in STRIKE_VALUES:
         problems.append(f"unknown strike value {params['strike']!r}")
     formulas = list(_formula_names(params))
     for name in formulas:

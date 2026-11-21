@@ -122,7 +122,7 @@ class EffectType(str, Enum):
     CANCEL_AFFINITY = "CANCEL_AFFINITY"
     STAFF_FULL_DAMAGE = "STAFF_FULL_DAMAGE"
     MIRACLE = "MIRACLE"
-    FATAL_SMOKE = "FATAL_SMOKE"
+    MIRACLE_NEUT = "MIRACLE_NEUT"
     # ── Post-combat ───────────────────────────────────────────────────────────
     HEAL_POST_CBT = "HEAL_POST_CBT"
     DAMAGE_POST_CBT = "DAMAGE_POST_CBT"

@@ -126,7 +126,7 @@ def special_miracle():
     return {
         "effect": "MIRACLE",
         "target": "self",
-        "params": {"strike": "on_unit_special"},
+        "params": {"special": True},
         "conditions": [],
     }
 
@@ -144,7 +144,7 @@ def fatal_smoke_status():
         name="Test Fatal Smoke",
         type="bonus",
         effects=[
-            {"effect": "FATAL_SMOKE", "target": "self", "params": {}, "conditions": []}
+            {"effect": "MIRACLE_NEUT", "target": "self", "params": {}, "conditions": []}
         ],
     )
 

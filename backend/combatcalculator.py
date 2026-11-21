@@ -1214,8 +1214,7 @@ class CombatEngine:
             # Skill miracle is once-per-combat; special miracle is gated by
             # cooldown instead, so only burn the flag for skill miracle.
             special_miracle = any(
-                e.type == EffectType.MIRACLE
-                and e.params.get("strike") == "on_unit_special"
+                e.type == EffectType.MIRACLE and e.params.get("special", False)
                 for e in target_state.effects_on_strike
             )
             if not special_miracle:
@@ -1453,29 +1452,28 @@ class CombatEngine:
         """True if a Miracle lets the target survive this lethal hit at 1 HP.
 
         Distinguished by the MIRACLE effect's params:
-          - Special miracle: strike == "on_unit_special" (requires the target's
-            special charged/ready) and cannot be bypassed by Fatal Smoke.
+          - Special miracle: special == True (requires the target's Special
+            charged/ready) and cannot be neutralized.
           - Skill miracle: otherwise. Once per combat (target_state.miracle_used),
-            and bypassed by FATAL_SMOKE on the attacker.
+            and neutralized by MIRACLE_NEUT (Fatal Smoke) on the attacker.
 
         Only checks; caller sets miracle_used for the skill-miracle case.
         """
         striker_state = self.combatant_states[strike.striker]
         target_state = self.combatant_states[strike.target]
-        fatal_smoke = any(
-            e.type == EffectType.FATAL_SMOKE for e in striker_state.effects_on_strike
+        miracle_neut = any(
+            e.type == EffectType.MIRACLE_NEUT for e in striker_state.effects_on_strike
         )
         for e in target_state.effects_on_strike:
             if e.type != EffectType.MIRACLE:
                 continue
-            is_special = e.params.get("strike") == "on_unit_special"
-            if is_special:
+            if e.params.get("special", False):
                 if target_miracle_triggers:
                     target_state.special_use_count += 1
                     target_state.current_cooldown = target_state.unit.max_cooldown
                     return True
             else:
-                if not target_state.miracle_used and not fatal_smoke:
+                if not target_state.miracle_used and not miracle_neut:
                     return True
         return False
 
