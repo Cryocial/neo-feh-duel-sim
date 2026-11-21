@@ -94,7 +94,7 @@ def loaded_matchup():
         "c",
         [
             {
-                "effect": "GRANT_VISIBLE_STAT",
+                "effect": "GRANT_VISIBLE_BUFF",
                 "target": "self",
                 "params": {"stats": {"atk": 6}},
                 "conditions": [],

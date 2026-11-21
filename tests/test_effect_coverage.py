@@ -24,8 +24,6 @@ UNTESTED_EFFECT_TYPES = frozenset(
     {
         "FLAT_DAMAGE_AOE",
         "PULSE_AOE",
-        "BONUS_NEUT",
-        "PENALTY_NEUT",
         "PHANTOM_STAT",
         "POTENT",
         "EFFECTIVE",

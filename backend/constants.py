@@ -85,8 +85,10 @@ class EffectType(str, Enum):
     DEF_FROZEN = "DEF_FROZEN"
 
     # ── Start of turn ─────────────────────────────────────────────────────────
-    GRANT_VISIBLE_STAT = "GRANT_VISIBLE_STAT"
+    GRANT_VISIBLE_BUFF = "GRANT_VISIBLE_BUFF"
+    INFLICT_VISIBLE_DEBUFF = "INFLICT_VISIBLE_DEBUFF"
     GRANT_STATUS = "GRANT_STATUS"
+    GRANT_GREAT_TALENT = "GRANT_GREAT_TALENT"
 
     # ── Pre-combat ────────────────────────────────────────────────────────────
     BURN_DAMAGE = "BURN_DAMAGE"
@@ -125,6 +127,7 @@ class EffectType(str, Enum):
     MIRACLE_NEUT = "MIRACLE_NEUT"
     # ── Post-combat ───────────────────────────────────────────────────────────
     HEAL_POST_CBT = "HEAL_POST_CBT"
+    GRANT_GREAT_TALENT_POST_CBT = "GRANT_GREAT_TALENT_POST_CBT"
     DAMAGE_POST_CBT = "DAMAGE_POST_CBT"
     DEEP_WOUNDS_POST_CBT = "DEEP_WOUNDS_POST_CBT"
     REDUCE_DEEP_WOUNDS_POST_CBT = "REDUCE_DEEP_WOUNDS_POST_CBT"
@@ -179,3 +182,11 @@ FORMULA_NAMES: frozenset[str] = frozenset(
         "num_bonus_and_penalties_on_unit",
     }
 )
+
+# The four stats Great Talent can raise, and the only ones the visible cap
+# applies to (HP fixtures in the tests run past 99 on purpose).
+COMBAT_STATS = ("atk", "spd", "defense", "res")
+
+# A visible stat never displays above this, buffs included. Anything past it
+# is "useless" for the stat itself but still exists as a bonus value.
+VISIBLE_STAT_CAP = 99
