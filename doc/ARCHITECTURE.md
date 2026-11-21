@@ -941,6 +941,9 @@ Formula names resolve to raw game quantities; skill-specific offsets and caps li
 | `bonus_penalty_total` | `static` | `{ "min_count": int, "include_foe": bool }` |
 | `is_engaged` | `static` | `{}` |
 | `first_combat_of_turn` | `static` | `{ "target": "self"\|"foe" }` |
+| `is_transformed` | `static` | `{ "target": "self"\|"foe" }` — reads `Unit.is_transformed` |
+| `savior` | `static` | `{ "target": "self"\|"foe" }` — reads `Unit.is_savior` |
+| `turn_window` | `static` | `{ "target": "self"\|"foe" }` — reads `Unit.turn_window_active`: the user says whether a skill's turn range ("turns 1–4") currently holds; the engine never counts turns |
 | `style_enabled` | `static` | `{}` |
 | `potent_patience` | `static` | `{ "spd_threshold": int }` |
 | `visible_stat_check` | `static` | `{ "stat": str, "margin": int, "comparison": "greater_or_equal"\|"lesser_than" }` |
