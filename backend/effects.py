@@ -16,6 +16,10 @@ EFFECT_LIST_MAP: dict[EffectType, str] = {
     EffectType.STAT_DAUNT: "effects_combat_stats",
     EffectType.BONUS_NEUT: "effects_combat_stats",
     EffectType.PENALTY_NEUT: "effects_combat_stats",
+    EffectType.BONUS_DOUBLER: "effects_combat_stats",
+    EffectType.PENALTY_DOUBLER: "effects_combat_stats",
+    EffectType.FRINGE_BONUS: "effects_combat_stats",
+    EffectType.SABOTAGE: "effects_combat_stats",
     EffectType.PHANTOM_STAT: "effects_combat_stats",
     EffectType.RANGE_EXTENSION: "effects_combat_stats",
     # ── Strike sequence ─────────────────────────────────────────────────

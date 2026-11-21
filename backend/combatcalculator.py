@@ -69,13 +69,27 @@ class CombatantState:
         stats during/after start-of-turn must go through here, not
         unit.get_visible_stat directly, or it won't see the grants.
         """
-        value = self.unit.visible_stat_uncapped(name, ignore_buffs, ignore_debuffs)
-        value += getattr(self.granted_great_talent, name)
+        value = self.unit.stat_before_bonuses(name) + getattr(self.granted_great_talent, name)
         if not ignore_buffs:
-            value += getattr(self.granted_visible_buffs, name)
+            value += self.visible_buff(name)
         if not ignore_debuffs:
-            value -= getattr(self.granted_visible_debuffs, name)
+            value -= self.visible_debuff(name)
         return cap_visible_stat(name, value)
+
+    def visible_buff(self, name: str) -> int:
+        """Visible bonuses don't stack: the unit's own buff and a granted one on
+        the same stat resolve to the highest. Raw, before the visible cap."""
+        return max(
+            getattr(self.unit.visible_buffs, name),
+            getattr(self.granted_visible_buffs, name),
+        )
+
+    def visible_debuff(self, name: str) -> int:
+        """Same rule for penalties."""
+        return max(
+            getattr(self.unit.visible_debuffs, name),
+            getattr(self.granted_visible_debuffs, name),
+        )
 
     @property
     def great_talent_total(self) -> StatBlock:
@@ -186,6 +200,17 @@ def _distribute_effects(attacker: CombatantState, defender: CombatantState) -> N
             effect = build_effect(desc, applied_by="self" if is_self else "foe")
             target = defender if is_self else attacker
             _add_to_bucket(target, effect)
+
+def _bonuses_neutralized(state: CombatantState, foe: CombatantState) -> bool:
+    """The foe's Lull (BONUS_NEUT) neutralizes this unit's visible bonuses:
+    they count as absent for stats, doublers, Treachery and the like."""
+    return any(e.type is EffectType.BONUS_NEUT for e in foe.effects_combat_stats)
+
+
+def _penalties_neutralized(state: CombatantState) -> bool:
+    """The unit's own PENALTY_NEUT: its visible penalties count as absent."""
+    return any(e.type is EffectType.PENALTY_NEUT for e in state.effects_combat_stats)
+
 
 def _great_talent_dict(total: StatBlock) -> dict[str, int]:
     return {stat: getattr(total, stat) for stat in COMBAT_STATS}
@@ -350,11 +375,12 @@ class CombatEngine:
 
     def _apply_grant(self, effect, target_state):
         """Applies a single start-of-turn effect to the target's per-combat layers."""
+        # Visible bonuses and penalties don't stack: highest wins per stat.
         if effect.type == EffectType.GRANT_VISIBLE_BUFF:
             target_state.granted_visible_buffs = replace(
                 target_state.granted_visible_buffs,
                 **{
-                    stat: getattr(target_state.granted_visible_buffs, stat) + amount
+                    stat: max(getattr(target_state.granted_visible_buffs, stat), amount)
                     for stat, amount in effect.params["stats"].items()
                 },
             )
@@ -362,7 +388,7 @@ class CombatEngine:
             target_state.granted_visible_debuffs = replace(
                 target_state.granted_visible_debuffs,
                 **{
-                    stat: getattr(target_state.granted_visible_debuffs, stat) + amount
+                    stat: max(getattr(target_state.granted_visible_debuffs, stat), amount)
                     for stat, amount in effect.params["stats"].items()
                 },
             )
@@ -408,14 +434,10 @@ class CombatEngine:
         for role in ("attacker", "defender"):
             state = self.combatant_states[role]
             bonuses = penalties = 0
-            for stat in ("atk", "spd", "defense", "res"):
-                if getattr(state.granted_visible_buffs, stat) > 0:
+            for stat in COMBAT_STATS:
+                if state.visible_buff(stat) > 0:
                     bonuses += 1
-                if getattr(state.granted_visible_debuffs, stat) > 0:
-                    penalties += 1
-                if getattr(state.unit.visible_buffs, stat) > 0:
-                    bonuses += 1
-                if getattr(state.unit.visible_debuffs, stat) > 0:
+                if state.visible_debuff(stat) > 0:
                     penalties += 1
             for status in state.unit.active_statuses:
                 if status.type == "bonus":
@@ -549,18 +571,10 @@ class CombatEngine:
         atk_state = self.combatant_states["attacker"]
         def_state = self.combatant_states["defender"]
 
-        atk_ignore_debuffs = any(
-            e.type == EffectType.PENALTY_NEUT for e in atk_state.effects_combat_stats
-        )
-        def_ignore_debuffs = any(
-            e.type == EffectType.PENALTY_NEUT for e in def_state.effects_combat_stats
-        )
-        atk_ignore_buffs = any(
-            e.type == EffectType.BONUS_NEUT for e in def_state.effects_combat_stats
-        )
-        def_ignore_buffs = any(
-            e.type == EffectType.BONUS_NEUT for e in atk_state.effects_combat_stats
-        )
+        atk_ignore_debuffs = _penalties_neutralized(atk_state)
+        def_ignore_debuffs = _penalties_neutralized(def_state)
+        atk_ignore_buffs = _bonuses_neutralized(atk_state, def_state)
+        def_ignore_buffs = _bonuses_neutralized(def_state, atk_state)
 
         atk_vals = {
             stat: atk_state.visible_stat(
@@ -599,6 +613,22 @@ class CombatEngine:
                 stats = effect.params["stats"]
                 updates = {s: getattr(state.combat_stats, s) + magnitude for s in stats}
                 state.combat_stats = replace(state.combat_stats, **updates)
+
+        # Doublers read the raw visible bonus / penalty per stat, including any
+        # part the visible cap wasted, and add it to the uncapped combat stats.
+        # Every source stacks. Neutralization (the foe's Lull for the bonus
+        # side, the unit's own PENALTY_NEUT for the penalty side) zeroes the
+        # unit's own half; see _doubler_deltas for what that leaves.
+        for state, buffs_neutralized, penalties_neutralized in (
+            (atk_state, atk_ignore_buffs, atk_ignore_debuffs),
+            (def_state, def_ignore_buffs, def_ignore_debuffs),
+        ):
+            deltas = self._doubler_deltas(state, buffs_neutralized, penalties_neutralized)
+            state.combat_stats = replace(
+                state.combat_stats,
+                **{s: getattr(state.combat_stats, s) + d for s, d in deltas.items() if d},
+            )
+
         # Apply PHANTOM_STAT effects. These accumulate into phantom_bonus
         # instead of combat_stats, so it wont apply to normal follow ups and etc.
         for state, foe in ((atk_state, def_state), (def_state, atk_state)):
@@ -619,6 +649,46 @@ class CombatEngine:
                 state.phantom_bonus = replace(state.phantom_bonus, **updates)
 
     # ── Strike sequence calculation ──────────────────────────────────────────────
+
+    def _doubler_deltas(
+        self, state: CombatantState, buffs_neutralized: bool, penalties_neutralized: bool
+    ) -> dict[str, int]:
+        """Per-stat combat-stat change from the doubler family, each stat
+        calculated independently:
+
+          BONUS_DOUBLER    + the unit's raw visible buff
+          FRINGE_BONUS     + the higher of that buff and the highest bonus among
+                             allies within 2 spaces (user-entered on the Unit)
+          PENALTY_DOUBLER  - the unit's raw visible debuff
+          SABOTAGE         - the higher of that debuff and the allies' highest
+
+        Neutralization (the foe's Lull for bonuses, the unit's own PENALTY_NEUT
+        for penalties) zeroes the unit's OWN half only. The plain doublers have
+        nothing else to read and go inert; Fringe and Sabotage keep working as
+        long as an ally within 2 spaces supplies the value.
+        """
+        unit = state.unit
+        has_allies = unit.allies_within_2_spaces > 0
+        deltas = {s: 0 for s in COMBAT_STATS}
+        for effect in state.effects_combat_stats:
+            stats = effect.params.get("stats", COMBAT_STATS)
+            if effect.type is EffectType.BONUS_DOUBLER and not buffs_neutralized:
+                for s in stats:
+                    deltas[s] += state.visible_buff(s)
+            elif effect.type is EffectType.FRINGE_BONUS:
+                for s in stats:
+                    own = 0 if buffs_neutralized else state.visible_buff(s)
+                    ally = getattr(unit.ally_bonuses_within_2_spaces, s) if has_allies else 0
+                    deltas[s] += max(own, ally)
+            elif effect.type is EffectType.PENALTY_DOUBLER and not penalties_neutralized:
+                for s in stats:
+                    deltas[s] -= state.visible_debuff(s)
+            elif effect.type is EffectType.SABOTAGE:
+                for s in stats:
+                    own = 0 if penalties_neutralized else state.visible_debuff(s)
+                    ally = getattr(unit.ally_penalties_within_2_spaces, s) if has_allies else 0
+                    deltas[s] -= max(own, ally)
+        return deltas
 
     def _determine_strike_sequence(self) -> list[Strike]:
         """Calculates the combat sequence using effects_strike_sequence instead of keywords."""
@@ -1578,19 +1648,20 @@ class CombatEngine:
                 case "spaces_moved":
                     variable = unit_state.spaces_moved
                 case "sum_visible_buffs":
-                    vb = (
-                        unit_state.unit.visible_buffs + unit_state.granted_visible_buffs
-                    )
-                    variable = sum(
-                        max(0, getattr(vb, s)) for s in ("atk", "spd", "defense", "res")
+                    # Treachery: nothing while the foe's Lull neutralizes the
+                    # unit's bonuses; otherwise the raw buffs, even any part
+                    # the visible cap wasted.
+                    variable = (
+                        0
+                        if _bonuses_neutralized(unit_state, foe_state)
+                        else sum(unit_state.visible_buff(s) for s in COMBAT_STATS)
                     )
                 case "sum_foe_visible_debuffs":
-                    vd = (
-                        foe_state.unit.visible_debuffs
-                        + foe_state.granted_visible_debuffs
-                    )
-                    variable = sum(
-                        max(0, getattr(vd, s)) for s in ("atk", "spd", "defense", "res")
+                    # Dominance: nothing if the foe neutralizes its own penalties.
+                    variable = (
+                        0
+                        if _penalties_neutralized(foe_state)
+                        else sum(foe_state.visible_debuff(s) for s in COMBAT_STATS)
                     )
                 case "unit_max_hp":
                     variable = unit_state.unit.max_hp
